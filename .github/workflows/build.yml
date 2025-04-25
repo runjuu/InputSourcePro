@@ -1,0 +1,73 @@
+name: App build
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build_with_signing:
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Restore ExportOptions.plist
+        run: |
+          echo "$EXPORT_OPTIONS_PLIST_B64" | base64 --decode > ExportOptions.plist
+        env:
+          EXPORT_OPTIONS_PLIST_B64: ${{ secrets.EXPORT_OPTIONS_PLIST_B64 }}
+      - name: Install Certificates
+        run: |
+          # https://docs.github.com/en/actions/deployment/deploying-xcode-applications/installing-an-apple-certificate-on-macos-runners-for-xcode-development
+          APPLE_DEVELOPMENT_PATH=$RUNNER_TEMP/madev.p12
+          DEVELOPER_ID_APPLICATION_PATH=$RUNNER_TEMP/devid.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          echo -n "$APPLE_DEVELOPMENT" | base64 --decode -o $APPLE_DEVELOPMENT_PATH
+          echo -n "$DEVELOPER_ID_APPLICATION" | base64 --decode -o $DEVELOPER_ID_APPLICATION_PATH
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security import $APPLE_DEVELOPMENT_PATH -P "$APPLE_DEVELOPMENT_PSW" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security import $DEVELOPER_ID_APPLICATION_PATH -P "$DEVELOPER_ID_APPLICATION_PSW" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+        env:
+          DEVELOPER_ID_APPLICATION: ${{ secrets.DEVELOPER_ID_APPLICATION }}
+          DEVELOPER_ID_APPLICATION_PSW: ${{ secrets.DEVELOPER_ID_APPLICATION_PSW }}
+          APPLE_DEVELOPMENT: ${{ secrets.APPLE_DEVELOPMENT }}
+          APPLE_DEVELOPMENT_PSW: ${{ secrets.APPLE_DEVELOPMENT_PSW }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      - name: Build App
+        run: |
+          mkdir -p dist
+          xcodebuild \
+            archive \
+            -project Input\ Source\ Pro.xcodeproj/ \
+            -scheme "Input Source Pro" \
+            -destination "generic/platform=macOS" \
+            -archivePath dist/ISP.xcarchive
+          xcodebuild \
+            -exportArchive \
+            -archivePath dist/ISP.xcarchive \
+            -exportOptionsPlist ./ExportOptions.plist \
+            -exportPath dist/ \
+            -allowProvisioningUpdates
+          npx create-dmg dist/Input\ Source\ Pro.app dist/
+          mv dist/Input\ Source\ Pro*.dmg dist/Input\ Source\ Pro.dmg
+      - name: Notarize DMG
+        run: |
+          xcrun notarytool submit \
+            --team-id "$TEAM_ID" \
+            --apple-id "$APPLE_ID" \
+            --password "$NOTARY_PASSWORD" \
+            --wait \
+            dist/Input\ Source\ Pro.dmg
+          xcrun stapler staple dist/Input\ Source\ Pro.dmg
+        env:
+          NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: Input Source Pro.dmg
+          path: dist/Input Source Pro.dmg
