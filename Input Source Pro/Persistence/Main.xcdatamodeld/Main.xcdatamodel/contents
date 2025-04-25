@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="23605" systemVersion="24B91" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="">
+    <entity name="AppRule" representedClassName="AppRule" syncable="YES" codeGenerationType="class">
+        <attribute name="bundleId" attributeType="String"/>
+        <attribute name="bundleName" attributeType="String"/>
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="doNotRestoreKeyboard" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="doRestoreKeyboard" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="hideIndicator" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="inputSourceId" optional="YES" attributeType="String"/>
+        <attribute name="removed" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="url" attributeType="URI"/>
+    </entity>
+    <entity name="BrowserRule" representedClassName="BrowserRule" syncable="YES" codeGenerationType="class">
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="disabled" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="hideIndicator" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="inputSourceId" optional="YES" attributeType="String"/>
+        <attribute name="keyboardRestoreStrategyRaw" optional="YES" attributeType="String"/>
+        <attribute name="sample" optional="YES" attributeType="String"/>
+        <attribute name="typeValue" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="value" optional="YES" attributeType="String"/>
+    </entity>
+    <entity name="HotKeyGroup" representedClassName="HotKeyGroup" syncable="YES" codeGenerationType="class">
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" optional="YES" attributeType="String"/>
+        <attribute name="inputSourceIds" optional="YES" attributeType="String"/>
+    </entity>
+    <entity name="KeyboardConfig" representedClassName="KeyboardConfig" syncable="YES" codeGenerationType="class">
+        <attribute name="bgColorHex" optional="YES" attributeType="String"/>
+        <attribute name="id" attributeType="String"/>
+        <attribute name="textColorHex" optional="YES" attributeType="String"/>
+    </entity>
+</model>

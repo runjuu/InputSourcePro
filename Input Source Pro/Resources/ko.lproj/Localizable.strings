@@ -1,0 +1,168 @@
+"Input Source Pro" = "Input Source Pro";
+"Preferences" = "설정";
+"Changelog" = "변경 내역";
+"Check for Updates" = "업데이트 확인";
+"Buy me a bubble tea" = "Buy Me a Bubble Tea";
+"Join Our Community" = "커뮤니티 가입하기";
+"Quit" = "종료";
+"Default Keyboard for %@" = "%@에 대한 기본 키보드";
+"Current App" = "현재 앱";
+"Default Keyboard Tooltip" = "공백 (기본값)을 두면 Input Source Pro가 키보드를 전환하지 않습니다";
+"Default" = "기본값";
+
+"Promotion" = "Input Source Pro는 100% 무료입니다 — 광고 없음, 인앱 결제 없음, 그리고 완전 오픈 소스입니다. 앱이 마음에 드셨다면, 향후 개발을 지원하는 방법들이 있습니다 ;)";
+"Star on GitHub" = "GitHub에서 별 주기";
+"Sponsor" = "후원";
+"Share with friends" = "친구와 공유하기";
+
+"General" = "일반";
+"Rules" = "규칙";
+"App Rules" = "앱 규칙";
+"Browser Rules" = "브라우저 규칙";
+"Hot Keys" = "단축키";
+"Others" = "기타";
+"About" = "소개";
+
+"System" = "시스템";
+"Launch at Login" = "로그인 시 시작";
+"Display Icon in Menu Bar" = "메뉴 바에 아이콘 표시";
+"Enhanced Mode" = "고급 모드";
+"Enhanced Mode Description" = "고급 모드를 활성화하면 보다 정확한 프롬프트 위치와 Spotlight와 유사한 앱에 대한 더 나은 지원이 가능합니다";
+"Enhanced Mode Permission Description" = "Input Source Pro는 **고급 모드**를 활성화하기 위해 접근성 권한이 필요합니다.";
+"Enhanced Mode Required Tips" = "이 기능은 \"고급 모드\"가 활성화되어야 사용할 수 있습니다.";
+"Open Accessibility Preferences" = "접근성 설정 열기";
+
+"For All Apps and Websites" = "모든 앱 및 웹사이트에 대하여";
+"When Switching Back to the App or Website" = "앱이나 웹사이트로 돌아갈 때";
+
+"Tooltip" = "표시기";
+"Indicator Triggers" = "표시기 트리거";
+"isActiveWhenFocusedElementChanges" = "포커스된 입력 필드가 변경될 때 표시";
+"isActiveWhenSwitchApp" = "앱 전환 시 표시";
+"isActiveWhenSwitchInputSource" = "키보드 전환 시 표시";
+"isActiveWhenLongpressLeftMouse" = "마우스 왼쪽 버튼을 길게 누를 때 표시";
+"isHideWhenSwitchAppWithForceKeyboard" = "기본 키보드 규칙이 적용될 때 숨기기";
+
+"Advanced" = "고급 설정";
+"Troubleshooting" = "문제 해결";
+"Enhanced Mode Required" = "고급 모드 필요";
+"Enabled CJKV Fix" = "입력 소스 전환 문제 수정";
+"Enabled CJKV Fix Description" = "이 기능을 활성화하면 입력 소스 아이콘이 변경되었지만, 입력 중에는 시스템이 이전 입력 소스를 계속 사용하는 문제를 수정할 수 있습니다.";
+"Enabled CJKV Fix Shortcut Img" = "CJKVFixEnableShortcut-EN";
+"Enabled CJKV Fix Failed Desc" = "이 기능을 활성화하려면 시스템의 \"이전 입력 소스 선택\" 단축키를 활성화해야 합니다.";
+"Open Keyboard Settings" = "키보드 설정 열기";
+
+"Customize Keyboard" = "사용자 정의";
+"Keyboard Indicator Style" = "표시기";
+"Always-On Indicator Style" = "항상 켜진 표시기";
+"Reset" = "재설정";
+
+"tryToDisplayIndicatorNearCursor" = "가능한 경우 입력 커서 근처에 표시";
+"isEnableAlwaysOnIndicator" = "입력 커서 근처에 항상 켜진 표시기 표시";
+"alwaysOnIndicatorTips" = "이 기능은 \"가능한 경우 입력 커서 근처에 표시\"가 활성화되어야 합니다.";
+"Customize Styles" = "스타일 사용자 정의";
+
+"Show" = "보기";
+"Keyboard Label" = "키보드 레이블";
+
+"Position" = "위치";
+"Follow Mouse" = "마우스 따라가기";
+"Relative to App" = "앱에 상대적";
+"Relative to Screen" = "화면에 상대적";
+"Spacing" = "간격";
+"Nope" = "없음";
+"XS" = "XS";
+"S" = "S";
+"M" = "M";
+"L" = "L";
+"XL" = "XL";
+"Alignment" = "정렬";
+"Top-Left Corner" = "왼쪽 상단 모서리";
+"Top-Center" = "상단 중앙";
+"Top-Right Corner" = "오른쪽 상단 모서리";
+"Center-Left" = "중앙 왼쪽";
+"Center" = "중앙";
+"Center-Right" = "중앙 오른쪽";
+"Bottom-Left Corner" = "왼쪽 하단 모서리";
+"Bottom-Center" = "하단 중앙";
+"Bottom-Right Corner" = "오른쪽 하단 모서리";
+
+"Appearance" = "외관";
+"Indicator Info" = "표시기 정보";
+"Icon and Title" = "아이콘 및 제목";
+"Icon" = "아이콘";
+"Title" = "제목";
+"Indicator Size" = "표시기 크기";
+"Small" = "작음";
+"Medium" = "중간";
+"Large" = "큼";
+"Color Scheme" = "색상 스키마";
+"In Dark Mode" = "다크 모드에서";
+"In Light Mode" = "라이트 모드에서";
+"Sync with OS" = "OS와 동기화";
+
+"Color" = "색상";
+"Background" = "배경";
+"Reset Colors" = "색상 초기화";
+
+"%@ App(s) Selected" = "%@개 앱 선택됨";
+"System-Wide" = "시스템 전체";
+"Default Keyboard" = "기본 입력 소스";
+"Keyboard Restore Strategy" = "입력 소스 복원 전략";
+"Restore Previously Used Keyboard" = "이전에 사용한 입력 소스 복원";
+"Use Default Keyboard Instead" = "기본 입력 소스 사용";
+"Restore Previously Used One" = "이전에 사용한 것 복원";
+"Indicator" = "표시기";
+"Hide Indicator" = "표시기 숨기기";
+"Add Running Apps" = "실행 중인 앱 추가";
+"(unknown)" = "(알 수 없음)";
+
+"Permission Required" = "권한 필요";
+"Authorized" = "승인됨";
+"Browser Rules Accessibility Permission Description" = "브라우저 탭이 전환되는 것을 알리기 위해, Input Source Pro는 **접근성** 권한이 필요합니다.";
+
+"Edit" = "편집";
+"Match" = "일치";
+"Sample URL" = "샘플 URL";
+"Rule Type" = "규칙 유형";
+"Domain" = "도메인";
+"Restore Strategy" = "복원 전략";
+"Keyboard" = "키보드";
+"Cancel" = "취소";
+"Add" = "추가";
+"Save" = "저장";
+"Close" = "닫기";
+
+"DOMAIN-SUFFIX Explanation" = "도메인 접미사를 이용해 URL을 매칭합니다. 예를 들어: '`google.com`'은 '`www.google.com`', '`mail.google.com`' 그리고 '`google.com`'을 매칭하지만, '`xxx-google.com`'은 매칭하지 **않습니다**.";
+"DOMAIN Explanation" = "정확한 도메인을 이용해 URL을 매칭합니다. 예를 들어: '`google.com`'은 '`google.com`'을 매칭하지만, '`www.google.com`' 또는 '`mail.google.com`'을 매칭하지 **않습니다**.";
+"URL-REGEX Explanation" = "[정규 표현식](https://inputsource.pro/help/regex)을 사용해 URL을 매칭합니다. 특수 문자들은 '`\\`', '`.`' 등을 escape하는 것을 잊지 마세요.";
+
+"Default Keyboard for Address Bar" = "주소창의 기본 키보드";
+
+"Version" = "버전";
+"Check Updates" = "업데이트 확인";
+"Automatically Check for Updates" = "자동 업데이트 확인";
+
+"Support" = "지원";
+"Website" = "웹사이트";
+"Email" = "이메일";
+"Copy" = "복사";
+"Twitter" = "트위터";
+
+"Privacy" = "개인 정보 보호";
+"Privacy Content" = "개인 정보를 포함하지 않은 시작 및 충돌 데이터만 수집합니다.";
+
+"Find Us" = "우리를 찾으세요";
+"Right click each section to copy link" = "링크를 복사하려면 각 섹션을 마우스 오른쪽 버튼으로 클릭하세요";
+
+"Send Feedback" = "피드백 보내기";
+"FeedbackTips" = "우리는 Input Source Pro를 어떻게 더 잘 만들 수 있을지 듣고 싶습니다. 이 양식을 작성하면 우리가 연락드립니다. 🥰";
+"FeedbackMessageTitle" = "메시지";
+"FeedbackMessagePlaceholder" = "버그를 찾았거나 정말로 보고 싶은 기능이 빠져 있나요?";
+"FeedbackEmailTitle" = "이메일(선택 사항)";
+"FeedbackSuccessTips" = "우리와 당신의 생각을 공유하는데 시간을 내 주셔서 감사합니다! ❤️";
+
+"Delete" = "삭제";
+"Select Input Sources" = "입력 소스 선택";
+"Add Switch Group" = "스위치 그룹 추가";
+"Add a switch group to allow switching between multiple input sources using the same hotkey. Select at least two input sources." = "같은 단축키로 여러 입력 소스를 전환할 수 있도록 스위치 그룹을 추가합니다. 최소 두 개 이상의 입력 소스를 선택하세요.";

@@ -1,0 +1,170 @@
+"Input Source Pro" = "Input Source Pro";
+"Preferences" = "设置";
+"Changelog" = "更新日志";
+"Check for Updates" = "检查更新";
+"Buy me a bubble tea" = "请我喝杯奶茶";
+"Join Our Community" = "加入社区";
+"Quit" = "退出";
+"Default Keyboard for %@" = "为「%@」设置默认输入法";
+"Current App" = "当前应用";
+"Default Keyboard Tooltip" = "选择空选项时，Input Source Pro 不会自动切换当前 App 的输入法";
+"Default" = "默认";
+
+"Promotion" = "Input Source Pro 完全免费 —— 无广告、无应用内购买，并且完全开源。如果你喜欢这款应用，可以通过以下方式支持其未来的发展 ;)";
+"Star on GitHub" = "在 GitHub 上点星标";
+"Sponsor" = "赞助";
+"Share with friends" = "分享给朋友";
+
+"General" = "通用";
+"Rules" = "规则";
+"App Rules" = "应用规则";
+"Browser Rules" = "浏览器规则";
+"Hot Keys" = "快捷键";
+"Others" = "其他";
+"About" = "关于";
+
+"System" = "系统";
+"Launch at Login" = "在登录时启动";
+"Display Icon in Menu Bar" = "在菜单栏中显示图标";
+"Support Spotlight-Like Apps" = "支持「聚焦」类应用";
+"Enhanced Mode" = "增强模式";
+"Enhanced Mode Description" = "启用增强模式让输入法提示位置更为准确，同时为「聚焦」类应用提供更完善的支持";
+"Enhanced Mode Permission Description" = "为了启用「增强模式」，Input Source Pro 需要你为它开启系统的「辅助功能」权限。";
+"Enhanced Mode Required Tips" = "开启此功能需先启用「增强模式」";
+"Open Accessibility Preferences" = "打开「辅助功能」设置";
+
+"For All Apps and Websites" = "适用于所有应用和网站";
+"When Switching Back to the App or Website" = "切换回应用或网站时";
+
+"Tooltip" = "提示";
+"Indicator Triggers" = "提示触发规则";
+"isActiveWhenFocusedElementChanges" = "切换输入焦点时显示";
+"isActiveWhenSwitchApp" = "切换应用时显示";
+"isActiveWhenSwitchInputSource" = "切换输入法时显示";
+"isActiveWhenLongpressLeftMouse" = "长按鼠标左键时显示";
+"isHideWhenSwitchAppWithForceKeyboard" = "当默认输入法生效时隐藏";
+
+"Advanced" = "高级设置";
+"Troubleshooting" = "故障排除";
+"Enhanced Mode Required" = "需要增强模式";
+"Enabled CJKV Fix" = "修复输入法切换问题";
+"Enabled CJKV Fix Description" = "启用此功能可以解决输入法图标已更改，但在打字时系统仍使用前一个输入法的问题。";
+"Enabled CJKV Fix Shortcut Img" = "CJKVFixEnableShortcut-CN";
+"Enabled CJKV Fix Failed Desc" = "为了启动该功能，需要启用系统的「选择上一个输入法」快捷键。";
+"Open Keyboard Settings" = "打开「键盘」设置";
+
+"Customize Keyboard" = "自定义样式";
+"Keyboard Indicator Style" = "默认样式";
+"Always-On Indicator Style" = "常驻样式";
+"Reset" = "重置";
+
+"Enhanced" = "实验功能";
+"tryToDisplayIndicatorNearCursor" = "优先在输入光标附近显示";
+"isEnableAlwaysOnIndicator" = "在输入光标处显示常驻提示";
+"alwaysOnIndicatorTips" = "开启此功能需先启用「优先在输入光标附近显示」";
+"Customize Styles" = "自定义样式";
+
+"Show" = "显示";
+"Keyboard Label" = "输入法标签";
+
+"Position" = "位置";
+"Follow Mouse" = "跟随鼠标";
+"Relative to App" = "跟随应用";
+"Relative to Screen" = "跟随屏幕";
+"Spacing" = "间隙";
+"Nope" = "无";
+"XS" = "特小";
+"S" = "小";
+"M" = "中";
+"L" = "大";
+"XL" = "特大";
+"Alignment" = "对齐方式";
+"Top-Left Corner" = "左上角";
+"Top-Center" = "上中";
+"Top-Right Corner" = "右上角";
+"Center-Left" = "左中";
+"Center" = "中心";
+"Center-Right" = "右中";
+"Bottom-Left Corner" = "左下角";
+"Bottom-Center" = "下中";
+"Bottom-Right Corner" = "右下角";
+
+"Appearance" = "外观";
+"Indicator Info" = "指示器信息";
+"Icon and Title" = "图标和标题";
+"Icon" = "图标";
+"Title" = "标题";
+"Indicator Size" = "指示器大小";
+"Small" = "小";
+"Medium" = "中";
+"Large" = "大";
+"Color Scheme" = "颜色方案";
+"In Dark Mode" = "在深色模式下";
+"In Light Mode" = "在浅色模式下";
+"Sync with OS" = "与操作系统同步";
+
+"Color" = "字体颜色";
+"Background" = "背景颜色";
+"Reset Colors" = "恢复默认颜色";
+
+"%@ App(s) Selected" = "已选中 %@ 个应用";
+"System-Wide" = "全局";
+"Default Keyboard" = "默认输入法";
+"Keyboard Restore Strategy" = "输入法恢复策略";
+"Restore Previously Used Keyboard" = "自动恢复应用上次使用的输入法";
+"Use Default Keyboard Instead" = "总是切换至默认输入法";
+"Restore Previously Used One" = "恢复上次使用的输入法";
+"Indicator" = "提示";
+"Hide Indicator" = "隐藏输入法提示";
+"Add Running Apps" = "添加运行中的应用";
+"(unknown)" = "（未知）";
+
+"Permission Required" = "需要授权";
+"Authorized" = "授权成功";
+"Browser Rules Accessibility Permission Description" = "为了知道浏览器什么时候切换页面，需要你为它开启系统的「辅助功能」权限。";
+
+"Edit" = "编辑";
+"Match" = "匹配";
+"Sample URL" = "测试链接";
+"Rule Type" = "类型";
+"Domain" = "域名";
+"Restore Strategy" = "恢复策略";
+"Keyboard" = "输入法";
+"Cancel" = "取消";
+"Add" = "添加";
+"Save" = "保存";
+"Close" = "关闭";
+
+"DOMAIN-SUFFIX Explanation" = "当前规则会匹配域名后缀。比如 `google.com` 会匹配 `www.google.com` 、 `mail.google.com` 以及 `google.com` 本身，但**不会**匹配到 `xxx-google.com`。";
+"DOMAIN Explanation" = "当前规则会匹配完整域名。比如 `google.com` 只会匹配 `google.com`，而 `www.google.com` 、`mail.google.com` 以及 `xxx-google.com` 则**不会**被匹配到。";
+"URL-REGEX Explanation" = "当前规则会使用[正则表达式](https://inputsource.pro/help/regex)进行匹配。在使用时请不要忘了对特殊字符（比如 `\\` 符号）进行转义。";
+
+"Default Keyboard for Address Bar" = "地址栏默认输入法";
+
+"Version" = "版本";
+"Check Updates" = "检查更新";
+"Automatically Check for Updates" = "自动检查更新";
+
+"Support" = "联系方式";
+"Website" = "网站";
+"Email" = "电子邮件";
+"Copy" = "复制";
+"Twitter" = "啁啾会馆";
+
+"Privacy" = "隐私";
+"Privacy Content" = "我们会收集启动以及崩溃数据。所有收集的数据都不会包括任何个人信息。";
+
+"Find Us" = "找到我们";
+"Right click each section to copy link" = "右键点击各项可复制链接";
+
+"Send Feedback" = "发送反馈";
+"FeedbackTips" = "👀";
+"FeedbackMessageTitle" = "说点啥";
+"FeedbackMessagePlaceholder" = "发现了 Bug 或者是少了一个你超想要的功能？";
+"FeedbackEmailTitle" = "回信邮箱(可选)";
+"FeedbackSuccessTips" = "感谢反馈～ 我们会尽快回复你的！ ❤️";
+
+"Delete" = "删除";
+"Select Input Sources" = "选择输入法";
+"Add Switch Group" = "添加切换组";
+"Add a switch group to allow switching between multiple input sources using the same hotkey. Select at least two input sources." = "添加切换组以允许使用相同的快捷键在多个输入法之间切换。请至少选择两个输入法。";

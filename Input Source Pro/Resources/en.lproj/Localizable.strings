@@ -1,0 +1,168 @@
+"Input Source Pro" = "Input Source Pro";
+"Preferences" = "Settings";
+"Changelog" = "Changelog";
+"Check for Updates" = "Check for Updates";
+"Buy me a bubble tea" = "Buy Me a Bubble Tea";
+"Join Our Community" = "Join Our Community";
+"Quit" = "Quit";
+"Default Keyboard for %@" = "Default Keyboard for %@";
+"Current App" = "Current App";
+"Default Keyboard Tooltip" = "Leave blank (default) and Input Source Pro won't switch keyboards";
+"Default" = "Default";
+
+"Promotion" = "Input Source Pro is 100% free — no ads, no in-app purchases, and fully open source. If you enjoy the app, here are some ways to support its future development :)";
+"Star on GitHub" = "Star on GitHub";
+"Sponsor" = "Sponsor";
+"Share with friends" = "Share with friends";
+
+"General" = "General";
+"Rules" = "Rules";
+"App Rules" = "App Rules";
+"Browser Rules" = "Browser Rules";
+"Hot Keys" = "Hot Keys";
+"Others" = "Others";
+"About" = "About";
+
+"System" = "System";
+"Launch at Login" = "Launch at Login";
+"Display Icon in Menu Bar" = "Display Icon in Menu Bar";
+"Enhanced Mode" = "Enhanced Mode";
+"Enhanced Mode Description" = "Enabling Enhanced Mode allows for more accurate prompt locations and better support for Spotlight-like apps";
+"Enhanced Mode Permission Description" = "Input Source Pro needs Accessibility permission to enable **Enhanced Mode**.";
+"Enhanced Mode Required Tips" = "This feature requires \"Enhanced Mode\" to be enabled.";
+"Open Accessibility Preferences" = "Open Accessibility Preferences";
+
+"For All Apps and Websites" = "For All Apps and Websites";
+"When Switching Back to the App or Website" = "When Switching Back to the App or Website";
+
+"Tooltip" = "Indicator";
+"Indicator Triggers" = "Indicator Triggers";
+"isActiveWhenFocusedElementChanges" = "Display When Focused Input Field Changes";
+"isActiveWhenSwitchApp" = "Display When Switch Apps";
+"isActiveWhenSwitchInputSource" = "Display When Switch Keyboard";
+"isActiveWhenLongpressLeftMouse" = "Display When Longpress Left Mouse";
+"isHideWhenSwitchAppWithForceKeyboard" = "Hide When Default Keyboard Rule Is Applied";
+
+"Advanced" = "Advanced";
+"Troubleshooting" = "Troubleshooting";
+"Enhanced Mode Required" = "Enhanced Mode Required";
+"Enabled CJKV Fix" = "Fix Input Sources Switching Problem";
+"Enabled CJKV Fix Description" = "Enabling this feature could fix the problem where the input source icon has changed, but the system still uses the previous input source while typing.";
+"Enabled CJKV Fix Shortcut Img" = "CJKVFixEnableShortcut-EN";
+"Enabled CJKV Fix Failed Desc" = "To enable this feature, you need to enable the system's “Select the previous input source” shortcut.";
+"Open Keyboard Settings" = "Open Keyboard Settings";
+
+"Customize Keyboard" = "Customize";
+"Keyboard Indicator Style" = "Tooltip";
+"Always-On Indicator Style" = "Always-On Indicator";
+"Reset" = "Reset";
+
+"tryToDisplayIndicatorNearCursor" = "Display Near the Input Cursor if Available";
+"isEnableAlwaysOnIndicator" = "Display Always-On Indicator Near the Input Cursor";
+"alwaysOnIndicatorTips" = "This feature requires \"Display Near the Input Cursor if Available\" to be enabled.";
+"Customize Styles" = "Customize Styles";
+
+"Show" = "Show";
+"Keyboard Label" = "Keyboard Label";
+
+"Position" = "Position";
+"Follow Mouse" = "Follow Mouse";
+"Relative to App" = "Relative to App";
+"Relative to Screen" = "Relative to Screen";
+"Spacing" = "Spacing";
+"Nope" = "Nope";
+"XS" = "XS";
+"S" = "S";
+"M" = "M";
+"L" = "L";
+"XL" = "XL";
+"Alignment" = "Alignment";
+"Top-Left Corner" = "Top-Left Corner";
+"Top-Center" = "Top-Center";
+"Top-Right Corner" = "Top-Right Corner";
+"Center-Left" = "Center-Left";
+"Center" = "Center";
+"Center-Right" = "Center-Right";
+"Bottom-Left Corner" = "Bottom-Left Corner";
+"Bottom-Center" = "Bottom-Center";
+"Bottom-Right Corner" = "Bottom-Right Corner";
+
+"Appearance" = "Appearance";
+"Indicator Info" = "Indicator Info";
+"Icon and Title" = "Icon and Title";
+"Icon" = "Icon";
+"Title" = "Title";
+"Indicator Size" = "Indicator Size";
+"Small" = "Small";
+"Medium" = "Medium";
+"Large" = "Large";
+"Color Scheme" = "Color Scheme";
+"In Dark Mode" = "In Dark Mode";
+"In Light Mode" = "In Light Mode";
+"Sync with OS" = "Sync with OS";
+
+"Color" = "Color";
+"Background" = "Background";
+"Reset Colors" = "Reset Colors";
+
+"%@ App(s) Selected" = "%@ App(s) Selected";
+"System-Wide" = "System-Wide";
+"Default Keyboard" = "Default Input Source";
+"Keyboard Restore Strategy" = "Input Source Restore Strategy";
+"Restore Previously Used Keyboard" = "Restore Previously Used Keyboard";
+"Use Default Keyboard Instead" = "Use Default Input Source";
+"Restore Previously Used One" = "Restore Previously Used One";
+"Indicator" = "Indicator";
+"Hide Indicator" = "Hide Indicator";
+"Add Running Apps" = "Add Running Apps";
+"(unknown)" = "(unknown)";
+
+"Permission Required" = "Permission Required";
+"Authorized" = "Authorized";
+"Browser Rules Accessibility Permission Description" = "In order to get notified when browser tabs are switched, Input Source Pro needs **Accessibility** permission.";
+
+"Edit" = "Edit";
+"Match" = "Match";
+"Sample URL" = "Sample URL";
+"Rule Type" = "Rule Type";
+"Domain" = "Domain";
+"Restore Strategy" = "Restore Strategy";
+"Keyboard" = "Keyboard";
+"Cancel" = "Cancel";
+"Add" = "Add";
+"Save" = "Save";
+"Close" = "Close";
+
+"DOMAIN-SUFFIX Explanation" = "Match URLs by domain suffixes. For example: '`google.com`' matches '`www.google.com`', '`mail.google.com`' and '`google.com`', but **does not** match '`xxx-google.com`'.";
+"DOMAIN Explanation" = "Match URLs by exact domains. For example: '`google.com`' matches '`google.com`', but **does not** match '`www.google.com`' or '`mail.google.com`'.";
+"URL-REGEX Explanation" = "Match URLs using [regular expressions](https://inputsource.pro/help/regex). Don't forget to escape special characters like '`\\`', '`.`', etc.";
+
+"Default Keyboard for Address Bar" = "Default Keyboard for Address Bar";
+
+"Version" = "Version";
+"Check Updates" = "Check Updates";
+"Automatically Check for Updates" = "Automatically Check for Updates";
+
+"Support" = "Support";
+"Website" = "Website";
+"Email" = "Email";
+"Copy" = "Copy";
+"Twitter" = "Twitter";
+
+"Privacy" = "Privacy";
+"Privacy Content" = "We only collect startup and crash data which does not include any personal information.";
+
+"Find Us" = "Find Us";
+"Right click each section to copy link" = "right click each section to copy link";
+
+"Send Feedback" = "Send Feedback";
+"FeedbackTips" = "We'd love to hear how we can make Input Source Pro better. Fill out the form and we'll get back to you. 🥰";
+"FeedbackMessageTitle" = "Message";
+"FeedbackMessagePlaceholder" = "Found a bug or missing a feature you really want to see?";
+"FeedbackEmailTitle" = "Email(Optional)";
+"FeedbackSuccessTips" = "Thank you for taking the time to share your thoughts with us! ❤️";
+
+"Delete" = "Delete";
+"Select Input Sources" = "Select Input Sources";
+"Add Switch Group" = "Add Switch Group";
+"Add a switch group to allow switching between multiple input sources using the same hotkey. Select at least two input sources." = "Add a switch group to allow switching between multiple input sources using the same hotkey. Select at least two input sources.";

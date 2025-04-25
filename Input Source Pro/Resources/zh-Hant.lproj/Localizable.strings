@@ -1,0 +1,170 @@
+"Input Source Pro" = "Input Source Pro";
+"Preferences" = "設定";
+"Changelog" = "更新紀錄";
+"Check for Updates" = "檢查更新";
+"Buy me a bubble tea" = "請我喝杯珍珠奶茶";
+"Join Our Community" = "加入社群";
+"Quit" = "結束";
+"Default Keyboard for %@" = "為「%@」設定預設輸入法";
+"Current App" = "目前應用程式";
+"Default Keyboard Tooltip" = "選擇空白選項時，Input Source Pro 不會自動切換目前 App 的輸入法";
+"Default" = "預設";
+
+"Promotion" = "Input Source Pro 完全免費 —— 無廣告、無應用內購買，並且完全開源。如果你喜歡這款應用，可以透過以下方式支持其未來的發展 ;)";
+"Star on GitHub" = "在 GitHub 上標星";
+"Sponsor" = "贊助";
+"Share with friends" = "分享給朋友";
+
+"General" = "一般";
+"Rules" = "規則";
+"App Rules" = "應用程式規則";
+"Browser Rules" = "瀏覽器規則";
+"Hot Keys" = "快速鍵";
+"Others" = "其他";
+"About" = "關於";
+
+"System" = "系統";
+"Launch at Login" = "在登入時啟動";
+"Display Icon in Menu Bar" = "在選單列中顯示圖示";
+"Support Spotlight-Like Apps" = "支援 Spotlight 類應用程式";
+"Enhanced Mode" = "增強模式";
+"Enhanced Mode Description" = "啟用增強模式讓輸入法提示位置更為準確，同時為 Spotlight 類應用程式提供更完善的支援";
+"Enhanced Mode Permission Description" = "為了啟用「增強模式」，Input Source Pro 需要您為其開啟系統的「輔助功能」權限。";
+"Enhanced Mode Required Tips" = "開啟此功能需先啟用「增強模式」";
+"Open Accessibility Preferences" = "打開「輔助功能」設定";
+
+"For All Apps and Websites" = "適用於所有應用程式和網站";
+"When Switching Back to the App or Website" = "切換回應用程式或網站時";
+
+"Tooltip" = "提示";
+"Indicator Triggers" = "提示觸發規則";
+"isActiveWhenFocusedElementChanges" = "切換輸入焦點時顯示";
+"isActiveWhenSwitchApp" = "切換應用程式時顯示";
+"isActiveWhenSwitchInputSource" = "切換輸入法時顯示";
+"isActiveWhenLongpressLeftMouse" = "長按滑鼠左鍵時顯示";
+"isHideWhenSwitchAppWithForceKeyboard" = "當預設輸入法生效時隱藏";
+
+"Advanced" = "進階設定";
+"Troubleshooting" = "故障排除";
+"Enhanced Mode Required" = "需要增強模式";
+"Enabled CJKV Fix" = "修復輸入法切換問題";
+"Enabled CJKV Fix Description" = "啟用此功能可以解決輸入法圖示已更改，但在打字時系統仍使用前一個輸入法的問題。";
+"Enabled CJKV Fix Shortcut Img" = "CJKVFixEnableShortcut-CN";
+"Enabled CJKV Fix Failed Desc" = "若要啟動此功能，您需要啟用系統的「選擇上一個輸入法」快速鍵。";
+"Open Keyboard Settings" = "打開「鍵盤」設定";
+
+"Customize Keyboard" = "自訂樣式";
+"Keyboard Indicator Style" = "預設樣式";
+"Always-On Indicator Style" = "常駐樣式";
+"Reset" = "重設";
+
+"Enhanced" = "實驗性功能";
+"tryToDisplayIndicatorNearCursor" = "優先在輸入游標附近顯示";
+"isEnableAlwaysOnIndicator" = "在輸入游標處顯示常駐提示";
+"alwaysOnIndicatorTips" = "開啟此功能需先啟用「優先在輸入游標附近顯示」";
+"Customize Styles" = "自訂樣式";
+
+"Show" = "顯示";
+"Keyboard Label" = "輸入法標籤";
+
+"Position" = "位置";
+"Follow Mouse" = "隨著滑鼠擺放";
+"Relative to App" = "隨著應用程式擺放";
+"Relative to Screen" = "隨著螢幕擺放";
+"Spacing" = "間隔";
+"Nope" = "無";
+"XS" = "特小";
+"S" = "小";
+"M" = "中";
+"L" = "大";
+"XL" = "特大";
+"Alignment" = "對齊方式";
+"Top-Left Corner" = "左上角";
+"Top-Center" = "上中";
+"Top-Right Corner" = "右上角";
+"Center-Left" = "左中";
+"Center" = "中心";
+"Center-Right" = "右中";
+"Bottom-Left Corner" = "左下角";
+"Bottom-Center" = "下中";
+"Bottom-Right Corner" = "右下角";
+
+"Appearance" = "外觀";
+"Indicator Info" = "指示器資訊";
+"Icon and Title" = "圖示和標題";
+"Icon" = "圖示";
+"Title" = "標題";
+"Indicator Size" = "指示器大小";
+"Small" = "小";
+"Medium" = "中";
+"Large" = "大";
+"Color Scheme" = "色彩樣式";
+"In Dark Mode" = "在深色模式下";
+"In Light Mode" = "在淺色模式下";
+"Sync with OS" = "與作業系統同步";
+
+"Color" = "字體顏色";
+"Background" = "背景顏色";
+"Reset Colors" = "復原預設顏色";
+
+"%@ App(s) Selected" = "已選取 %@ 個應用程式";
+"System-Wide" = "全域";
+"Default Keyboard" = "預設輸入法";
+"Keyboard Restore Strategy" = "輸入法復原模式";
+"Restore Previously Used Keyboard" = "自動復原應用程式上次使用的輸入法";
+"Use Default Keyboard Instead" = "總是切換至預設輸入法";
+"Restore Previously Used One" = "復原上次使用的輸入法";
+"Indicator" = "提示";
+"Hide Indicator" = "隱藏輸入法提示";
+"Add Running Apps" = "加入執行中的 Apps";
+"(unknown)" = "（未知）";
+
+"Permission Required" = "需要授權";
+"Authorized" = "授權成功";
+"Browser Rules Accessibility Permission Description" = "為了知道瀏覽器什麼時候切換頁面，您需要為其開啟系統的「輔助功能」權限。";
+
+"Edit" = "編輯";
+"Match" = "符合";
+"Sample URL" = "測試連結";
+"Rule Type" = "類型";
+"Domain" = "網域";
+"Restore Strategy" = "復原模式";
+"Keyboard" = "輸入法";
+"Cancel" = "取消";
+"Add" = "加入";
+"Save" = "儲存";
+"Close" = "關閉";
+
+"DOMAIN-SUFFIX Explanation" = "目前規則會比對網域後綴。比如 `google.com` 符合 `www.google.com`、`mail.google.com` 以及 `google.com` 本身，但**不符合**  `xxx-google.com`。";
+"DOMAIN Explanation" = "目前規則會比對完整網域。比如 `google.com` 只符合 `google.com`，而 `www.google.com`、`mail.google.com` 以及 `xxx-google.com` 均**不符合**。";
+"URL-REGEX Explanation" = "目前規則會使用[正規表示式](https://inputsource.pro/help/regex)進行比對。在使用時請不要忘了對特殊字元（比如 `\\` 符號）進行轉義。";
+
+"Default Keyboard for Address Bar" = "網址列預設輸入法";
+
+"Version" = "版本";
+"Check Updates" = "檢查更新";
+"Automatically Check for Updates" = "自動檢查更新";
+
+"Support" = "聯絡方式";
+"Website" = "網站";
+"Email" = "電子郵件";
+"Copy" = "複製";
+"Twitter" = "推特";
+
+"Privacy" = "隱私";
+"Privacy Content" = "我們會收集啟動以及當機資料。所有收集的資料均不包括任何個人資訊。";
+
+"Find Us" = "找到我們";
+"Right click each section to copy link" = "右鍵點選各項可以複製連結";
+
+"Send Feedback" = "傳送使用者意見";
+"FeedbackTips" = "👀";
+"FeedbackMessageTitle" = "說點什麼";
+"FeedbackMessagePlaceholder" = "發現了 Bug 或者是少了一個你超想要的功能？";
+"FeedbackEmailTitle" = "回信信箱（可選）";
+"FeedbackSuccessTips" = "感謝回報～我們會盡快回覆你的！❤️";
+
+"Delete" = "刪除";
+"Select Input Sources" = "選擇輸入法";
+"Add Switch Group" = "新增切換群組";
+"Add a switch group to allow switching between multiple input sources using the same hotkey. Select at least two input sources." = "新增切換群組，允許使用相同的快捷鍵在多個輸入法之間切換。請至少選擇兩個輸入法。";
