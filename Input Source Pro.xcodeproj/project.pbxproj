@@ -19,7 +19,6 @@
 		4A0930892867E91100232089 /* AppsDiff.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A0930882867E91100232089 /* AppsDiff.swift */; };
 		4A09308B28680A3200232089 /* NSViewHoverable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A09308A28680A3200232089 /* NSViewHoverable.swift */; };
 		4A0930952868780600232089 /* ApplicationVM+AXNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A0930942868780600232089 /* ApplicationVM+AXNotification.swift */; };
-		4A0C1CC3284A0D8B00833A16 /* NSImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A0C1CC2284A0D8B00833A16 /* NSImage.swift */; };
 		4A0C1CC5284A121B00833A16 /* IndicatorPositionEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A0C1CC4284A121B00833A16 /* IndicatorPositionEditor.swift */; };
 		4A0C1CC9284B0C6200833A16 /* MockWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A0C1CC8284B0C6200833A16 /* MockWindowView.swift */; };
 		4A0C1CCD284B0D0C00833A16 /* IndicatorAlignmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A0C1CCC284B0D0C00833A16 /* IndicatorAlignmentView.swift */; };
@@ -185,7 +184,6 @@
 		4A0930882867E91100232089 /* AppsDiff.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppsDiff.swift; sourceTree = "<group>"; };
 		4A09308A28680A3200232089 /* NSViewHoverable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NSViewHoverable.swift; sourceTree = "<group>"; };
 		4A0930942868780600232089 /* ApplicationVM+AXNotification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ApplicationVM+AXNotification.swift"; sourceTree = "<group>"; };
-		4A0C1CC2284A0D8B00833A16 /* NSImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NSImage.swift; sourceTree = "<group>"; };
 		4A0C1CC4284A121B00833A16 /* IndicatorPositionEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndicatorPositionEditor.swift; sourceTree = "<group>"; };
 		4A0C1CC8284B0C6200833A16 /* MockWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockWindowView.swift; sourceTree = "<group>"; };
 		4A0C1CCC284B0D0C00833A16 /* IndicatorAlignmentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndicatorAlignmentView.swift; sourceTree = "<group>"; };
@@ -628,7 +626,6 @@
 				4A0C1CD4284B2B6100833A16 /* NSScreen.swift */,
 				4A881A7F2888559200B76498 /* NSString.swift */,
 				4A4167312813D9FA00CCC28C /* NSRegularExpression.swift */,
-				4A0C1CC2284A0D8B00833A16 /* NSImage.swift */,
 				4A2A175F280BA7FA00E13249 /* NSImage+Extension.swift */,
 				4A2A175E280BA7FA00E13249 /* CodableUserDefault.swift */,
 				4A09307A285F31E800232089 /* NSToolbarItem+Identifier.swift */,
@@ -710,7 +707,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1430;
-				LastUpgradeCheck = 1620;
+				LastUpgradeCheck = 1630;
 				TargetAttributes = {
 					4A2A172A280BA6A600E13249 = {
 						CreatedOnToolsVersion = 13.3.1;
@@ -805,7 +802,6 @@
 				4A2A177F280BA7FA00E13249 /* StatusItemController.swift in Sources */,
 				4A1F25222830C3E400001BAB /* Bundle+Version.swift in Sources */,
 				4AC5738528411B33000BF10B /* AppKeyboardCache.swift in Sources */,
-				4A0C1CC3284A0D8B00833A16 /* NSImage.swift in Sources */,
 				4A881A93288BC55E00B76498 /* PreferencesVM+KeyboardConfig.swift in Sources */,
 				4A2A1789280BA7FA00E13249 /* TISInputSource+Extension.swift in Sources */,
 				4AC50D6B283A72810034E894 /* NSColor.swift in Sources */,
@@ -951,6 +947,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
@@ -1014,6 +1011,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
