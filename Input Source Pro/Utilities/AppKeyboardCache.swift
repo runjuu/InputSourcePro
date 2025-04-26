@@ -35,7 +35,7 @@ class AppKeyboardCache {
     }
 
     func clear() {
-        // FIXME: - 部分选择「恢复」的应用/网站应该被忽略
+        // FIXME: - Some apps/websites where 'restore' is selected should be ignored
         logger.debug { "Clear All" }
         cache.removeAll()
     }
