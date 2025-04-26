@@ -69,5 +69,5 @@ jobs:
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
-          name: Input Source Pro.dmg
+          name: Input Source Pro ${{ github.ref_name }}.dmg
           path: dist/Input Source Pro.dmg
