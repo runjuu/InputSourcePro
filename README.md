@@ -38,7 +38,13 @@ brew install --cask input-source-pro
 Download the latest release from the [Releases page](https://inputsource.pro/changelog).
 
 ## Contributing
-Input Source Pro is always looking for contributions, whether through bug reports, code, or new translations. Check out our [issues](https://github.com/runjuu/InputSourcePro/issues) to see where you can help, and if you have feature requests or ideas, feel free to share them in the [discussions](https://github.com/runjuu/InputSourcePro/discussions).
+
+Contributions are highly welcome! Whether you have a bug report, a feature suggestion, or want to contribute code, your help is appreciated.
+
+* For detailed contribution steps, setup, and code guidelines, please read our [**Contributing Guidelines**](CONTRIBUTING.md).
+* **Bug Reports:** Please submit bug reports via [**GitHub Issues**](https://github.com/runjuu/InputSourcePro/issues). Check existing issues first!
+* **Feature Requests & Questions:** For suggesting new features, asking questions, or general discussion, please use [**GitHub Discussions**](https://github.com/runjuu/InputSourcePro/discussions).
+* **Code of Conduct:** Please note that this project adheres to our [**Code of Conduct**](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
 
 ## Building from Source
 Clone the repository and build it using the latest version of Xcode:
