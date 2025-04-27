@@ -54,7 +54,7 @@ class AppMenu: NSMenu {
         let windowMenu = NSMenuItem()
         windowMenu.submenu = NSMenu(title: "Window")
         windowMenu.submenu?.items = [
-            NSMenuItem(title: "Minmize", action: #selector(NSWindow.miniaturize(_:)), keyEquivalent: "m"),
+            NSMenuItem(title: "Minimize", action: #selector(NSWindow.miniaturize(_:)), keyEquivalent: "m"),
             NSMenuItem(title: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: ""),
             NSMenuItem.separator(),
             NSMenuItem(title: "Show All", action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "m"),
