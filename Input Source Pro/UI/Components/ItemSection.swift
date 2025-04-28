@@ -25,7 +25,7 @@ struct ItemSectionStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(NSColor.background1.color)
-            .cornerRadius(6)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
             .overlay(
                 RoundedRectangle(cornerRadius: 6)
                     .stroke(NSColor.border2.color, lineWidth: 1)

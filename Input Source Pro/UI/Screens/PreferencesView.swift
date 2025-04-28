@@ -207,7 +207,7 @@ struct NavButtonStyle: ButtonStyle {
         .background(isActive ? Color.gray.opacity(0.2) : Color.clear)
         .background(configuration.isPressed ? Color.gray.opacity(0.1) : Color.clear)
         .foregroundColor(Color.primary)
-        .cornerRadius(6)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
         .contentShape(Rectangle())
         .padding(.horizontal, 10)
     }

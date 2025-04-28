@@ -43,7 +43,7 @@ struct PositionSettingsView: View {
                 SettingsSection(title: "Position") {
                     VStack(spacing: 0) {
                         IndicatorPositionEditor()
-                            .cornerRadius(6)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
                             .padding(.horizontal)
                             .padding(.top)
 
@@ -69,7 +69,7 @@ struct PositionSettingsView: View {
                                             .foregroundColor(.primary)
                                             .frame(width: 50, height: 25)
                                             .background(Color.primary.opacity(0.05))
-                                            .cornerRadius(6)
+                                            .clipShape(RoundedRectangle(cornerRadius: 6))
                                             .noAnimation()
                                     }
                                 }

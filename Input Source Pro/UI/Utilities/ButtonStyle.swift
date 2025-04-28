@@ -35,7 +35,7 @@ struct SectionButtonStyle: ButtonStyle {
             .frame(maxWidth: .infinity)
             .background(configuration.isPressed ? Color.gray.opacity(0.05) : Color.clear)
             .foregroundColor(Color.accentColor)
-            .cornerRadius(6)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
             .contentShape(Rectangle())
     }
 }

@@ -23,7 +23,7 @@ struct ISPTextEditor: View {
                 .foregroundColor(Color(.labelColor))
                 .multilineTextAlignment(.leading)
                 .background(Color(NSColor.textBackgroundColor))
-                .cornerRadius(6.0)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
                         .stroke(Color.primary.opacity(0.3), lineWidth: 1)
