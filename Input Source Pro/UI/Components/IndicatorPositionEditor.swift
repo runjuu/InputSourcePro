@@ -184,17 +184,14 @@ private extension IndicatorPosition.Alignment {
     func indicator() -> some View {
         switch self {
         case .center:
-            Rectangle()
+            RoundedRectangle(cornerRadius: 3)
                 .frame(width: 30, height: 30)
-                .cornerRadius(3)
         case .topCenter, .bottomCenter:
-            Rectangle()
+            RoundedRectangle(cornerRadius: 2)
                 .frame(width: 44, height: 8)
-                .cornerRadius(2)
         case .centerLeft, .centerRight:
-            Rectangle()
+            RoundedRectangle(cornerRadius: 2)
                 .frame(width: 8, height: 30)
-                .cornerRadius(2)
         default:
             Image(nsImage: .triangle)
                 .resizable()
