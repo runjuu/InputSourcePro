@@ -117,6 +117,8 @@ extension PreferencesVM {
             return preferences.isEnableURLSwitchForFirefoxDeveloperEdition
         case .FirefoxNightly:
             return preferences.isEnableURLSwitchForFirefoxNightly
+        case .Zen:
+            return preferences.isEnableURLSwitchForZen
         }
     }
 

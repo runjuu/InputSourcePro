@@ -172,6 +172,8 @@ extension PreferencesVM {
             guard preferences.isEnableURLSwitchForFirefoxDeveloperEdition else { return nil }
         case .FirefoxNightly:
             guard preferences.isEnableURLSwitchForFirefoxNightly else { return nil }
+        case .Zen:
+            guard preferences.isEnableURLSwitchForZen else { return nil }
         }
 
         if let application = application,
@@ -238,6 +240,7 @@ struct Preferences {
         static let isEnableURLSwitchForFirefox = "isEnableURLSwitchForFirefox"
         static let isEnableURLSwitchForFirefoxDeveloperEdition = "isEnableURLSwitchForFirefoxDeveloperEdition"
         static let isEnableURLSwitchForFirefoxNightly = "isEnableURLSwitchForFirefoxNightly"
+        static let isEnableURLSwitchForZen = "isEnableURLSwitchForZen"
 
         static let isAutoAppearanceMode = "isAutoAppearanceMode"
         static let appearanceMode = "appearanceMode"
@@ -351,6 +354,9 @@ struct Preferences {
 
     @UserDefault(Preferences.Key.isEnableURLSwitchForFirefoxNightly)
     var isEnableURLSwitchForFirefoxNightly = false
+
+    @UserDefault(Preferences.Key.isEnableURLSwitchForZen)
+    var isEnableURLSwitchForZen = false
 
     // MARK: - Appearance
 
