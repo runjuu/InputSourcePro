@@ -98,7 +98,7 @@ enum BrowserThatCanWatchBrowserAddressFocus: CaseIterable {
         return nil
     }
 
-    case Safari, SafariTechnologyPreview, Chrome, Chromium, Brave, BraveBeta, BraveNightly, Edge, Vivaldi, Arc, Opera, Firefox, FirefoxNightly, FirefoxDeveloperEdition
+    case Safari, SafariTechnologyPreview, Chrome, Chromium, Brave, BraveBeta, BraveNightly, Edge, Vivaldi, Arc, Opera, Firefox, FirefoxNightly, FirefoxDeveloperEdition, Zen
 
     var bundleIdentifier: String {
         return browser.rawValue
@@ -134,6 +134,8 @@ enum BrowserThatCanWatchBrowserAddressFocus: CaseIterable {
             return .FirefoxNightly
         case .FirefoxDeveloperEdition:
             return .FirefoxDeveloperEdition
+        case .Zen:
+            return .Zen
         }
     }
 
@@ -174,7 +176,7 @@ enum BrowserThatCanWatchBrowserAddressFocus: CaseIterable {
                 return false
             }
 
-        case .Firefox, .FirefoxNightly, .FirefoxDeveloperEdition:
+        case .Firefox, .FirefoxNightly, .FirefoxDeveloperEdition, .Zen:
             return focusedElement.firefoxDomIdentifier() == "urlbar-input"
         }
     }
