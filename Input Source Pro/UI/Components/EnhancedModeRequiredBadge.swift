@@ -21,7 +21,7 @@ struct EnhanceMoreRequiredButtonStyle: ButtonStyle {
             .padding(.vertical, 3)
             .background(Color.yellow)
             .foregroundColor(Color.black)
-            .cornerRadius(4)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
             .contentShape(Rectangle())
     }
 }

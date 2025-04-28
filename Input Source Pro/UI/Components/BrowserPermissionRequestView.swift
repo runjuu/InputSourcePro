@@ -58,7 +58,7 @@ struct BrowserPermissionRequestView: View {
                 }
                 .font(.system(size: 10).weight(.bold))
                 .frame(width: 18, height: 18)
-                .cornerRadius(99)
+                .clipShape(RoundedRectangle(cornerRadius: 99))
                 .disabled(isDisableTips)
 
                 Spacer()

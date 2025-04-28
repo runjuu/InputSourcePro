@@ -74,7 +74,7 @@ struct BrowserRuleEditView: View {
                             }
                             .font(.system(size: 10).weight(.bold))
                             .frame(width: 18, height: 18)
-                            .cornerRadius(99)
+                            .clipShape(RoundedRectangle(cornerRadius: 99))
                             .popover(
                                 isPresented: self.$isPopover,
                                 arrowEdge: .bottom
@@ -110,7 +110,7 @@ struct BrowserRuleEditView: View {
                 }
                 .padding()
                 .background(Color.gray.opacity(0.1))
-                .cornerRadius(8)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
                 .padding(.bottom)
             }
 
@@ -147,7 +147,7 @@ struct BrowserRuleEditView: View {
                 }
                 .padding()
                 .background(Color.gray.opacity(0.1))
-                .cornerRadius(8)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
                 .padding(.bottom)
             }
 
@@ -170,7 +170,7 @@ struct BrowserRuleEditView: View {
                 }
                 .padding()
                 .background(Color.gray.opacity(0.1))
-                .cornerRadius(8)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
                 .padding(.bottom)
             }
 

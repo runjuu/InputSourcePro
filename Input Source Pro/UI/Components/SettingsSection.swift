@@ -35,7 +35,7 @@ struct SettingsSection<Content: View, Tips: View>: View {
             }
             .frame(maxWidth: .infinity)
             .background(NSColor.background2.color)
-            .cornerRadius(8)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(NSColor.border2.color, lineWidth: 1)

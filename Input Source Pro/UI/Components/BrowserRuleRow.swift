@@ -42,7 +42,7 @@ struct BrowserRuleRow: View {
                 .padding(.vertical, 2)
                 .foregroundColor(.white)
                 .background(Color.accentColor)
-                .cornerRadius(2)
+                .clipShape(RoundedRectangle(cornerRadius: 2))
 
             Button("Edit") {
                 showModal = true

@@ -29,7 +29,7 @@ struct MockWindowView: View {
             }
             .padding(10)
         }
-        .cornerRadius(9)
+        .clipShape(RoundedRectangle(cornerRadius: 9))
         .shadow(color: Color.black.opacity(0.2), radius: 5, x: 3, y: 3)
     }
 }
