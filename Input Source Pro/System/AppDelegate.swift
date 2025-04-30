@@ -4,6 +4,8 @@ import SwiftUI
 import Alamofire
 
 class AppDelegate: NSObject, NSApplicationDelegate {
+    private var didJustLaunch = true
+
     var navigationVM: NavigationVM!
     var indicatorVM: IndicatorVM!
     var preferencesVM: PreferencesVM!
@@ -47,6 +49,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_: Notification) {
+        if didJustLaunch {
+            print("Skipping applicationDidBecomeActive on first launch")
+            didJustLaunch = false
+            return
+        }
+        print("applicationDidBecomeActive (not first launch)")
         statusItemController.openPreferences()
     }
 
