@@ -43,6 +43,10 @@ class LoopingPlayerUIView: NSView {
         // Start the movie
         player.play()
     }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
 
     @objc
     func playerItemDidReachEnd(notification _: Notification) {
