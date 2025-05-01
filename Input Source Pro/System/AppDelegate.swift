@@ -2,6 +2,7 @@ import Cocoa
 import Combine
 import SwiftUI
 import Alamofire
+import LaunchAtLogin
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var navigationVM: NavigationVM!
@@ -40,7 +41,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             feedbackVM: feedbackVM,
             inputSourceVM: inputSourceVM
         )
-
+        
+        LaunchAtLogin.migrateIfNeeded()
         openPreferencesAtFirstLaunch()
         sendLaunchPing()
         updateInstallVersionInfo()
