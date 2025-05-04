@@ -66,8 +66,11 @@ jobs:
           NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           TEAM_ID: ${{ secrets.TEAM_ID }}
+      - name: Rename DMG
+        run: |
+          mv dist/Input\ Source\ Pro.dmg dist/Input\ Source\ Pro\ ${{ github.ref_name }}.dmg
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
           name: Input Source Pro ${{ github.ref_name }}.dmg
-          path: dist/Input Source Pro.dmg
+          path: dist/Input Source Pro ${{ github.ref_name }}.dmg
