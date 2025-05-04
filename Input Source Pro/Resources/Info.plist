@@ -28,8 +28,6 @@
 	<string></string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
-	<key>SUFeedURL</key>
-	<string>https://inputsource.pro/stable/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>oVx6o5OjVhhAmgHLxajfyBWZL+aU0C27ncWAaDl1nXI=</string>
 </dict>

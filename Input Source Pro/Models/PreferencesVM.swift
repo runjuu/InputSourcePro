@@ -6,8 +6,13 @@ import LaunchAtLogin
 import Sparkle
 import SwiftUI
 
+private enum UpdateFeed {
+    static let stable = URL(string: "https://inputsource.pro/stable/appcast.xml")!
+    static let beta = URL(string: "https://inputsource.pro/beta/appcast.xml")!
+}
+
 @MainActor
-final class PreferencesVM: ObservableObject {
+final class PreferencesVM: NSObject, ObservableObject {
     @Published
     var preferences = Preferences()
 
@@ -39,7 +44,9 @@ final class PreferencesVM: ObservableObject {
         self.permissionsVM = permissionsVM
         container = NSPersistentContainer(name: "Main")
         mainStorage = MainStorage(container: container)
-
+        
+        super.init();
+        
         setupAutoUpdate()
 
         // TODO: - Move to MainStorage
@@ -51,12 +58,6 @@ final class PreferencesVM: ObservableObject {
             }
         }
 
-        $preferences
-            .map(\.isLaunchAtLogin)
-            .removeDuplicates()
-            .sink { LaunchAtLogin.isEnabled = $0 }
-            .store(in: cancelBag)
-
         if preferences.prevInstalledBuildVersion == 0 {
             for filterApp in filterApps(NSWorkspace.shared.runningApplications) {
                 addAppCustomization(filterApp)
@@ -67,6 +68,7 @@ final class PreferencesVM: ObservableObject {
         migratePreferncesIfNeed()
         migrateBoutiqueIfNeed()
         watchKeyboardConfigsChange()
+        watchPreferenceChanges()
     }
 
     func update(_ change: (inout Preferences) -> Void) {
@@ -98,17 +100,25 @@ final class PreferencesVM: ObservableObject {
 }
 
 extension PreferencesVM {
+    private func watchPreferenceChanges() {
+        $preferences
+            .map(\.isLaunchAtLogin)
+            .removeDuplicates()
+            .sink { LaunchAtLogin.isEnabled = $0 }
+            .store(in: cancelBag)
+    }
+    
     private func watchKeyboardConfigsChange() {
         mainStorage.keyboardConfigs
             .assign(to: &$keyboardConfigs)
     }
 }
 
-extension PreferencesVM {
+extension PreferencesVM: @preconcurrency SPUUpdaterDelegate {
     private func setupAutoUpdate() {
         updaterController = SPUStandardUpdaterController(
             startingUpdater: true,
-            updaterDelegate: nil,
+            updaterDelegate: self,
             userDriverDelegate: nil
         )
 
@@ -130,6 +140,11 @@ extension PreferencesVM {
 
     func checkUpdates() {
         updaterController?.updater.checkForUpdates()
+    }
+    
+    func feedURLString(for updater: SPUUpdater) -> String? {
+        let url = preferences.receiveBetaUpdates ? UpdateFeed.beta : UpdateFeed.stable
+        return url.absoluteString
     }
 }
 
@@ -257,6 +272,8 @@ struct Preferences {
 
         static let indicatorSize = "indicatorSize"
         static let indicatorInfo = "indicatorInfo"
+        
+        static let receiveBetaUpdates = "receiveBetaUpdates"
     }
 
     fileprivate init() {}
@@ -277,6 +294,9 @@ struct Preferences {
 
     @UserDefault(Preferences.Key.isCJKVFixEnabled)
     var isCJKVFixEnabled = false
+    
+    @UserDefault(Preferences.Key.receiveBetaUpdates)
+    var receiveBetaUpdates = false
 
     // MARK: - Triggers
 

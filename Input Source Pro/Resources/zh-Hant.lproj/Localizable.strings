@@ -26,12 +26,14 @@
 "System" = "系統";
 "Launch at Login" = "在登入時啟動";
 "Display Icon in Menu Bar" = "在選單列中顯示圖示";
-"Support Spotlight-Like Apps" = "支援 Spotlight 類應用程式";
 "Enhanced Mode" = "增強模式";
 "Enhanced Mode Description" = "啟用增強模式讓輸入法提示位置更為準確，同時為 Spotlight 類應用程式提供更完善的支援";
 "Enhanced Mode Permission Description" = "為了啟用「增強模式」，Input Source Pro 需要您為其開啟系統的「輔助功能」權限。";
 "Enhanced Mode Required Tips" = "開啟此功能需先啟用「增強模式」";
 "Open Accessibility Preferences" = "打開「輔助功能」設定";
+
+"Updates" = "更新";
+"Receive Beta Updates" = "接收測試版更新";
 
 "For All Apps and Websites" = "適用於所有應用程式和網站";
 "When Switching Back to the App or Website" = "切換回應用程式或網站時";
