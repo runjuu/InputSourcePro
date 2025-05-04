@@ -55,5 +55,15 @@ git clone git@github.com:runjuu/InputSourcePro.git
 
 Then open the project in Xcode and hit Build. 🍻
 
+## Sponsors
+
+This project is made possible by all the sponsors supporting my work:
+
+<p align="center">
+  <a href="https://github.com/sponsors/runjuu">
+    <img src='https://cdn.jsdelivr.net/gh/runjuu/runjuu/sponsorkit/sponsors.svg' alt="Logos from Sponsors" />
+  </a>
+</p>
+
 ## License
 Input Source Pro is licensed under the [GPL-3.0 License](LICENSE).
