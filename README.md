@@ -61,7 +61,7 @@ This project is made possible by all the sponsors supporting my work:
 
 <p align="center">
   <a href="https://github.com/sponsors/runjuu">
-    <img src='https://cdn.jsdelivr.net/gh/runjuu/runjuu/sponsorkit/sponsors.svg' alt="Logos from Sponsors" />
+    <img src="https://github.com/runjuu/runjuu/raw/refs/heads/main/sponsorkit/sponsors.svg" alt="Logos from Sponsors" />
   </a>
 </p>
 
