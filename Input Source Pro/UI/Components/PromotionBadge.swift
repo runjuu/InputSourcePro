@@ -10,19 +10,48 @@ struct PromotionBadge: View {
             HStack {
                 Spacer()
                 
-                Button("🫶 " + "Share with friends".i18n(), action: {
+                Button(action: {
                     URL(string: "https://inputsource.pro")?.open()
-                })
+                }) {
+                    Label {
+                        Text("Share with friends".i18n())
+                    } icon: {
+                        Image(systemName: "square.and.arrow.up.fill")
+                            .foregroundColor(.blue)
+                    }
+                }
                 
-                Button("⭐️ " + "Star on GitHub".i18n(), action: {
+                Button(action: {
                     URL(string: "https://github.com/runjuu/InputSourcePro")?.open()
-                })
+                }) {
+                    Label {
+                        Text("Star on GitHub".i18n())
+                    } icon: {
+                        Image(systemName: "star.fill")
+                            .foregroundColor(Color(red: 1.0, green: 0.84, blue: 0.0))
+                    }
+                }
                 
-                Button("🧡 " + "Sponsor".i18n(), action: {
+                Button(action: {
                     URL(string: "https://github.com/sponsors/runjuu")?.open()
-                })
+                }) {
+                    Label {
+                        Text("Sponsor".i18n())
+                    } icon: {
+                        Image(systemName: "heart.fill")
+                            .foregroundColor(.pink)
+                    }
+                }
             }
         }
         .padding()
+    }
+}
+
+// add support for Canvas Preview
+struct PromotionBadge_Previews: PreviewProvider {
+    static var previews: some View {
+        PromotionBadge()
+            .frame(width: 635, height: 95)
     }
 }

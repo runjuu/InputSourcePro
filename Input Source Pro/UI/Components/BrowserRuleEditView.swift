@@ -159,7 +159,7 @@ struct BrowserRuleEditView: View {
 
                 VStack {
                     HStack {
-                        Text("🫥 " + "Hide Indicator".i18n() + ":")
+                        Text("􀋯 " + "Hide Indicator".i18n() + ":")
                             .alignedView(width: $width, alignment: .trailing)
 
                         Toggle("", isOn: $hideIndicator)

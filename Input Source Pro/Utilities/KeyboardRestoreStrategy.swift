@@ -1,3 +1,5 @@
+import SwiftUI
+
 enum KeyboardRestoreStrategy: String, CaseIterable, Identifiable {
     case UseDefaultKeyboardInstead
     case RestorePreviouslyUsedOne
@@ -11,12 +13,12 @@ enum KeyboardRestoreStrategy: String, CaseIterable, Identifiable {
         }
     }
 
-    var emoji: String {
+    var SFSymbol: String {
         switch self {
         case .UseDefaultKeyboardInstead:
-            return "🙋"
+            return "􀀊"
         case .RestorePreviouslyUsedOne:
-            return "🔁"
+            return "􀅉"
         }
     }
 

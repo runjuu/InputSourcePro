@@ -76,7 +76,7 @@ struct ApplicationDetail: View {
                     .fontWeight(.medium)
 
                 NSToggleView(
-                    label: "🫥 " + "Hide Indicator".i18n(),
+                    label: "􀋯 " + "Hide Indicator".i18n(),
                     state: hideIndicator,
                     onStateUpdate: handleToggleHideIndicator
                 )
@@ -188,7 +188,7 @@ struct ApplicationDetail: View {
     }
 
     func restoreStrategyName(strategy: KeyboardRestoreStrategy) -> String {
-        "\(strategy.emoji) " + strategy.name + restoreStrategyTips(strategy: strategy)
+        "\(strategy.SFSymbol) " + strategy.name + restoreStrategyTips(strategy: strategy)
     }
 
     func restoreStrategyTips(strategy: KeyboardRestoreStrategy) -> String {

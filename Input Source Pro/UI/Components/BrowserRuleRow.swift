@@ -15,14 +15,14 @@ struct BrowserRuleRow: View {
 
             if rule.hideIndicator == true {
                 VStack {
-                    Text("🫥")
+                    Text("􀋯")
                 }
                 .frame(width: imgSize, height: imgSize)
             }
 
             if let keyboardRestoreStrategy = rule.keyboardRestoreStrategy {
                 VStack {
-                    Text(keyboardRestoreStrategy.emoji)
+                    Text(keyboardRestoreStrategy.SFSymbol)
                         .font(.system(size: imgSize - 4))
                 }
                 .frame(width: imgSize, height: imgSize)

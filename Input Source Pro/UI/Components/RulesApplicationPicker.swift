@@ -31,21 +31,25 @@ struct ApplicationPicker: View {
                     Spacer()
 
                     if app.hideIndicator {
-                        Text("🫥")
+                        SwiftUI.Image(systemName: "eye.slash")
+                            .foregroundColor(.gray)
                     }
 
                     if preferencesVM.needDisplayEnhancedModePrompt(bundleIdentifier: app.bundleId) {
-                        Text("⚠️")
+                        SwiftUI.Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(Color(red: 1.0, green: 0.84, blue: 0.0))
                     }
 
                     if preferencesVM.preferences.isRestorePreviouslyUsedInputSource {
                         if app.doNotRestoreKeyboard {
-                            Text("🙋")
+                            SwiftUI.Image(systemName: "d.circle")
+                                .foregroundColor(.green)
                                 .offset(x: 0, y: -1.5)
                         }
                     } else {
                         if app.doRestoreKeyboard {
-                            Text("🔁")
+                            SwiftUI.Image(systemName: "arrow.counterclockwise")
+                                .foregroundColor(.blue)
                                 .offset(x: 0, y: -1)
                         }
                     }
