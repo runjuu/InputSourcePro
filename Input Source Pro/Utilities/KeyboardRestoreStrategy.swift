@@ -13,12 +13,12 @@ enum KeyboardRestoreStrategy: String, CaseIterable, Identifiable {
         }
     }
 
-    var SFSymbol: String {
+    var systemImageName: String {
         switch self {
         case .UseDefaultKeyboardInstead:
-            return "􀀊"
+            return "d.circle"
         case .RestorePreviouslyUsedOne:
-            return "􀅉"
+            return "arrow.counterclockwise"
         }
     }
 

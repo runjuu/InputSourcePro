@@ -14,18 +14,24 @@ struct BrowserRuleRow: View {
             Spacer()
 
             if rule.hideIndicator == true {
-                VStack {
-                    Text("􀋯")
-                }
-                .frame(width: imgSize, height: imgSize)
+                Image(systemName: "eye.slash")
+                    .foregroundColor(.gray)
+                    .frame(width: imgSize, height: imgSize)
             }
 
             if let keyboardRestoreStrategy = rule.keyboardRestoreStrategy {
-                VStack {
-                    Text(keyboardRestoreStrategy.SFSymbol)
-                        .font(.system(size: imgSize - 4))
-                }
-                .frame(width: imgSize, height: imgSize)
+                let symbolName = keyboardRestoreStrategy.systemImageName
+                let color: Color = {
+                    switch symbolName {
+                    case "d.circle", "d.square.fill": return .green
+                    case "arrow.counterclockwise": return .blue
+                    default: return .primary
+                    }
+                }()
+                Image(systemName: symbolName)
+                    .foregroundColor(color)
+                    .font(.system(size: imgSize - 4))
+                    .frame(width: imgSize, height: imgSize)
             }
 
             if let forcedKeyboard = rule.forcedKeyboard {
