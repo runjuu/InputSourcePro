@@ -159,8 +159,12 @@ struct BrowserRuleEditView: View {
 
                 VStack {
                     HStack {
-                        Text("􀋯 " + "Hide Indicator".i18n() + ":")
-                            .alignedView(width: $width, alignment: .trailing)
+                        HStack(spacing: 4) {
+                            Image(systemName: "eye.slash")
+                                .foregroundColor(.gray)
+                            Text("Hide Indicator".i18n() + ":")
+                        }
+                        .alignedView(width: $width, alignment: .trailing)
 
                         Toggle("", isOn: $hideIndicator)
                             .toggleStyle(.switch)

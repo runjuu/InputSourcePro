@@ -1,5 +1,17 @@
 import SwiftUI
 
+// 新增 ToggleLabel 组件
+struct ToggleLabel: View {
+    let systemImageName: String
+    let text: String
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: systemImageName)
+            Text(text)
+        }
+    }
+}
+
 struct ApplicationDetail: View {
     @Binding var selectedApp: Set<AppRule>
 
@@ -47,25 +59,35 @@ struct ApplicationDetail: View {
                 Text("Keyboard Restore Strategy".i18n())
                     .fontWeight(.medium)
 
-                NSToggleView(
-                    label: restoreStrategyName(strategy: .UseDefaultKeyboardInstead),
-                    state: preferencesVM.preferences.isRestorePreviouslyUsedInputSource
-                        ? doNotRestoreKeyboardState
-                        : .on,
-                    onStateUpdate: handleToggleDoNotRestoreKeyboard
-                )
-                .fixedSize()
-                .disabled(!preferencesVM.preferences.isRestorePreviouslyUsedInputSource)
+                HStack {
+                    Image(systemName: "d.circle")
+                        .foregroundColor(.green)
+                        .frame(width: 20, height: 20, alignment: .center)
+                    NSToggleView(
+                        label: restoreStrategyName(strategy: .UseDefaultKeyboardInstead),
+                        state: preferencesVM.preferences.isRestorePreviouslyUsedInputSource
+                            ? doNotRestoreKeyboardState
+                            : .on,
+                        onStateUpdate: handleToggleDoNotRestoreKeyboard
+                    )
+                    .fixedSize()
+                    .disabled(!preferencesVM.preferences.isRestorePreviouslyUsedInputSource)
+                }
 
-                NSToggleView(
-                    label: restoreStrategyName(strategy: .RestorePreviouslyUsedOne),
-                    state: preferencesVM.preferences.isRestorePreviouslyUsedInputSource
-                        ? .on
-                        : doRestoreKeyboardState,
-                    onStateUpdate: handleToggleDoRestoreKeyboard
-                )
-                .fixedSize()
-                .disabled(preferencesVM.preferences.isRestorePreviouslyUsedInputSource)
+                HStack {
+                    Image(systemName: "arrow.counterclockwise")
+                        .foregroundColor(.blue)
+                        .frame(width: 20, height: 20, alignment: .center)
+                    NSToggleView(
+                        label: restoreStrategyName(strategy: .RestorePreviouslyUsedOne),
+                        state: preferencesVM.preferences.isRestorePreviouslyUsedInputSource
+                            ? .on
+                            : doRestoreKeyboardState,
+                        onStateUpdate: handleToggleDoRestoreKeyboard
+                    )
+                    .fixedSize()
+                    .disabled(preferencesVM.preferences.isRestorePreviouslyUsedInputSource)
+                }
             }
 
             Divider()
@@ -74,13 +96,17 @@ struct ApplicationDetail: View {
             VStack(alignment: .leading) {
                 Text("Indicator".i18n())
                     .fontWeight(.medium)
-
-                NSToggleView(
-                    label: "􀋯 " + "Hide Indicator".i18n(),
-                    state: hideIndicator,
-                    onStateUpdate: handleToggleHideIndicator
-                )
-                .fixedSize()
+                HStack {
+                    Image(systemName: "eye.slash")
+                        .foregroundColor(.gray)
+                        .frame(width: 20, height: 20, alignment: .center)
+                    NSToggleView(
+                        label: "Hide Indicator".i18n(),
+                        state: hideIndicator,
+                        onStateUpdate: handleToggleHideIndicator
+                    )
+                    .fixedSize()
+                }
             }
 
             if selectedApp.contains(where: { preferencesVM.needDisplayEnhancedModePrompt(bundleIdentifier: $0.bundleId) }) {
@@ -188,7 +214,7 @@ struct ApplicationDetail: View {
     }
 
     func restoreStrategyName(strategy: KeyboardRestoreStrategy) -> String {
-        "\(strategy.SFSymbol) " + strategy.name + restoreStrategyTips(strategy: strategy)
+        strategy.name + restoreStrategyTips(strategy: strategy)
     }
 
     func restoreStrategyTips(strategy: KeyboardRestoreStrategy) -> String {
