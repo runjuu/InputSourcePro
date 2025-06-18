@@ -60,9 +60,8 @@ struct ApplicationDetail: View {
                     .fontWeight(.medium)
 
                 HStack {
-                    Image(systemName: "d.circle")
+                    Image(systemName: "d.circle.fill")
                         .foregroundColor(.green)
-                        .frame(width: 20, height: 20, alignment: .center)
                     NSToggleView(
                         label: restoreStrategyName(strategy: .UseDefaultKeyboardInstead),
                         state: preferencesVM.preferences.isRestorePreviouslyUsedInputSource
@@ -75,9 +74,8 @@ struct ApplicationDetail: View {
                 }
 
                 HStack {
-                    Image(systemName: "arrow.counterclockwise")
+                    Image(systemName: "arrow.uturn.left.circle.fill")
                         .foregroundColor(.blue)
-                        .frame(width: 20, height: 20, alignment: .center)
                     NSToggleView(
                         label: restoreStrategyName(strategy: .RestorePreviouslyUsedOne),
                         state: preferencesVM.preferences.isRestorePreviouslyUsedInputSource
@@ -97,9 +95,8 @@ struct ApplicationDetail: View {
                 Text("Indicator".i18n())
                     .fontWeight(.medium)
                 HStack {
-                    Image(systemName: "eye.slash")
+                    Image(systemName: "eye.slash.circle.fill")
                         .foregroundColor(.gray)
-                        .frame(width: 20, height: 20, alignment: .center)
                     NSToggleView(
                         label: "Hide Indicator".i18n(),
                         state: hideIndicator,

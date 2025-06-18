@@ -31,7 +31,7 @@ struct ApplicationPicker: View {
                     Spacer()
 
                     if app.hideIndicator {
-                        SwiftUI.Image(systemName: "eye.slash")
+                        SwiftUI.Image(systemName: "eye.slash.circle.fill")
                             .foregroundColor(.gray)
                     }
 
@@ -42,15 +42,13 @@ struct ApplicationPicker: View {
 
                     if preferencesVM.preferences.isRestorePreviouslyUsedInputSource {
                         if app.doNotRestoreKeyboard {
-                            SwiftUI.Image(systemName: "d.circle")
+                            SwiftUI.Image(systemName: "d.circle.fill")
                                 .foregroundColor(.green)
-                                .offset(x: 0, y: -1.5)
                         }
                     } else {
                         if app.doRestoreKeyboard {
-                            SwiftUI.Image(systemName: "arrow.counterclockwise")
+                            SwiftUI.Image(systemName: "arrow.uturn.left.circle.fill")
                                 .foregroundColor(.blue)
-                                .offset(x: 0, y: -1)
                         }
                     }
 

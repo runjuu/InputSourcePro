@@ -14,7 +14,7 @@ struct BrowserRuleRow: View {
             Spacer()
 
             if rule.hideIndicator == true {
-                Image(systemName: "eye.slash")
+                Image(systemName: "eye.slash.circle.fill")
                     .foregroundColor(.gray)
                     .frame(width: imgSize, height: imgSize)
             }
@@ -23,14 +23,13 @@ struct BrowserRuleRow: View {
                 let symbolName = keyboardRestoreStrategy.systemImageName
                 let color: Color = {
                     switch symbolName {
-                    case "d.circle", "d.square.fill": return .green
-                    case "arrow.counterclockwise": return .blue
+                    case "d.circle.fill", "d.square.fill": return .green
+                    case "arrow.uturn.left.circle.fill": return .blue
                     default: return .primary
                     }
                 }()
                 Image(systemName: symbolName)
                     .foregroundColor(color)
-                    .font(.system(size: imgSize - 4))
                     .frame(width: imgSize, height: imgSize)
             }
 
