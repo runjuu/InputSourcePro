@@ -169,3 +169,17 @@
 "Select Input Sources" = "入力ソースを選択";
 "Add Switch Group" = "スイッチグループを追加";
 "Add a switch group to allow switching between multiple input sources using the same hotkey. Select at least two input sources." = "同じホットキーを使用して複数の入力ソースを切り替えられるように、スイッチグループを追加します。少なくとも2つの入力ソースを選択してください。";
+
+"Cursor Lag Fix" = "光標の遅延問題を修正";
+"Cursor Lag Fix Description" = "光標の遅延や CursorUIViewService が応答しない問題が発生した場合、redesigned_text_cursor 機能を無効化してください。これは macOS 内のバグによるもので、Input Source Pro とは無関係です。";
+"Disable Cursor Feature" = "無効化";
+"Enable Cursor Feature" = "有効化";
+"Check Cursor Setting" = "設定の確認";
+"Remove Cursor Setting" = "設定の削除";
+"Cursor Setting Status" = "現在の状態：";
+"Cursor Setting Enabled" = "有効化済み";
+"Cursor Setting Disabled" = "無効化済み";
+"Cursor Setting Undefined" = "未定義";
+"Cursor Setting Unknown" = "不明";
+"Check Cursor Setting Now" = "今すぐ確認";
+"Reboot Required Notice" = "変更を適用するには、再起動してください。";
