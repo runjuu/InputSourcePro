@@ -16,17 +16,8 @@ struct PromotionBadge: View {
                     Label {
                         Text("Share with friends".i18n())
                     } icon: {
-                        if #available(macOS 15.0, *) {
-                            Image(systemName: "square.and.arrow.up.fill")
-                                .symbolRenderingMode(.palette)
-                                .foregroundStyle(.primary, .blue)
-                                .symbolEffect(.bounce.down.byLayer, options: .repeat(.periodic(delay: 1)))
-                        } else {
-                            Image(systemName: "square.and.arrow.up.fill")
-                                .foregroundColor(.blue)
-                        }
-                        
-                    }
+                        Image(systemName: "square.and.arrow.up.fill")
+                            .foregroundColor(.blue)                    }
                 }
                 
                 Button(action: {
@@ -35,14 +26,8 @@ struct PromotionBadge: View {
                     Label {
                         Text("Star on GitHub".i18n())
                     } icon: {
-                        if #available(macOS 15.0, *) {
-                            Image(systemName: "star.fill")
-                                .symbolRenderingMode(.multicolor)
-                                .symbolEffect(.bounce.down.byLayer, options: .repeat(.periodic(delay: 1)))
-                        } else {
-                            Image(systemName: "star.fill")
-                                .foregroundColor(Color(red: 1.0, green: 0.84, blue: 0.0))
-                        }
+                        Image(systemName: "star.fill")
+                            .foregroundColor(Color(red: 1.0, green: 0.84, blue: 0.0))
                     }
                 }
                 
@@ -52,14 +37,8 @@ struct PromotionBadge: View {
                     Label {
                         Text("Sponsor".i18n())
                     } icon: {
-                        if #available(macOS 15.0, *) {
-                            Image(systemName: "heart.fill")
-                                .symbolRenderingMode(.multicolor)
-                                .symbolEffect(.bounce.down.byLayer, options: .repeat(.periodic(delay: 1)))
-                        } else {
-                            Image(systemName: "heart.fill")
-                                .foregroundColor(.pink)
-                        }
+                        Image(systemName: "heart.fill")
+                            .foregroundColor(.pink)
                     }
                 }
             }
