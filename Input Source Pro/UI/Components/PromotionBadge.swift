@@ -17,7 +17,8 @@ struct PromotionBadge: View {
                         Text("Share with friends".i18n())
                     } icon: {
                         Image(systemName: "square.and.arrow.up.fill")
-                            .foregroundColor(.blue)                    }
+                            .foregroundColor(.blue)
+                    }
                 }
                 
                 Button(action: {
