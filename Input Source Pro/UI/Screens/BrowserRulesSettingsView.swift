@@ -55,7 +55,7 @@ struct BrowserRulesSettingsView: View {
             .border(width: 1, edges: [.bottom], color: NSColor.border.color)
 
             List(browserRules, id: \.self, selection: $selectedRules) { rule in
-                BrowserRuleRow(rule: rule)
+                BrowserRuleRow(isSelected: selectedRules.contains(rule), rule: rule)
             }
 
             HStack(spacing: 0) {
