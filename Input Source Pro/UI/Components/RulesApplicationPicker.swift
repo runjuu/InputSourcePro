@@ -32,7 +32,7 @@ struct ApplicationPicker: View {
 
                     if app.hideIndicator {
                         SwiftUI.Image(systemName: "eye.slash.circle.fill")
-                            .foregroundColor(.gray)
+                            .opacity(0.7)
                     }
 
                     if preferencesVM.needDisplayEnhancedModePrompt(bundleIdentifier: app.bundleId) {
@@ -43,12 +43,14 @@ struct ApplicationPicker: View {
                     if preferencesVM.preferences.isRestorePreviouslyUsedInputSource {
                         if app.doNotRestoreKeyboard {
                             SwiftUI.Image(systemName: "d.circle.fill")
-                                .foregroundColor(.green)
+                                .foregroundColor(selectedApp.contains(app) ? .primary : .green)
+                                .opacity(selectedApp.contains(app) ? 0.7 : 1.0)
                         }
                     } else {
                         if app.doRestoreKeyboard {
                             SwiftUI.Image(systemName: "arrow.uturn.left.circle.fill")
-                                .foregroundColor(.blue)
+                                .foregroundColor(selectedApp.contains(app) ? .primary : .blue)
+                                .opacity(selectedApp.contains(app) ? 0.7 : 1.0)
                         }
                     }
 

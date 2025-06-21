@@ -2,7 +2,9 @@ import SwiftUI
 
 struct BrowserRuleRow: View {
     @State var showModal = false
-
+    
+    var isSelected: Bool = false
+    
     @ObservedObject var rule: BrowserRule
 
     let imgSize: CGFloat = 16
@@ -15,7 +17,7 @@ struct BrowserRuleRow: View {
 
             if rule.hideIndicator == true {
                 Image(systemName: "eye.slash.circle.fill")
-                    .foregroundColor(.gray)
+                    .opacity(0.7)
                     .frame(width: imgSize, height: imgSize)
             }
 
@@ -23,9 +25,12 @@ struct BrowserRuleRow: View {
                 let symbolName = keyboardRestoreStrategy.systemImageName
                 let color: Color = {
                     switch symbolName {
-                    case "d.circle.fill", "d.square.fill": return .green
-                    case "arrow.uturn.left.circle.fill": return .blue
-                    default: return .primary
+                    case "d.circle.fill", "d.square.fill":
+                        return isSelected ? .primary.opacity(0.7) : .green
+                    case "arrow.uturn.left.circle.fill":
+                        return isSelected ? .primary.opacity(0.7) : .blue
+                    default:
+                        return .primary
                     }
                 }()
                 Image(systemName: symbolName)
