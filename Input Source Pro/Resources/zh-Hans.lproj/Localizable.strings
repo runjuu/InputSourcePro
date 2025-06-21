@@ -170,3 +170,17 @@
 "Select Input Sources" = "选择输入法";
 "Add Switch Group" = "添加切换组";
 "Add a switch group to allow switching between multiple input sources using the same hotkey. Select at least two input sources." = "添加切换组以允许使用相同的快捷键在多个输入法之间切换。请至少选择两个输入法。";
+
+"Cursor Lag Fix" = "修复光标卡顿问题";
+"Cursor Lag Fix Description" = "如果您遇到光标延迟或 CursorUIViewService 无响应的问题，请禁用 redesigned_text_cursor 功能。这是由于 macOS 中的一个错误引起的，与 Input Source Pro 无关。";
+"Disable Cursor Feature" = "禁用";
+"Enable Cursor Feature" = "启用";
+"Check Cursor Setting" = "检查设置";
+"Remove Cursor Setting" = "移除设置";
+"Cursor Setting Status" = "当前状态：";
+"Cursor Setting Enabled" = "已启用";
+"Cursor Setting Disabled" = "已禁用";
+"Cursor Setting Undefined" = "未定义";
+"Cursor Setting Unknown" = "未知";
+"Check Cursor Setting Now" = "立即检查";
+"Reboot Required Notice" = "请重启以应用更改。";

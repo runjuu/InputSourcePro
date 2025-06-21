@@ -169,3 +169,17 @@
 "Select Input Sources" = "Select Input Sources";
 "Add Switch Group" = "Add Switch Group";
 "Add a switch group to allow switching between multiple input sources using the same hotkey. Select at least two input sources." = "Add a switch group to allow switching between multiple input sources using the same hotkey. Select at least two input sources.";
+
+"Cursor Lag Fix" = "Fix Cursor Lag Issues";
+"Cursor Lag Fix Description" = "If you experience cursor lag or CursorUIViewService unresponsiveness, disable the redesigned_text_cursor feature. This is due to a macOS bug and not related to Input Source Pro.";
+"Disable Cursor Feature" = "Disable";
+"Enable Cursor Feature" = "Enable";
+"Check Cursor Setting" = "Check Setting";
+"Remove Cursor Setting" = "Remove Setting";
+"Cursor Setting Status" = "Current Status: ";
+"Cursor Setting Enabled" = "Enabled";
+"Cursor Setting Disabled" = "Disabled";
+"Cursor Setting Undefined" = "Undefined";
+"Cursor Setting Unknown" = "Unknown";
+"Check Cursor Setting Now" = "Check Now";
+"Reboot Required Notice" = "Please restart to apply changes.";
