@@ -16,9 +16,9 @@ enum KeyboardRestoreStrategy: String, CaseIterable, Identifiable {
     var systemImageName: String {
         switch self {
         case .UseDefaultKeyboardInstead:
-            return "d.circle"
+            return "d.circle.fill"
         case .RestorePreviouslyUsedOne:
-            return "arrow.counterclockwise"
+            return "arrow.uturn.left.circle.fill"
         }
     }
 

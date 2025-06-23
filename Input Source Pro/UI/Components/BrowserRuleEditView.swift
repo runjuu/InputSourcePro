@@ -160,7 +160,7 @@ struct BrowserRuleEditView: View {
                 VStack {
                     HStack {
                         HStack(spacing: 4) {
-                            Image(systemName: "eye.slash")
+                            Image(systemName: "eye.slash.circle.fill")
                                 .foregroundColor(.gray)
                             Text("Hide Indicator".i18n() + ":")
                         }
