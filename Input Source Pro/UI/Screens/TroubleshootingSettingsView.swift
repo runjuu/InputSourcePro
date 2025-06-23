@@ -41,18 +41,22 @@ struct TroubleshootingSettingsView: View {
                 // Cursor Lag Fix Section
                 SettingsSection(title: "") {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Cursor Lag Fix".i18n())
-                            .font(.headline)
+                        HStack {
+                            Text("Cursor Lag Fix".i18n())
+                                .font(.headline)
+                            
+                            Spacer()
+                            
+                            Button(action: {}) {
+                                Text("Reboot Required Notice".i18n())
+                            }
+                            .buttonStyle(EnhanceMoreRequiredButtonStyle())
+                        }
                         
                         Text(.init("Cursor Lag Fix Description".i18n()))
                             .font(.system(size: 12))
                             .opacity(0.8)
-                        
-                        Text("Reboot Required Notice".i18n())
-                            .font(.system(size: 12))
-                            .opacity(0.8)
-                            .padding(.bottom, 8)
-                        
+                                      
                         // Status display
                         HStack {
                             Text("Cursor Setting Status".i18n())
