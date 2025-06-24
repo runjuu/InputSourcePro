@@ -19,6 +19,7 @@ enum Browser: String, CaseIterable {
     case FirefoxDeveloperEdition = "org.mozilla.firefoxdeveloperedition"
     case FirefoxNightly = "org.mozilla.nightly"
     case Zen = "app.zen-browser.zen"
+    case Dia = "company.thebrowser.dia"
 
     var displayName: String {
         switch self {
@@ -54,6 +55,8 @@ enum Browser: String, CaseIterable {
             return "Firefox Nightly"
         case .Zen:
             return "Zen"
+        case .Dia:
+            return "Dia"
         }
     }
 }

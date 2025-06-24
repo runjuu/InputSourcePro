@@ -177,6 +177,8 @@ struct BrowserRulesSettingsView: View {
                 $0.isEnableURLSwitchForFirefoxNightly = isEnable
             case .Zen:
                 $0.isEnableURLSwitchForZen = isEnable
+            case .Dia:
+                $0.isEnableURLSwitchForDia = isEnable
             }
         }
     }

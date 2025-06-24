@@ -119,6 +119,8 @@ extension PreferencesVM {
             return preferences.isEnableURLSwitchForFirefoxNightly
         case .Zen:
             return preferences.isEnableURLSwitchForZen
+        case .Dia:
+            return preferences.isEnableURLSwitchForDia
         }
     }
 
