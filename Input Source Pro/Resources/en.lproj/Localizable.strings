@@ -170,16 +170,6 @@
 "Add Switch Group" = "Add Switch Group";
 "Add a switch group to allow switching between multiple input sources using the same hotkey. Select at least two input sources." = "Add a switch group to allow switching between multiple input sources using the same hotkey. Select at least two input sources.";
 
-"Cursor Lag Fix" = "Fix Cursor Lag Issues";
-"Cursor Lag Fix Description" = "If you experience cursor lag or CursorUIViewService unresponsiveness, disable the redesigned_text_cursor feature. This is due to a macOS bug and not related to Input Source Pro.";
-"Disable Cursor Feature" = "Disable";
-"Enable Cursor Feature" = "Enable";
-"Check Cursor Setting" = "Check Setting";
-"Remove Cursor Setting" = "Remove Setting";
-"Cursor Setting Status" = "Current Status: ";
-"Cursor Setting Enabled" = "Enabled";
-"Cursor Setting Disabled" = "Disabled";
-"Cursor Setting Undefined" = "Undefined";
-"Cursor Setting Unknown" = "Unknown";
-"Check Cursor Setting Now" = "Check Now";
-"Reboot Required Notice" = "System Reboot Required";
+"System Reboot Required" = "Changes will apply after restarting your Mac";
+"Cursor Lag Fix" = "Fix Typing/Cursor Lag";
+"Cursor Lag Fix Description" = "macOS 14 Sonoma introduces an experimental text-cursor that shows a small tooltip under the insertion point (e.g. Caps Lock, input-source changes). On some Macs this feature can make CursorUIViewService freeze, causing typing and cursor lag. If you ever encounter this issue, you might try turning on this option to disable the experimental cursor and restore the classic I-beam.";

@@ -7,13 +7,13 @@ struct EnhancedModeRequiredBadge: View {
         Button(action: {}) {
             Text("Enhanced Mode Required".i18n())
         }
-        .buttonStyle(EnhanceMoreRequiredButtonStyle())
+        .buttonStyle(EnhanceModeRequiredButtonStyle())
         .opacity(preferencesVM.preferences.isEnhancedModeEnabled ? 0 : 1)
         .animation(.easeInOut, value: preferencesVM.preferences.isEnhancedModeEnabled)
     }
 }
 
-struct EnhanceMoreRequiredButtonStyle: ButtonStyle {
+struct EnhanceModeRequiredButtonStyle: ButtonStyle {
     func makeBody(configuration: Self.Configuration) -> some View {
         configuration.label
             .font(.system(size: 10))

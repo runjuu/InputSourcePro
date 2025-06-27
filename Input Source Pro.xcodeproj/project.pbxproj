@@ -24,6 +24,8 @@
 		4A0C1CCD284B0D0C00833A16 /* IndicatorAlignmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A0C1CCC284B0D0C00833A16 /* IndicatorAlignmentView.swift */; };
 		4A0C1CD1284B249D00833A16 /* PreferencesVM+IndicatorPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A0C1CD0284B249D00833A16 /* PreferencesVM+IndicatorPosition.swift */; };
 		4A0C1CD5284B2B6100833A16 /* NSScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A0C1CD4284B2B6100833A16 /* NSScreen.swift */; };
+		4A15EE412E0E123B007B76C3 /* CursorLagFixView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A15EE402E0E123B007B76C3 /* CursorLagFixView.swift */; };
+		4A15EE432E0E1309007B76C3 /* RebootRequiredBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A15EE422E0E1309007B76C3 /* RebootRequiredBadge.swift */; };
 		4A1BD908287AD20200E4D8C2 /* KeyboardCustomization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A1BD907287AD20200E4D8C2 /* KeyboardCustomization.swift */; };
 		4A1BD90B287AD33C00E4D8C2 /* Boutique in Frameworks */ = {isa = PBXBuildFile; productRef = 4A1BD90A287AD33C00E4D8C2 /* Boutique */; };
 		4A1BD90F287BD14000E4D8C2 /* CustomizedIndicatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A1BD90E287BD14000E4D8C2 /* CustomizedIndicatorView.swift */; };
@@ -189,6 +191,8 @@
 		4A0C1CCC284B0D0C00833A16 /* IndicatorAlignmentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndicatorAlignmentView.swift; sourceTree = "<group>"; };
 		4A0C1CD0284B249D00833A16 /* PreferencesVM+IndicatorPosition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesVM+IndicatorPosition.swift"; sourceTree = "<group>"; };
 		4A0C1CD4284B2B6100833A16 /* NSScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NSScreen.swift; sourceTree = "<group>"; };
+		4A15EE402E0E123B007B76C3 /* CursorLagFixView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLagFixView.swift; sourceTree = "<group>"; };
+		4A15EE422E0E1309007B76C3 /* RebootRequiredBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RebootRequiredBadge.swift; sourceTree = "<group>"; };
 		4A1BD907287AD20200E4D8C2 /* KeyboardCustomization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardCustomization.swift; sourceTree = "<group>"; };
 		4A1BD90E287BD14000E4D8C2 /* CustomizedIndicatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomizedIndicatorView.swift; sourceTree = "<group>"; };
 		4A1F25212830C3E400001BAB /* Bundle+Version.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Bundle+Version.swift"; sourceTree = "<group>"; };
@@ -542,8 +546,10 @@
 				D525609D29B58448009EB7BA /* LoadingView.swift */,
 				D50821F129FE29C40078ADEC /* EnhancedModeToggle.swift */,
 				D5CC44952A33F485007FF839 /* EnhancedModeRequiredBadge.swift */,
+				4A15EE422E0E1309007B76C3 /* RebootRequiredBadge.swift */,
 				D5115A172A33A61500D94E51 /* QuestionButton.swift */,
 				4A4E035B2DB97534008E5C2F /* PromotionBadge.swift */,
+				4A15EE402E0E123B007B76C3 /* CursorLagFixView.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -867,6 +873,7 @@
 				4AEEE08428126A4900C883F8 /* BrowserURL.swift in Sources */,
 				4A2A179C280BA7FA00E13249 /* PreferencesView.swift in Sources */,
 				D50821F229FE29C40078ADEC /* EnhancedModeToggle.swift in Sources */,
+				4A15EE412E0E123B007B76C3 /* CursorLagFixView.swift in Sources */,
 				4AC50D6D283A74050034E894 /* Border.swift in Sources */,
 				4A093073285E166E00232089 /* PreferencesVM+AppKeyboardCache.swift in Sources */,
 				4A2A179D280BA7FA00E13249 /* GeneralSettingsView.swift in Sources */,
@@ -886,6 +893,7 @@
 				4A2A1793280BA7FA00E13249 /* FloatWindow.swift in Sources */,
 				4AC450C7281E729000DA0329 /* IndicatorColor.swift in Sources */,
 				4A1BD90F287BD14000E4D8C2 /* CustomizedIndicatorView.swift in Sources */,
+				4A15EE432E0E1309007B76C3 /* RebootRequiredBadge.swift in Sources */,
 				4A1BD908287AD20200E4D8C2 /* KeyboardCustomization.swift in Sources */,
 				4A09307F286359F800232089 /* Accessibility.swift in Sources */,
 				4A2A1792280BA7FA00E13249 /* FloatWindowController.swift in Sources */,
