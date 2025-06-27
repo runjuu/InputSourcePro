@@ -10,16 +10,28 @@ struct PromotionBadge: View {
             HStack {
                 Spacer()
                 
-                Button(action: {
-                    URL(string: "https://inputsource.pro")?.open()
-                }) {
-                    Label {
-                        Text("Share with friends".i18n())
-                    } icon: {
-                        Image(systemName: "square.and.arrow.up.fill")
-                            .foregroundColor(.blue)
+                if #available(macOS 13, *) {
+                    ShareLink(item: .website) {
+                        Label {
+                            Text("Share with friends".i18n())
+                        } icon: {
+                            Image(systemName: "square.and.arrow.up.fill")
+                                .foregroundColor(.blue)
+                        }
+                    }
+                } else {
+                    Button(action: {
+                        URL.website.open()
+                    }) {
+                        Label {
+                            Text("Share with friends".i18n())
+                        } icon: {
+                            Image(systemName: "square.and.arrow.up.fill")
+                                .foregroundColor(.blue)
+                        }
                     }
                 }
+                
                 
                 Button(action: {
                     URL(string: "https://github.com/runjuu/InputSourcePro")?.open()
