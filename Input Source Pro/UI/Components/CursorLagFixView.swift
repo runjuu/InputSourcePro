@@ -26,7 +26,7 @@ struct CursorLagFixView: View {
                 
                 Spacer()
                 
-                RebootRequiredBadge(isRequired: !isRebootRequired)
+                RebootRequiredBadge(isRequired: isRebootRequired)
             }
             
             Text(.init("Cursor Lag Fix Description".i18n()))
