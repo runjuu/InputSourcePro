@@ -72,6 +72,13 @@ extension PreferencesVM {
             return .specified(defaultKeyboard)
         }
 
+        // Fallback to system-wide default keyboard to prevent input method getting stuck
+        // This ensures that apps without specific keyboard configuration will always
+        // switch to the system default, resolving issues like ChatGPT → Terminal switching
+        if let systemDefaultKeyboard = systemWideDefaultKeyboard {
+            return .specified(systemDefaultKeyboard)
+        }
+
         return nil
     }
 
