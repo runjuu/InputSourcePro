@@ -31,6 +31,20 @@
     </tr>
 </table>
 
+<hr />
+
+<h2 align="center">
+    🙌 Meet my new app: <a href="https://refine.sh/" target="_blank">Refine</a>, a local Grammarly alternative that runs 100% offline 🤩
+</h2>
+
+<p align="center">
+  <a href="https://refine.sh?utm_source=github&utm_medium=readme&utm_campaign=inputsourcepro">
+    <img src="https://refine.sh/banner.png" width="800" />
+  </a>
+</p>
+
+<hr />
+
 ## Features
 ### 🥷 Automatic Context-Aware Switching
 Automatically switch input sources based on custom rules for each **application** or **website**.
