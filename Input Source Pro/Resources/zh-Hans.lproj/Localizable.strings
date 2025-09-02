@@ -118,6 +118,8 @@
 "Restore Previously Used One" = "恢复上次使用的输入法";
 "Indicator" = "提示";
 "Hide Indicator" = "隐藏输入法提示";
+"ASCII Punctuation" = "ASCII 标点符号";
+"Force ASCII Punctuation" = "强制使用 ASCII 标点符号";
 "Add Running Apps" = "添加运行中的应用";
 "(unknown)" = "（未知）";
 

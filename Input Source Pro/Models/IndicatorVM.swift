@@ -14,6 +14,7 @@ final class IndicatorVM: ObservableObject {
     let preferencesVM: PreferencesVM
     let inputSourceVM: InputSourceVM
     let permissionsVM: PermissionsVM
+    let punctuationService: PunctuationService
 
     let logger = ISPLogger(category: String(describing: IndicatorVM.self))
 
@@ -62,6 +63,7 @@ final class IndicatorVM: ObservableObject {
         self.preferencesVM = preferencesVM
         self.applicationVM = applicationVM
         self.inputSourceVM = inputSourceVM
+        self.punctuationService = PunctuationService(preferencesVM: preferencesVM)
         state = .from(
             preferencesVM: preferencesVM,
             inputSourceChangeReason: .system,
@@ -71,6 +73,7 @@ final class IndicatorVM: ObservableObject {
 
         clearAppKeyboardCacheIfNeed()
         watchState()
+        watchPunctuationRules()
     }
 
     private func clearAppKeyboardCacheIfNeed() {
@@ -89,6 +92,23 @@ final class IndicatorVM: ObservableObject {
             .filter { $0 == false }
             .sink { [weak self] _ in
                 self?.preferencesVM.clearKeyboardCache()
+            }
+            .store(in: cancelBag)
+    }
+
+    private func watchPunctuationRules() {
+        applicationVM.$appKind
+            .compactMap { $0 }
+            .sink { [weak self] appKind in
+                guard let self = self else { return }
+                
+                let app = appKind.getApp()
+                if self.punctuationService.shouldEnableForApp(app) {
+                    self.logger.debug { "Enabling ASCII punctuation for app: \(app.localizedName ?? app.bundleIdentifier ?? "Unknown")" }
+                    self.punctuationService.enable()
+                } else {
+                    self.punctuationService.disable()
+                }
             }
             .store(in: cancelBag)
     }

@@ -65,6 +65,14 @@ extension PreferencesVM {
         }
     }
 
+    func setForceAsciiPunctuation(_ appCustomization: AppRule?, _ forceAsciiPunctuation: Bool) {
+        guard let appCustomization = appCustomization else { return }
+
+        saveContext {
+            appCustomization.forceAsciiPunctuation = forceAsciiPunctuation
+        }
+    }
+
     func getAppCustomization(app: NSRunningApplication) -> AppRule? {
         return getAppCustomization(bundleId: app.bundleId())
     }

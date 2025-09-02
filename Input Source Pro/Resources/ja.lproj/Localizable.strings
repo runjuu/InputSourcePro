@@ -117,6 +117,8 @@
 "Restore Previously Used One" = "以前使用したものを復元";
 "Indicator" = "ツールチップ";
 "Hide Indicator" = "ツールチップを隠す";
+"ASCII Punctuation" = "ASCII 句読点";
+"Force ASCII Punctuation" = "ASCII 句読点を強制使用";
 "Add Running Apps" = "実行中のアプリを追加";
 "(unknown)" = "（不明）";
 
