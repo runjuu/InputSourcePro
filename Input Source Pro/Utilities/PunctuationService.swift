@@ -37,6 +37,11 @@ class PunctuationService: ObservableObject {
     func enable() {
         guard !isEnabled else { return }
         
+        guard PermissionsVM.checkInputMonitoring(prompt: false) else {
+            logger.debug { "Input Monitoring permission required for ASCII punctuation" }
+            return
+        }
+        
         logger.debug { "Enabling ASCII punctuation service" }
         startMonitoring()
         isEnabled = true

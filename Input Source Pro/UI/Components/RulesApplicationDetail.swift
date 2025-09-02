@@ -131,6 +131,12 @@ struct ApplicationDetail: View {
                 EnhancedModeRequiredBadge()
             }
 
+            if selectedApp.contains(where: { $0.forceAsciiPunctuation }) {
+                Divider().padding(.vertical, 4)
+
+                InputMonitoringRequiredBadge()
+            }
+
             Spacer()
         }
         .disabled(selectedApp.isEmpty)
