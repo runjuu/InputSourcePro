@@ -28,7 +28,10 @@ class PunctuationService: ObservableObject {
     }
     
     deinit {
-        stopMonitoring()
+        // Note: stopMonitoring() will be called by disable() before deallocation
+        if let eventTap = eventTap {
+            CFMachPortInvalidate(eventTap)
+        }
     }
     
     func enable() {
@@ -75,7 +78,7 @@ class PunctuationService: ObservableObject {
             
             logger.debug { "Event tap created successfully" }
         } else {
-            logger.error { "Failed to create event tap - accessibility permissions may be required" }
+            logger.debug { "ERROR: Failed to create event tap - accessibility permissions may be required" }
         }
     }
     
@@ -124,7 +127,7 @@ class PunctuationService: ObservableObject {
         else { return nil }
         
         // Set the Unicode string for the replacement
-        let unicodeString = Array(replacement.unicodeScalars.map { $0.value })
+        let unicodeString = Array(replacement.utf16)
         newEvent.keyboardSetUnicodeString(stringLength: unicodeString.count, unicodeString: unicodeString)
         
         // Copy relevant properties from the original event
