@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		25C5A6B52E678D86005AB80E /* PunctuationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25C5A6B42E678D86005AB80E /* PunctuationService.swift */; };
 		4A093071285DACAA00232089 /* NSToggleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A093070285DACAA00232089 /* NSToggleView.swift */; };
 		4A093073285E166E00232089 /* PreferencesVM+AppKeyboardCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A093072285E166E00232089 /* PreferencesVM+AppKeyboardCache.swift */; };
 		4A093075285EE55A00232089 /* RulesApplicationPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A093074285EE55A00232089 /* RulesApplicationPicker.swift */; };
@@ -174,6 +175,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		25C5A6B42E678D86005AB80E /* PunctuationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PunctuationService.swift; sourceTree = "<group>"; };
 		4A093070285DACAA00232089 /* NSToggleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NSToggleView.swift; sourceTree = "<group>"; };
 		4A093072285E166E00232089 /* PreferencesVM+AppKeyboardCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesVM+AppKeyboardCache.swift"; sourceTree = "<group>"; };
 		4A093074285EE55A00232089 /* RulesApplicationPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesApplicationPicker.swift; sourceTree = "<group>"; };
@@ -427,6 +429,7 @@
 		4A2A175D280BA7FA00E13249 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				25C5A6B42E678D86005AB80E /* PunctuationService.swift */,
 				D598C7E228B74B16004747D1 /* Indicator */,
 				D598C7E428B74B48004747D1 /* AppKit */,
 				D598C7E328B74B32004747D1 /* Accessibility */,
@@ -811,6 +814,7 @@
 				4A881A93288BC55E00B76498 /* PreferencesVM+KeyboardConfig.swift in Sources */,
 				4A2A1789280BA7FA00E13249 /* TISInputSource+Extension.swift in Sources */,
 				4AC50D6B283A72810034E894 /* NSColor.swift in Sources */,
+				25C5A6B52E678D86005AB80E /* PunctuationService.swift in Sources */,
 				4ACC9B812D2640F70002B8CE /* AddSwitchingGroupButton.swift in Sources */,
 				4A2A178C280BA7FA00E13249 /* CancelBag.swift in Sources */,
 				4A4167302813CAE600CCC28C /* PreferencesVM+BrowserRule.swift in Sources */,
