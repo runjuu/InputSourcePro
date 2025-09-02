@@ -7,6 +7,12 @@ extension NSWorkspace {
         )
     }
 
+    func openInputMonitoringPreferences() {
+        open(
+            URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!
+        )
+    }
+
     func openAutomationPreferences() {
         open(
             URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!
