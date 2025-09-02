@@ -6,6 +6,7 @@
         <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="doNotRestoreKeyboard" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="doRestoreKeyboard" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="forceAsciiPunctuation" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="hideIndicator" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="inputSourceId" optional="YES" attributeType="String"/>
         <attribute name="removed" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>

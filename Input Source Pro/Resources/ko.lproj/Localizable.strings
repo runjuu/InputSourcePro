@@ -117,6 +117,8 @@
 "Restore Previously Used One" = "이전에 사용한 것 복원";
 "Indicator" = "표시기";
 "Hide Indicator" = "표시기 숨기기";
+"ASCII Punctuation" = "ASCII 구두점";
+"Force ASCII Punctuation" = "ASCII 구두점 강제 사용";
 "Add Running Apps" = "실행 중인 앱 추가";
 "(unknown)" = "(알 수 없음)";
 

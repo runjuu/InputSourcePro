@@ -21,6 +21,7 @@ struct ApplicationDetail: View {
     @State var doRestoreKeyboardState = NSToggleViewState.off
     @State var doNotRestoreKeyboardState = NSToggleViewState.off
     @State var hideIndicator = NSToggleViewState.off
+    @State var forceAsciiPunctuation = NSToggleViewState.off
 
     var mixed: Bool {
         Set(selectedApp.map { $0.forcedKeyboard?.id }).count > 1
@@ -106,6 +107,24 @@ struct ApplicationDetail: View {
                 }
             }
 
+            Divider()
+                .padding(.vertical, 4)
+
+            VStack(alignment: .leading) {
+                Text("ASCII Punctuation".i18n())
+                    .fontWeight(.medium)
+                HStack {
+                    Image(systemName: "textformat.abc")
+                        .foregroundColor(.orange)
+                    NSToggleView(
+                        label: "Force ASCII Punctuation".i18n(),
+                        state: forceAsciiPunctuation,
+                        onStateUpdate: handleToggleForceAsciiPunctuation
+                    )
+                    .fixedSize()
+                }
+            }
+
             if selectedApp.contains(where: { preferencesVM.needDisplayEnhancedModePrompt(bundleIdentifier: $0.bundleId) }) {
                 Divider().padding(.vertical, 4)
 
@@ -120,6 +139,7 @@ struct ApplicationDetail: View {
             updateDoRestoreKeyboardState()
             updateDoNotRestoreKeyboardState()
             updateHideIndicatorState()
+            updateForceAsciiPunctuationState()
         }
     }
 
@@ -160,6 +180,16 @@ struct ApplicationDetail: View {
             hideIndicator = .mixed
         } else {
             hideIndicator = stateSet.first == true ? .on : .off
+        }
+    }
+
+    func updateForceAsciiPunctuationState() {
+        let stateSet = Set(selectedApp.map { $0.forceAsciiPunctuation })
+
+        if stateSet.count > 1 {
+            forceAsciiPunctuation = .mixed
+        } else {
+            forceAsciiPunctuation = stateSet.first == true ? .on : .off
         }
     }
 
@@ -206,6 +236,19 @@ struct ApplicationDetail: View {
         case .off, .mixed:
             selectedApp.forEach { preferencesVM.setHideIndicator($0, true) }
             hideIndicator = .on
+            return .on
+        }
+    }
+
+    func handleToggleForceAsciiPunctuation() -> NSControl.StateValue {
+        switch forceAsciiPunctuation {
+        case .on:
+            selectedApp.forEach { preferencesVM.setForceAsciiPunctuation($0, false) }
+            forceAsciiPunctuation = .off
+            return .off
+        case .off, .mixed:
+            selectedApp.forEach { preferencesVM.setForceAsciiPunctuation($0, true) }
+            forceAsciiPunctuation = .on
             return .on
         }
     }
