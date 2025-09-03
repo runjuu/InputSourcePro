@@ -118,7 +118,7 @@
 "Indicator" = "Indicator";
 "Hide Indicator" = "Hide Indicator";
 "ASCII Punctuation" = "ASCII Punctuation";
-"Force ASCII Punctuation" = "Force ASCII Punctuation";
+"Force ASCII Punctuation" = "Force English Punctuation";
 "Input Monitoring Required" = "Input Monitoring Required";
 "Add Running Apps" = "Add Running Apps";
 "(unknown)" = "(unknown)";

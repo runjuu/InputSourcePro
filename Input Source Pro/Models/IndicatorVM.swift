@@ -104,7 +104,7 @@ final class IndicatorVM: ObservableObject {
                 
                 let app = appKind.getApp()
                 if self.punctuationService.shouldEnableForApp(app) {
-                    self.logger.debug { "Enabling ASCII punctuation for app: \(app.localizedName ?? app.bundleIdentifier ?? "Unknown")" }
+                    self.logger.debug { "Enabling English punctuation for app: \(app.localizedName ?? app.bundleIdentifier ?? "Unknown")" }
                     self.punctuationService.enable()
                 } else {
                     self.punctuationService.disable()

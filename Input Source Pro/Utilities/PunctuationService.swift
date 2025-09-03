@@ -12,7 +12,7 @@ class PunctuationService: ObservableObject {
     private var eventTap: CFMachPort?
     private weak var preferencesVM: PreferencesVM?
     
-    private let chinesePunctuationMap: [UInt16: String] = [
+    private let cjkvToEnglishPunctuationMap: [UInt16: String] = [
         // Correct macOS keyCode mappings for punctuation marks
         43: ",",    // 0x2B - Comma key -> ,
         47: ".",    // 0x2F - Period key -> .
@@ -72,7 +72,7 @@ class PunctuationService: ObservableObject {
     func disable() {
         guard isEnabled else { return }
         
-        logger.debug { "Disabling ASCII punctuation service" }
+        logger.debug { "Disabling English punctuation service" }
         stopMonitoring()
         isEnabled = false
     }
@@ -151,7 +151,7 @@ class PunctuationService: ObservableObject {
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
         
         // Check if this is a punctuation key we want to intercept
-        guard let asciiReplacement = chinesePunctuationMap[UInt16(keyCode)] else {
+        guard let englishReplacement = cjkvToEnglishPunctuationMap[UInt16(keyCode)] else {
             // Not a punctuation key we're interested in
             return Unmanaged.passUnretained(event)
         }
@@ -159,15 +159,15 @@ class PunctuationService: ObservableObject {
         // Check if we're in a Chinese/CJKV input method
         let currentInputSource = InputSource.getCurrentInputSource()
         guard currentInputSource.isCJKVR else {
-            // Already in ASCII input method, no need to intercept
-            logger.debug { "Skipping intercept - already in ASCII input method: \(currentInputSource.name ?? "unknown")" }
+            // Already in English/ASCII input method, no need to intercept
+            logger.debug { "Skipping intercept - already in English input method: \(currentInputSource.name ?? "unknown")" }
             return Unmanaged.passUnretained(event)
         }
         
-        logger.debug { "🎯 Intercepting punctuation key: \(keyCode) ('\(asciiReplacement)') in CJKV input method: \(currentInputSource.name ?? "unknown")" }
+        logger.debug { "🎯 Intercepting punctuation key: \(keyCode) ('\(englishReplacement)') in CJKV input method: \(currentInputSource.name ?? "unknown")" }
         
-        // Create a new event with ASCII replacement
-        if let newEvent = createAsciiPunctuationEvent(originalEvent: event, replacement: asciiReplacement) {
+        // Create a new event with English replacement
+        if let newEvent = createEnglishPunctuationEvent(originalEvent: event, replacement: englishReplacement) {
             logger.debug { "✅ Successfully created replacement event, returning new event" }
             return Unmanaged.passRetained(newEvent)
         } else {
@@ -176,8 +176,8 @@ class PunctuationService: ObservableObject {
         }
     }
     
-    private func createAsciiPunctuationEvent(originalEvent: CGEvent, replacement: String) -> CGEvent? {
-        // Create a new keyboard event for the ASCII character using privateState to avoid modifier pollution
+    private func createEnglishPunctuationEvent(originalEvent: CGEvent, replacement: String) -> CGEvent? {
+        // Create a new keyboard event for the English character using privateState to avoid modifier pollution
         guard let source = CGEventSource(stateID: .privateState),
               let newEvent = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true)
         else { 
@@ -204,7 +204,7 @@ class PunctuationService: ObservableObject {
         guard let preferencesVM = preferencesVM else { return false }
         
         let appRule = preferencesVM.getAppCustomization(app: app)
-        return appRule?.shouldForceAsciiPunctuation == true
+        return appRule?.shouldForceEnglishPunctuation == true
     }
     
     /// Check current service status and log detailed information for debugging
@@ -222,7 +222,7 @@ class PunctuationService: ObservableObject {
             - CGEvent Permission Check: \(permissionViaCGEvent ? "✅ Passed" : "❌ Failed")  
             - Accessibility Permission: \(accessibilityEnabled ? "✅ Granted" : "❌ Denied")
             - Current Input Source: \(currentInputSource.name ?? "unknown") (CJKV: \(currentInputSource.isCJKVR))
-            - Monitored Keys: \(chinesePunctuationMap.map { "\($0.key)→'\($0.value)'" }.joined(separator: ", "))
+            - Monitored Keys: \(cjkvToEnglishPunctuationMap.map { "\($0.key)→'\($0.value)'" }.joined(separator: ", "))
             """ }
     }
 }

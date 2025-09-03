@@ -119,7 +119,7 @@
 "Indicator" = "提示";
 "Hide Indicator" = "隱藏輸入法提示";
 "ASCII Punctuation" = "ASCII 標點符號";
-"Force ASCII Punctuation" = "強制使用 ASCII 標點符號";
+"Force ASCII Punctuation" = "強制使用英文標點符號";
 "Input Monitoring Required" = "需要輸入監控權限";
 "Add Running Apps" = "加入執行中的 Apps";
 "(unknown)" = "（未知）";
