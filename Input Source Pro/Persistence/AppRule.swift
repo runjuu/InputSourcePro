@@ -16,7 +16,7 @@ extension AppRule {
         return InputSource.sources.first { $0.id == inputSourceId }
     }
     
-    var shouldForceAsciiPunctuation: Bool {
-        return forceAsciiPunctuation
+    var shouldForceEnglishPunctuation: Bool {
+        return forceEnglishPunctuation
     }
 }
