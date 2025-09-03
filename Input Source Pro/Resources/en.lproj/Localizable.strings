@@ -117,7 +117,9 @@
 "Restore Previously Used One" = "Restore Previously Used One";
 "Indicator" = "Indicator";
 "Hide Indicator" = "Hide Indicator";
+"Punctuation" = "Punctuation";
 "ASCII Punctuation" = "ASCII Punctuation";
+"Force English Punctuation" = "Force English Punctuation";
 "Force ASCII Punctuation" = "Force English Punctuation";
 "Input Monitoring Required" = "Input Monitoring Required";
 "Add Running Apps" = "Add Running Apps";

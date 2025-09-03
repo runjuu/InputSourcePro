@@ -118,7 +118,9 @@
 "Restore Previously Used One" = "恢复上次使用的输入法";
 "Indicator" = "提示";
 "Hide Indicator" = "隐藏输入法提示";
+"Punctuation" = "标点符号";
 "ASCII Punctuation" = "ASCII 标点符号";
+"Force English Punctuation" = "强制使用英文标点符号";
 "Force ASCII Punctuation" = "强制使用英文标点符号";
 "Input Monitoring Required" = "需要输入监控权限";
 "Add Running Apps" = "添加运行中的应用";

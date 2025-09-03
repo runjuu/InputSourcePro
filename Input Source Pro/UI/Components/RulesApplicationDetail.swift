@@ -111,13 +111,13 @@ struct ApplicationDetail: View {
                 .padding(.vertical, 4)
 
             VStack(alignment: .leading) {
-                Text("ASCII Punctuation".i18n())
+                Text("Punctuation".i18n())
                     .fontWeight(.medium)
                 HStack {
                     Image(systemName: "textformat.abc")
                         .foregroundColor(.orange)
                     NSToggleView(
-                        label: "Force ASCII Punctuation".i18n(),
+                        label: "Force English Punctuation".i18n(),
                         state: forceEnglishPunctuation,
                         onStateUpdate: handleToggleForceEnglishPunctuation
                     )
