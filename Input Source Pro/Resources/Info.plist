@@ -26,6 +26,8 @@
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string></string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Input Source Pro needs to monitor keyboard input to automatically switch between English and Chinese punctuation marks based on your app-specific rules.</string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUPublicEDKey</key>
