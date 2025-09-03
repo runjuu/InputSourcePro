@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import IOKit
 
 @MainActor
 final class PermissionsVM: ObservableObject {
@@ -11,10 +12,41 @@ final class PermissionsVM: ObservableObject {
 
     @discardableResult
     static func checkInputMonitoring(prompt: Bool) -> Bool {
+        // Multi-strategy permission checking for better reliability
+        
+        // Strategy 1: IOHIDCheckAccess (most reliable)
+        if checkInputMonitoringViaIOHID() {
+            return true
+        }
+        
+        // Strategy 2: CGEvent.tapCreate (traditional method)
+        if checkInputMonitoringViaCGEvent(prompt: prompt) {
+            return true
+        }
+        
+        // Strategy 3: Delayed retry for timing-sensitive cases
+        if !prompt {
+            // For non-prompt calls, try a brief delay and retry
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                // Retry the check after a brief delay
+                _ = checkInputMonitoringViaCGEvent(prompt: false)
+            }
+        }
+        
+        return false
+    }
+    
+    private static func checkInputMonitoringViaIOHID() -> Bool {
+        // Use IOHIDCheckAccess for reliable permission checking
+        let access = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent)
+        return access == kIOHIDAccessTypeGranted
+    }
+    
+    private static func checkInputMonitoringViaCGEvent(prompt: Bool) -> Bool {
         let eventTap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
-            options: .defaultTap,
+            options: prompt ? .defaultTap : .listenOnly,
             eventsOfInterest: 1,
             callback: { _, _, event, _ in
                 return Unmanaged.passUnretained(event)
