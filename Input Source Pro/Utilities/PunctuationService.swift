@@ -12,6 +12,11 @@ class PunctuationService: ObservableObject {
     private var eventTap: CFMachPort?
     private weak var preferencesVM: PreferencesVM?
     
+    // Performance optimization: Cache input source state to reduce system calls
+    private var cachedInputSource: InputSource?
+    private var inputSourceCacheTime: TimeInterval = 0
+    private let inputSourceCacheTimeout: TimeInterval = 0.5 // Cache for 500ms
+    
     private let cjkvToEnglishPunctuationMap: [UInt16: String] = [
         // Correct macOS keyCode mappings for punctuation marks
         43: ",",    // 0x2B - Comma key -> ,
@@ -29,8 +34,10 @@ class PunctuationService: ObservableObject {
     }
     
     deinit {
-        // Note: stopMonitoring() will be called by disable() before deallocation
+        // Ensure cleanup happens regardless of disable() being called
+        // Note: Direct cleanup since deinit is not on MainActor
         if let eventTap = eventTap {
+            CGEvent.tapEnable(tap: eventTap, enable: false)
             CFMachPortInvalidate(eventTap)
         }
     }
@@ -56,16 +63,7 @@ class PunctuationService: ObservableObject {
             logger.debug { "English punctuation service started successfully" }
         } else {
             logger.debug { "Failed to start English punctuation service - Input Monitoring permission required" }
-            
-            // Schedule a retry after a delay in case permissions were just granted
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-                guard let self = self, !self.isEnabled else { return }
-                self.logger.debug { "Retrying English punctuation service activation..." }
-                if self.startMonitoring() {
-                    self.isEnabled = true
-                    self.logger.debug { "English punctuation service activated on retry" }
-                }
-            }
+            // Service will remain disabled until next enable() call or permission state change
         }
     }
     
@@ -88,8 +86,11 @@ class PunctuationService: ObservableObject {
         let eventMask = (1 << CGEventType.keyDown.rawValue)
         
         let callback: CGEventTapCallBack = { proxy, type, event, refcon in
-            guard let service = Unmanaged<PunctuationService>.fromOpaque(refcon!).takeUnretainedValue() as PunctuationService?
-            else { return Unmanaged.passUnretained(event) }
+            guard let refcon = refcon,
+                  let service = Unmanaged<PunctuationService>.fromOpaque(refcon).takeUnretainedValue() as? PunctuationService
+            else { 
+                return Unmanaged.passUnretained(event) 
+            }
             
             return service.handleKeyEvent(proxy: proxy, type: type, event: event)
         }
@@ -139,11 +140,20 @@ class PunctuationService: ObservableObject {
             CGEvent.tapEnable(tap: eventTap, enable: false)
             CFMachPortInvalidate(eventTap)
             self.eventTap = nil
-            logger.debug { "Event tap disabled" }
+            logger.debug { "Event tap disabled and invalidated" }
         }
+        
+        // Clear cached input source to ensure fresh state on next enable
+        cachedInputSource = nil
+        inputSourceCacheTime = 0
     }
     
     private func handleKeyEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent> {
+        // Handle event tap being disabled (can happen if permissions are revoked)
+        guard isEnabled else {
+            return Unmanaged.passUnretained(event)
+        }
+        
         guard type == .keyDown else {
             return Unmanaged.passUnretained(event)
         }
@@ -156,11 +166,10 @@ class PunctuationService: ObservableObject {
             return Unmanaged.passUnretained(event)
         }
         
-        // Check if we're in a Chinese/CJKV input method
-        let currentInputSource = InputSource.getCurrentInputSource()
+        // Check if we're in a Chinese/CJKV input method (with caching for performance)
+        let currentInputSource = getCachedCurrentInputSource()
         guard currentInputSource.isCJKVR else {
             // Already in English/ASCII input method, no need to intercept
-            logger.debug { "Skipping intercept - already in English input method: \(currentInputSource.name ?? "unknown")" }
             return Unmanaged.passUnretained(event)
         }
         
@@ -177,11 +186,14 @@ class PunctuationService: ObservableObject {
     }
     
     private func createEnglishPunctuationEvent(originalEvent: CGEvent, replacement: String) -> CGEvent? {
-        // Create a new keyboard event for the English character using privateState to avoid modifier pollution
+        // Use the original keyCode but with English character replacement
+        let originalKeyCode = CGKeyCode(originalEvent.getIntegerValueField(.keyboardEventKeycode))
+        
+        // Create a new keyboard event using the original key code with privateState to avoid modifier pollution
         guard let source = CGEventSource(stateID: .privateState),
-              let newEvent = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true)
+              let newEvent = CGEvent(keyboardEventSource: source, virtualKey: originalKeyCode, keyDown: true)
         else { 
-            logger.debug { "Failed to create CGEventSource or CGEvent" }
+            logger.debug { "Failed to create CGEventSource or CGEvent with keyCode: \(originalKeyCode)" }
             return nil 
         }
         
@@ -195,7 +207,7 @@ class PunctuationService: ObservableObject {
         // Explicitly set flags to none to ensure clean character input
         newEvent.flags = []
         
-        logger.debug { "Created ASCII replacement event for: '\(replacement)' (keyCode mapping verified)" }
+        logger.debug { "Created ASCII replacement event for: '\(replacement)' using original keyCode: \(originalKeyCode)" }
         
         return newEvent
     }
@@ -205,6 +217,24 @@ class PunctuationService: ObservableObject {
         
         let appRule = preferencesVM.getAppCustomization(app: app)
         return appRule?.shouldForceEnglishPunctuation == true
+    }
+    
+    /// Get current input source with caching to improve performance during rapid typing
+    private func getCachedCurrentInputSource() -> InputSource {
+        let currentTime = CACurrentMediaTime()
+        
+        // Return cached value if it's still valid
+        if let cached = cachedInputSource, 
+           currentTime - inputSourceCacheTime < inputSourceCacheTimeout {
+            return cached
+        }
+        
+        // Cache has expired or doesn't exist, fetch new value
+        let currentInputSource = InputSource.getCurrentInputSource()
+        cachedInputSource = currentInputSource
+        inputSourceCacheTime = currentTime
+        
+        return currentInputSource
     }
     
     /// Check current service status and log detailed information for debugging
