@@ -76,7 +76,17 @@ extension NSApplication {
     static func isBrowserApp(_ bundleIdentifier: String?) -> Bool {
         guard let bundleIdentifier = bundleIdentifier else { return false }
 
-        return browserAppIdentifier.contains(bundleIdentifier)
+        if browserAppIdentifier.contains(bundleIdentifier) {
+            return true
+        }
+
+        if Browser(rawValue: bundleIdentifier) != nil,
+           NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) != nil
+        {
+            return true
+        }
+
+        return false
     }
 
     static func isBrowserInstalled(_ bundleIdentifier: String) -> Bool {
