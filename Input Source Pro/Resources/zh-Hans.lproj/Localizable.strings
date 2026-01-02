@@ -26,14 +26,12 @@
 "System" = "系统";
 "Launch at Login" = "在登录时启动";
 "Display Icon in Menu Bar" = "在菜单栏中显示图标";
+"Support Spotlight-Like Apps" = "支持「聚焦」类应用";
 "Enhanced Mode" = "增强模式";
 "Enhanced Mode Description" = "启用增强模式让输入法提示位置更为准确，同时为「聚焦」类应用提供更完善的支持";
 "Enhanced Mode Permission Description" = "为了启用「增强模式」，Input Source Pro 需要你为它开启系统的「辅助功能」权限。";
 "Enhanced Mode Required Tips" = "开启此功能需先启用「增强模式」";
 "Open Accessibility Preferences" = "打开「辅助功能」设置";
-
-"Updates" = "更新";
-"Receive Beta Updates" = "接收测试版更新";
 
 "For All Apps and Websites" = "适用于所有应用和网站";
 "When Switching Back to the App or Website" = "切换回应用或网站时";

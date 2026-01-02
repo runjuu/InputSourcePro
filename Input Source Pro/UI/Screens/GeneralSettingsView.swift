@@ -150,17 +150,10 @@ struct GeneralSettingsView: View {
                             Spacer()
                         }
                         .padding()
+                        .border(width: 1, edges: [.bottom], color: NSColor.border2.color)
                     }
 
-                    SettingsSection(title: "Updates") {
-                        HStack {
-                            Toggle("", isOn: $preferencesVM.preferences.receiveBetaUpdates)
-                            Text("Receive Beta Updates".i18n())
-                            Spacer()
-                        }
-                        .padding()
-                        .border(width: 1, edges: [.bottom], color: NSColor.border2.color)
-                        
+                    SettingsSection(title: "") {
                         Button(action: { preferencesVM.checkUpdates() }, label: {
                             HStack {
                                 Text("Check for Updates".i18n() + "...")
