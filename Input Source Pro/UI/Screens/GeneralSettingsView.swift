@@ -65,6 +65,7 @@ struct GeneralSettingsView: View {
                             }
                         }
                         .pickerStyle(.segmented)
+                        .flexibleButtonSizing()
                     }
                     .padding()
                 }
