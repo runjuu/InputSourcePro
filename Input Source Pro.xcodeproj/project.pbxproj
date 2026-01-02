@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		25C5A6B52E678D86005AB80E /* PunctuationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25C5A6B42E678D86005AB80E /* PunctuationService.swift */; };
-		25C5A6B72E679DCD005AB80E /* InputMonitoringRequiredBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25C5A6B62E679DCD005AB80E /* InputMonitoringRequiredBadge.swift */; };
 		4A093071285DACAA00232089 /* NSToggleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A093070285DACAA00232089 /* NSToggleView.swift */; };
 		4A093073285E166E00232089 /* PreferencesVM+AppKeyboardCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A093072285E166E00232089 /* PreferencesVM+AppKeyboardCache.swift */; };
 		4A093075285EE55A00232089 /* RulesApplicationPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A093074285EE55A00232089 /* RulesApplicationPicker.swift */; };
@@ -177,7 +176,6 @@
 
 /* Begin PBXFileReference section */
 		25C5A6B42E678D86005AB80E /* PunctuationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PunctuationService.swift; sourceTree = "<group>"; };
-		25C5A6B62E679DCD005AB80E /* InputMonitoringRequiredBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputMonitoringRequiredBadge.swift; sourceTree = "<group>"; };
 		4A093070285DACAA00232089 /* NSToggleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NSToggleView.swift; sourceTree = "<group>"; };
 		4A093072285E166E00232089 /* PreferencesVM+AppKeyboardCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesVM+AppKeyboardCache.swift"; sourceTree = "<group>"; };
 		4A093074285EE55A00232089 /* RulesApplicationPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesApplicationPicker.swift; sourceTree = "<group>"; };
@@ -521,7 +519,6 @@
 		4A2A177A280BA7FA00E13249 /* Components */ = {
 			isa = PBXGroup;
 			children = (
-				25C5A6B62E679DCD005AB80E /* InputMonitoringRequiredBadge.swift */,
 				4A2A177B280BA7FA00E13249 /* IndicatorView.swift */,
 				4A1BD90E287BD14000E4D8C2 /* CustomizedIndicatorView.swift */,
 				4AC450BE281D841300DA0329 /* PreferenceSection.swift */,
@@ -885,7 +882,6 @@
 				4A093073285E166E00232089 /* PreferencesVM+AppKeyboardCache.swift in Sources */,
 				4A2A179D280BA7FA00E13249 /* GeneralSettingsView.swift in Sources */,
 				4A5EAA6C280BF6F700A9E332 /* AppearanceSettingsView.swift in Sources */,
-				25C5A6B72E679DCD005AB80E /* InputMonitoringRequiredBadge.swift in Sources */,
 				D5CC449E2A353E81007FF839 /* BrowserRuleMenuItem.swift in Sources */,
 				4A2A1780280BA7FA00E13249 /* IndicatorViewController.swift in Sources */,
 				4A093075285EE55A00232089 /* RulesApplicationPicker.swift in Sources */,

@@ -121,6 +121,8 @@
 "ASCII Punctuation" = "ASCII Punctuation";
 "Force English Punctuation" = "Force English Punctuation";
 "Input Monitoring Required" = "Input Monitoring Required";
+"This feature requires input monitoring permission to work" = "This feature requires input monitoring permission to work";
+"Open Permission Settings" = "Open Permission Settings";
 "Add Running Apps" = "Add Running Apps";
 "(unknown)" = "(unknown)";
 

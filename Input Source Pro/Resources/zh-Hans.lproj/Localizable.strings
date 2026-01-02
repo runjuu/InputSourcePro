@@ -122,6 +122,8 @@
 "ASCII Punctuation" = "ASCII 标点符号";
 "Force English Punctuation" = "强制使用英文标点符号";
 "Input Monitoring Required" = "需要输入监控权限";
+"This feature requires input monitoring permission to work" = "此功能需要输入监控权限才能使用";
+"Open Permission Settings" = "打开权限设置";
 "Add Running Apps" = "添加运行中的应用";
 "(unknown)" = "（未知）";
 

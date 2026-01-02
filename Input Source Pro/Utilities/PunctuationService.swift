@@ -130,7 +130,9 @@ class PunctuationService: ObservableObject {
         
         // If all configurations failed, provide detailed diagnostic info
         logger.debug { "❌ All event tap configurations failed. Diagnostic info:" }
+        #if DEBUG
         checkServiceStatus()
+        #endif
         
         return false
     }
@@ -173,7 +175,7 @@ class PunctuationService: ObservableObject {
             return Unmanaged.passUnretained(event)
         }
         
-        logger.debug { "🎯 Intercepting punctuation key: \(keyCode) ('\(englishReplacement)') in CJKV input method: \(currentInputSource.name ?? "unknown")" }
+        logger.debug { "🎯 Intercepting punctuation key: \(keyCode) ('\(englishReplacement)') in CJKV input method: \(currentInputSource.name)" }
         
         // Create a new event with English replacement
         if let newEvent = createEnglishPunctuationEvent(originalEvent: event, replacement: englishReplacement) {
@@ -251,7 +253,7 @@ class PunctuationService: ObservableObject {
             - IOHIDCheckAccess (Input Monitoring): \(permissionViaIOHID ? "✅ Granted" : "❌ Denied")
             - CGEvent Permission Check: \(permissionViaCGEvent ? "✅ Passed" : "❌ Failed")  
             - Accessibility Permission: \(accessibilityEnabled ? "✅ Granted" : "❌ Denied")
-            - Current Input Source: \(currentInputSource.name ?? "unknown") (CJKV: \(currentInputSource.isCJKVR))
+            - Current Input Source: \(currentInputSource.name) (CJKV: \(currentInputSource.isCJKVR))
             - Monitored Keys: \(cjkvToEnglishPunctuationMap.map { "\($0.key)→'\($0.value)'" }.joined(separator: ", "))
             """ }
     }

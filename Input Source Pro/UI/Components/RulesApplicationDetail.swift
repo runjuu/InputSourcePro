@@ -16,6 +16,7 @@ struct ApplicationDetail: View {
     @Binding var selectedApp: Set<AppRule>
 
     @EnvironmentObject var preferencesVM: PreferencesVM
+    @EnvironmentObject var permissionsVM: PermissionsVM
 
     @State var forceKeyboard: PickerItem?
     @State var doRestoreKeyboardState = NSToggleViewState.off
@@ -111,8 +112,13 @@ struct ApplicationDetail: View {
                 .padding(.vertical, 4)
 
             VStack(alignment: .leading) {
-                Text("Punctuation".i18n())
-                    .fontWeight(.medium)
+                HStack {
+                    Text("Punctuation".i18n())
+                        .fontWeight(.medium)
+                    Spacer()
+                    EnhancedModeRequiredBadge()
+                }
+                
                 HStack {
                     Image(systemName: "textformat.abc")
                         .foregroundColor(.orange)
@@ -122,6 +128,25 @@ struct ApplicationDetail: View {
                         onStateUpdate: handleToggleForceEnglishPunctuation
                     )
                     .fixedSize()
+                    .disabled(!preferencesVM.preferences.isEnhancedModeEnabled)
+                }
+                
+                if selectedApp.contains(where: { $0.forceEnglishPunctuation }) && !PermissionsVM.checkInputMonitoring(prompt: false) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("This feature requires input monitoring permission to work".i18n())
+
+                        HStack {
+                            Spacer()
+                            Button("Open Permission Settings".i18n()) {
+                                NSWorkspace.shared.openInputMonitoringPreferences()
+                            }
+                        }
+                    }
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(NSColor.background1.color)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .padding(.top)
                 }
             }
 
@@ -129,12 +154,6 @@ struct ApplicationDetail: View {
                 Divider().padding(.vertical, 4)
 
                 EnhancedModeRequiredBadge()
-            }
-
-            if selectedApp.contains(where: { $0.forceEnglishPunctuation }) {
-                Divider().padding(.vertical, 4)
-
-                InputMonitoringRequiredBadge()
             }
 
             Spacer()
@@ -255,6 +274,10 @@ struct ApplicationDetail: View {
         case .off, .mixed:
             selectedApp.forEach { preferencesVM.setForceEnglishPunctuation($0, true) }
             forceEnglishPunctuation = .on
+            
+            if !PermissionsVM.checkInputMonitoring(prompt: false) {
+                PermissionsVM.checkInputMonitoring(prompt: true)
+            }
             return .on
         }
     }

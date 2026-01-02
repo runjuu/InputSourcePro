@@ -121,6 +121,8 @@
 "ASCII Punctuation" = "ASCII 句読点";
 "Force English Punctuation" = "英語句読点を強制使用";
 "Input Monitoring Required" = "入力監視権限が必要";
+"This feature requires input monitoring permission to work" = "この機能を使うには入力監視権限が必要です";
+"Open Permission Settings" = "権限設定を開く";
 "Add Running Apps" = "実行中のアプリを追加";
 "(unknown)" = "（不明）";
 
