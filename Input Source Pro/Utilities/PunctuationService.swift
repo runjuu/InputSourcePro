@@ -25,8 +25,7 @@ class PunctuationService: ObservableObject {
         39: "'",    // 0x27 - Single Quote key -> '
         42: "\"",   // 0x2A - Double Quote key -> "
         33: "[",    // 0x21 - Left Bracket key -> [
-        30: "]",    // 0x1E - Right Bracket key -> ]
-        49: " ",    // 0x31 - Space key -> space (for full-width space handling)
+        30: "]"     // 0x1E - Right Bracket key -> ]
     ]
     
     init(preferencesVM: PreferencesVM) {
