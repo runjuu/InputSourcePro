@@ -12,21 +12,21 @@ struct EnhancedModeToggle: View {
             set: { onNeedDetectSpotlightLikeApp($0) }
         )
 
-        VStack(alignment: .leading) {
-            HStack {
-                Toggle("", isOn: isDetectSpotlightLikeAppBinding)
-                    .sheet(isPresented: $isShowAccessibilityRequest) {
-                        AccessibilityPermissionRequestView(isPresented: $isShowAccessibilityRequest)
-                    }
+        HStack(alignment: .firstTextBaseline) {
+            Toggle("", isOn: isDetectSpotlightLikeAppBinding)
+                .sheet(isPresented: $isShowAccessibilityRequest) {
+                    AccessibilityPermissionRequestView(isPresented: $isShowAccessibilityRequest)
+                }
 
+            VStack(alignment: .leading, spacing: 6) {
                 Text("Enhanced Mode".i18n())
-
-                Spacer()
+                
+                Text(.init("Enhanced Mode Description".i18n()))
+                    .font(.system(size: 12))
+                    .opacity(0.8)
             }
 
-            Text(.init("Enhanced Mode Description".i18n()))
-                .font(.system(size: 12))
-                .opacity(0.8)
+            Spacer()
         }
         .padding()
     }
