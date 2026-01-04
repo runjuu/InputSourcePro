@@ -25,14 +25,20 @@ class InputSourceVM: ObservableObject {
         watchSystemNotification()
 
         selectInputSourceSubject
-            .tap { [weak self] inputSource in
-                guard let preferencesVM = self?.preferencesVM
-                else { return }
+            .map { [weak self] inputSource -> Bool in
+                guard let preferencesVM = self?.preferencesVM else {
+                    return false
+                }
 
-                inputSource.select(useCJKVFix: preferencesVM.isUseCJKVFix())
+                return inputSource.select(useCJKVFix: preferencesVM.isUseCJKVFix())
             }
-            .flatMapLatest { _ in
-                Timer.interval(seconds: 0.2)
+            .flatMapLatest { [weak self] didSwitch -> AnyPublisher<InputSource, Never> in
+                guard didSwitch else {
+                    self?._isProgrammaticChange = false
+                    return Empty().eraseToAnyPublisher()
+                }
+
+                return Timer.interval(seconds: 0.2)
                     .map { _ in InputSource.getCurrentInputSource() }
                     .withPrevious()
                     .filter { previous, current in
@@ -41,6 +47,7 @@ class InputSourceVM: ObservableObject {
                     }
                     .map { _, current in current }
                     .prefix(1)
+                    .eraseToAnyPublisher()
             }
             .sink { [weak self] in
                 self?.inputSourceChangesSubject.send($0)

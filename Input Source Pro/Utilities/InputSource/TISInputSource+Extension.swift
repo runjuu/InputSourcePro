@@ -33,8 +33,16 @@ extension TISInputSource {
         return getProperty(kTISPropertyInputSourceIsSelectCapable) as? Bool ?? false
     }
 
+    var isEnabled: Bool {
+        return getProperty(kTISPropertyInputSourceIsEnabled) as? Bool ?? false
+    }
+
     var sourceLanguages: [String] {
         return getProperty(kTISPropertyInputSourceLanguages) as? [String] ?? []
+    }
+
+    var inputModeID: String? {
+        return getProperty(kTISPropertyInputModeID) as? String
     }
 
     var iconImageURL: URL? {

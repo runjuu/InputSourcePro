@@ -1,7 +1,5 @@
 import Carbon
 import Cocoa
-import Combine
-import CoreGraphics
 import CryptoKit
 
 @MainActor
@@ -17,6 +15,7 @@ class InputSource {
 
     var id: String { tisInputSource.id }
     var name: String { tisInputSource.name }
+    var inputModeID: String? { tisInputSource.inputModeID }
 
     var isCJKVR: Bool {
         guard let lang = tisInputSource.sourceLanguages.first else { return false }
@@ -62,46 +61,14 @@ class InputSource {
         }()
     }
 
-    func select(useCJKVFix: Bool) {
+    @discardableResult
+    func select(useCJKVFix: Bool) -> Bool {
         Self.logger.debug { "Select \(id)" }
-
-        guard Self.getCurrentInputSource().id != id else {
-            Self.logger.debug { "Skip Select \(id)" }
-            return
+        let didSwitch = InputSourceSwitcher.switchToInputSource(self, useCJKVFix: useCJKVFix)
+        if !didSwitch {
+            Self.logger.debug { "Failed to select \(id)" }
         }
-
-        let updateStrategy: String = {
-            if isCJKVR {
-                // https://stackoverflow.com/a/60375569
-                if useCJKVFix,
-                   PermissionsVM.checkAccessibility(prompt: false),
-                   let selectPreviousShortcut = Self.getSelectPreviousShortcut()
-                {
-                    TISSelectInputSource(tisInputSource)
-
-                    // Workaround for TIS CJKV layout bug:
-                    // when it's CJKV, select nonCJKV input first and then return
-                    if let nonCJKV = Self.nonCJKVSource() {
-                        Self.logger.debug { "S1: Start" }
-                        TISSelectInputSource(nonCJKV.tisInputSource)
-                        Self.logger.debug { "S1: selectPrevious" }
-                        Self.selectPrevious(shortcut: selectPreviousShortcut)
-                        Self.logger.debug { "S1: Done" }
-                    }
-
-                    return "S1"
-                } else {
-                    TISSelectInputSource(tisInputSource)
-                    return "S0-2"
-                }
-            } else {
-                TISSelectInputSource(tisInputSource)
-
-                return "S0-2"
-            }
-        }()
-
-        Self.logger.debug { "Select by \(updateStrategy)" }
+        return didSwitch
     }
 }
 
@@ -138,52 +105,13 @@ extension InputSource {
         return sources.first(where: { $0 != current && $0.isCJKVR })
     }
 
-    static func selectPrevious(shortcut: (Int, UInt64)) {
-        let src = CGEventSource(stateID: .hidSystemState)
-
-        let key = CGKeyCode(shortcut.0)
-        let flag = CGEventFlags(rawValue: shortcut.1)
-
-        let down = CGEvent(keyboardEventSource: src, virtualKey: key, keyDown: true)!
-        let up = CGEvent(keyboardEventSource: src, virtualKey: key, keyDown: false)!
-
-        down.flags = flag
-        up.flags = flag
-
-        let ctrlDown = CGEvent(keyboardEventSource: nil, virtualKey: UInt16(kVK_Control), keyDown: true)
-        let ctrlUp = CGEvent(keyboardEventSource: nil, virtualKey: UInt16(kVK_Control), keyDown: false)
-
-        ctrlDown?.post(tap: .cghidEventTap)
-        down.post(tap: .cghidEventTap)
-        up.post(tap: .cghidEventTap)
-        ctrlUp?.post(tap: .cghidEventTap)
-    }
-
     // from read-symbolichotkeys script of Karabiner
     // github.com/tekezo/Karabiner/blob/master/src/util/read-symbolichotkeys/read-symbolichotkeys/main.m
     static func getSelectPreviousShortcut() -> (Int, UInt64)? {
-        guard let dict = UserDefaults.standard.persistentDomain(forName: "com.apple.symbolichotkeys") else {
+        guard let shortcut = InputSourceSwitcher.systemSelectPreviousShortcut() else {
             return nil
         }
-        guard let symbolichotkeys = dict["AppleSymbolicHotKeys"] as! NSDictionary? else {
-            return nil
-        }
-        guard let symbolichotkey = symbolichotkeys["60"] as! NSDictionary? else {
-            return nil
-        }
-        if (symbolichotkey["enabled"] as! NSNumber).intValue != 1 {
-            return nil
-        }
-        guard let value = symbolichotkey["value"] as! NSDictionary? else {
-            return nil
-        }
-        guard let parameters = value["parameters"] as! NSArray? else {
-            return nil
-        }
-        return (
-            (parameters[1] as! NSNumber).intValue,
-            (parameters[2] as! NSNumber).uint64Value
-        )
+        return (Int(shortcut.keyCode), shortcut.modifiers.rawValue)
     }
 }
 
