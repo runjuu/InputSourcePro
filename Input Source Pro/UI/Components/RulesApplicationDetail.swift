@@ -1,59 +1,13 @@
 import SwiftUI
 
 // 新增 ToggleLabel 组件
-private enum RulesApplicationDetailIconStyle {
-    static let size: CGFloat = 16
-    static var imageFont: Font { .system(size: size) }
-    static var textFont: Font { .system(size: size, weight: .regular, design: .rounded) }
-}
-
-private struct RulesApplicationDetailIcon: View {
-    enum Content {
-        case system(String)
-        case text(String)
-    }
-
-    let content: Content
-    let color: Color
-
-    init(systemName: String, color: Color = .primary) {
-        content = .system(systemName)
-        self.color = color
-    }
-
-    init(text: String, color: Color = .primary) {
-        content = .text(text)
-        self.color = color
-    }
-
-    var body: some View {
-        Group {
-            switch content {
-            case .system(let name):
-                Image(systemName: name)
-                    .font(RulesApplicationDetailIconStyle.imageFont)
-            case .text(let value):
-                Text(value)
-                    .font(RulesApplicationDetailIconStyle.textFont)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-            }
-        }
-        .foregroundColor(color)
-        .frame(
-            width: RulesApplicationDetailIconStyle.size,
-            height: RulesApplicationDetailIconStyle.size,
-            alignment: .center
-        )
-    }
-}
 
 struct ToggleLabel: View {
     let systemImageName: String
     let text: String
     var body: some View {
         HStack(spacing: 6) {
-            RulesApplicationDetailIcon(systemName: systemImageName)
+            RuleSettingIcon(systemName: systemImageName)
             Text(text)
         }
     }
@@ -147,7 +101,7 @@ struct ApplicationDetail: View {
                     .fontWeight(.medium)
 
                 HStack {
-                    RulesApplicationDetailIcon(systemName: "d.circle.fill", color: .green)
+                    RuleSettingIcon(systemName: "d.circle.fill", color: .green)
                     NSToggleView(
                         label: restoreStrategyName(strategy: .UseDefaultKeyboardInstead),
                         state: preferencesVM.preferences.isRestorePreviouslyUsedInputSource
@@ -160,7 +114,7 @@ struct ApplicationDetail: View {
                 }
 
                 HStack {
-                    RulesApplicationDetailIcon(systemName: "arrow.uturn.left.circle.fill", color: .blue)
+                    RuleSettingIcon(systemName: "arrow.uturn.left.circle.fill", color: .blue)
                     NSToggleView(
                         label: restoreStrategyName(strategy: .RestorePreviouslyUsedOne),
                         state: preferencesVM.preferences.isRestorePreviouslyUsedInputSource
@@ -180,7 +134,7 @@ struct ApplicationDetail: View {
                 Text("Indicator".i18n())
                     .fontWeight(.medium)
                 HStack {
-                    RulesApplicationDetailIcon(systemName: "eye.slash.circle.fill", color: .gray)
+                    RuleSettingIcon(systemName: "eye.slash.circle.fill", color: .gray)
                     NSToggleView(
                         label: "Hide Indicator".i18n(),
                         state: hideIndicator,
@@ -202,7 +156,7 @@ struct ApplicationDetail: View {
                 }
                 
                 HStack {
-                    RulesApplicationDetailIcon(text: "Aa", color: .orange)
+                    RuleSettingIcon(text: "Aa", color: .orange)
                     NSToggleView(
                         label: "Force English Punctuation".i18n(),
                         state: forceEnglishPunctuation,

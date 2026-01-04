@@ -12,6 +12,7 @@
 		4A093073285E166E00232089 /* PreferencesVM+AppKeyboardCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A093072285E166E00232089 /* PreferencesVM+AppKeyboardCache.swift */; };
 		4A093075285EE55A00232089 /* RulesApplicationPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A093074285EE55A00232089 /* RulesApplicationPicker.swift */; };
 		4A093077285EE58000232089 /* RulesApplicationDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A093076285EE58000232089 /* RulesApplicationDetail.swift */; };
+		D5F1A1B33A4B5C6D7E8F9012 /* RuleSettingIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5F1A1B23A4B5C6D7E8F9012 /* RuleSettingIcon.swift */; };
 		4A093079285EE63D00232089 /* RunningApplicationsPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A093078285EE63D00232089 /* RunningApplicationsPicker.swift */; };
 		4A09307B285F31E800232089 /* NSToolbarItem+Identifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A09307A285F31E800232089 /* NSToolbarItem+Identifier.swift */; };
 		4A09307D285F32B100232089 /* PreferencesWindowController+NSToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A09307C285F32B100232089 /* PreferencesWindowController+NSToolbar.swift */; };
@@ -182,6 +183,7 @@
 		4A093072285E166E00232089 /* PreferencesVM+AppKeyboardCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesVM+AppKeyboardCache.swift"; sourceTree = "<group>"; };
 		4A093074285EE55A00232089 /* RulesApplicationPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesApplicationPicker.swift; sourceTree = "<group>"; };
 		4A093076285EE58000232089 /* RulesApplicationDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesApplicationDetail.swift; sourceTree = "<group>"; };
+		D5F1A1B23A4B5C6D7E8F9012 /* RuleSettingIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuleSettingIcon.swift; sourceTree = "<group>"; };
 		4A093078285EE63D00232089 /* RunningApplicationsPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunningApplicationsPicker.swift; sourceTree = "<group>"; };
 		4A09307A285F31E800232089 /* NSToolbarItem+Identifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSToolbarItem+Identifier.swift"; sourceTree = "<group>"; };
 		4A09307C285F32B100232089 /* PreferencesWindowController+NSToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesWindowController+NSToolbar.swift"; sourceTree = "<group>"; };
@@ -542,6 +544,7 @@
 				4A093070285DACAA00232089 /* NSToggleView.swift */,
 				4A093074285EE55A00232089 /* RulesApplicationPicker.swift */,
 				4A093076285EE58000232089 /* RulesApplicationDetail.swift */,
+				D5F1A1B23A4B5C6D7E8F9012 /* RuleSettingIcon.swift */,
 				4A093078285EE63D00232089 /* RunningApplicationsPicker.swift */,
 				4A09308A28680A3200232089 /* NSViewHoverable.swift */,
 				4A1BD907287AD20200E4D8C2 /* KeyboardCustomization.swift */,
@@ -812,6 +815,7 @@
 				D5F73B022A2C1DCD00BBC10A /* InputSourceVM.swift in Sources */,
 				4AC261472870338F0032AAFE /* NSTableView+RemoveBG.swift in Sources */,
 				4A093077285EE58000232089 /* RulesApplicationDetail.swift in Sources */,
+				D5F1A1B33A4B5C6D7E8F9012 /* RuleSettingIcon.swift in Sources */,
 				D525609E29B58448009EB7BA /* LoadingView.swift in Sources */,
 				4A0930812866BC4A00232089 /* AXSwift.swift in Sources */,
 				4A2A177F280BA7FA00E13249 /* StatusItemController.swift in Sources */,
