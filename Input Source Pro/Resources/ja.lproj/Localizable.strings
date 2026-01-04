@@ -110,6 +110,8 @@
 "%@ App(s) Selected" = "%@個のアプリが選択されました";
 "System-Wide" = "システム全体";
 "Default Keyboard" = "デフォルトキーボード";
+"Default Function Keys" = "デフォルトのファンクションキー";
+"Function Keys" = "ファンクションキー";
 "Keyboard Restore Strategy" = "キーボード復元戦略";
 "Restore Previously Used Keyboard" = "以前使用していたキーボードを復元";
 "Use Default Keyboard Instead" = "代わりにデフォルトキーボードを使用";
@@ -119,6 +121,10 @@
 "Punctuation" = "句読点";
 "ASCII Punctuation" = "ASCII 句読点";
 "Force English Punctuation" = "英語句読点を強制使用";
+"Use Function Keys" = "ファンクションキーを使用 (F1、F2 など)";
+"Use Media Keys" = "メディアキーを使用 (明るさ、音量など)";
+"Use Global Setting" = "グローバル設定を使用";
+"Function Keys Description" = "F1、F2 などをメディアキーではなく標準のファンクションキーとして使用します";
 "Input Monitoring Required" = "入力監視権限が必要";
 "This feature requires input monitoring permission to work" = "この機能を使うには入力監視権限が必要です";
 "Open Permission Settings" = "権限設定を開く";

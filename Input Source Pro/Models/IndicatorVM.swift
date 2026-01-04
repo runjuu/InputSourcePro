@@ -18,6 +18,8 @@ final class IndicatorVM: ObservableObject {
 
     let logger = ISPLogger(category: String(describing: IndicatorVM.self))
 
+    private var currentFKeyMode: FKeyMode?
+
     @Published
     private(set) var state: State
 
@@ -74,6 +76,7 @@ final class IndicatorVM: ObservableObject {
         clearAppKeyboardCacheIfNeed()
         watchState()
         watchPunctuationRules()
+        watchFunctionKeyMode()
     }
 
     private func clearAppKeyboardCacheIfNeed() {
@@ -111,6 +114,40 @@ final class IndicatorVM: ObservableObject {
                 }
             }
             .store(in: cancelBag)
+    }
+
+    private func watchFunctionKeyMode() {
+        applicationVM.$appKind
+            .compactMap { $0 }
+            .sink { [weak self] appKind in
+                self?.applyFunctionKeyMode(for: appKind)
+            }
+            .store(in: cancelBag)
+
+        preferencesVM.$preferences
+            .map(\.isFunctionKeysEnabled)
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                guard let self = self,
+                      let appKind = self.applicationVM.appKind
+                else { return }
+
+                self.applyFunctionKeyMode(for: appKind)
+            }
+            .store(in: cancelBag)
+    }
+
+    private func applyFunctionKeyMode(for appKind: AppKind) {
+        let desiredMode = preferencesVM.functionKeyMode(for: appKind)
+
+        guard desiredMode != currentFKeyMode else { return }
+
+        do {
+            try FKeyManager.setCurrentFKeyMode(desiredMode)
+            currentFKeyMode = desiredMode
+        } catch {
+            logger.debug { "Failed to set function key mode: \(error.localizedDescription)" }
+        }
     }
 }
 

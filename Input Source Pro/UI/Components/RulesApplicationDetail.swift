@@ -70,14 +70,35 @@ struct ApplicationDetail: View {
     @State var doNotRestoreKeyboardState = NSToggleViewState.off
     @State var hideIndicator = NSToggleViewState.off
     @State var forceEnglishPunctuation = NSToggleViewState.off
+    @State var functionKeyModeItem: PickerItem?
 
     var mixed: Bool {
         Set(selectedApp.map { $0.forcedKeyboard?.id }).count > 1
     }
 
+    var isFunctionKeyModeMixed: Bool {
+        Set(selectedApp.map { $0.functionKeyMode }).count > 1
+    }
+
     var items: [PickerItem] {
         [mixed ? PickerItem.mixed : nil, PickerItem.empty].compactMap { $0 }
             + InputSource.sources.map { PickerItem(id: $0.id, title: $0.name, toolTip: $0.id) }
+    }
+
+    var functionKeyItems: [PickerItem] {
+        [isFunctionKeyModeMixed ? PickerItem.mixed : nil, functionKeyDefaultItem].compactMap { $0 }
+            + functionKeyOptionItems
+    }
+
+    var functionKeyDefaultItem: PickerItem {
+        PickerItem(id: "default", title: "Use Global Setting".i18n(), toolTip: nil)
+    }
+
+    var functionKeyOptionItems: [PickerItem] {
+        [
+            PickerItem(id: FKeyMode.functionKeys.rawValue, title: "Use Function Keys".i18n(), toolTip: nil),
+            PickerItem(id: FKeyMode.mediaKeys.rawValue, title: "Use Media Keys".i18n(), toolTip: nil),
+        ]
     }
 
     var body: some View {
@@ -98,6 +119,23 @@ struct ApplicationDetail: View {
                     getTitle: { $0?.title ?? "" },
                     getToolTip: { $0?.toolTip },
                     onSelect: handleSelect
+                )
+            }
+
+            Divider()
+                .padding(.vertical, 4)
+
+            VStack(alignment: .leading) {
+                Text("Function Keys".i18n())
+                    .fontWeight(.medium)
+
+                PopUpButtonPicker<PickerItem?>(
+                    items: functionKeyItems,
+                    isItemEnabled: { $0?.id != "mixed" },
+                    isItemSelected: { $0 == functionKeyModeItem },
+                    getTitle: { $0?.title ?? "" },
+                    getToolTip: { $0?.toolTip },
+                    onSelect: handleSelectFunctionKeyMode
                 )
             }
 
@@ -208,6 +246,7 @@ struct ApplicationDetail: View {
             updateDoNotRestoreKeyboardState()
             updateHideIndicatorState()
             updateForceEnglishPunctuationState()
+            updateFunctionKeyModeItem()
         }
     }
 
@@ -259,6 +298,22 @@ struct ApplicationDetail: View {
         } else {
             forceEnglishPunctuation = stateSet.first == true ? .on : .off
         }
+    }
+
+    func updateFunctionKeyModeItem() {
+        let modeSet = Set(selectedApp.map { $0.functionKeyMode })
+
+        if modeSet.count > 1 {
+            functionKeyModeItem = PickerItem.mixed
+            return
+        }
+
+        guard let mode = modeSet.first ?? nil else {
+            functionKeyModeItem = functionKeyDefaultItem
+            return
+        }
+
+        functionKeyModeItem = functionKeyItem(for: mode)
     }
 
     func handleSelect(_ index: Int) {
@@ -323,6 +378,30 @@ struct ApplicationDetail: View {
             }
             return .on
         }
+    }
+
+    func handleSelectFunctionKeyMode(_ index: Int) {
+        let selection = functionKeyItems[index]
+        functionKeyModeItem = selection
+
+        let mode: FKeyMode?
+
+        switch selection.id {
+        case functionKeyDefaultItem.id:
+            mode = nil
+        case FKeyMode.functionKeys.rawValue:
+            mode = .functionKeys
+        case FKeyMode.mediaKeys.rawValue:
+            mode = .mediaKeys
+        default:
+            mode = nil
+        }
+
+        selectedApp.forEach { preferencesVM.setFunctionKeyMode($0, mode) }
+    }
+
+    func functionKeyItem(for mode: FKeyMode) -> PickerItem {
+        functionKeyOptionItems.first(where: { $0.id == mode.rawValue }) ?? functionKeyDefaultItem
     }
 
     func restoreStrategyName(strategy: KeyboardRestoreStrategy) -> String {

@@ -15,6 +15,16 @@ extension AppRule {
 
         return InputSource.sources.first { $0.id == inputSourceId }
     }
+
+    var functionKeyMode: FKeyMode? {
+        get {
+            guard let rawValue = functionKeyModeRaw else { return nil }
+            return FKeyMode(rawValue: rawValue)
+        }
+        set {
+            functionKeyModeRaw = newValue?.rawValue
+        }
+    }
     
     var shouldForceEnglishPunctuation: Bool {
         return forceEnglishPunctuation

@@ -73,6 +73,14 @@ extension PreferencesVM {
         }
     }
 
+    func setFunctionKeyMode(_ appCustomization: AppRule?, _ mode: FKeyMode?) {
+        guard let appCustomization = appCustomization else { return }
+
+        saveContext {
+            appCustomization.functionKeyMode = mode
+        }
+    }
+
     func getAppCustomization(app: NSRunningApplication) -> AppRule? {
         return getAppCustomization(bundleId: app.bundleId())
     }

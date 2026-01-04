@@ -90,6 +90,7 @@
 		4A881A93288BC55E00B76498 /* PreferencesVM+KeyboardConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A881A92288BC55E00B76498 /* PreferencesVM+KeyboardConfig.swift */; };
 		4A881A98288CDDD500B76498 /* MainStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A881A97288CDDD500B76498 /* MainStorage.swift */; };
 		4A8E47692F08814500424D11 /* SwiftUI+FlexibleButtonSizing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A8E47682F08814500424D11 /* SwiftUI+FlexibleButtonSizing.swift */; };
+		4A8E49912F0AF69300424D11 /* FKeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A8E49902F0AF69200424D11 /* FKeyManager.swift */; };
 		4A9B8A1D2881AE94007D23BB /* ButtonStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9B8A1C2881AE94007D23BB /* ButtonStyle.swift */; };
 		4A9B8A202883CCA3007D23BB /* AlignedWidth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9B8A1F2883CCA3007D23BB /* AlignedWidth.swift */; };
 		4AB1B192281F971B0081D94C /* AccessibilityPermissionRequestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AB1B191281F971B0081D94C /* AccessibilityPermissionRequestView.swift */; };
@@ -258,6 +259,7 @@
 		4A881A92288BC55E00B76498 /* PreferencesVM+KeyboardConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesVM+KeyboardConfig.swift"; sourceTree = "<group>"; };
 		4A881A97288CDDD500B76498 /* MainStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainStorage.swift; sourceTree = "<group>"; };
 		4A8E47682F08814500424D11 /* SwiftUI+FlexibleButtonSizing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwiftUI+FlexibleButtonSizing.swift"; sourceTree = "<group>"; };
+		4A8E49902F0AF69200424D11 /* FKeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FKeyManager.swift; sourceTree = "<group>"; };
 		4A9B8A1C2881AE94007D23BB /* ButtonStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ButtonStyle.swift; sourceTree = "<group>"; };
 		4A9B8A1F2883CCA3007D23BB /* AlignedWidth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlignedWidth.swift; sourceTree = "<group>"; };
 		4AB1B191281F971B0081D94C /* AccessibilityPermissionRequestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityPermissionRequestView.swift; sourceTree = "<group>"; };
@@ -446,6 +448,7 @@
 				4A2A1766280BA7FA00E13249 /* i18n.swift */,
 				4AEEE08328126A4900C883F8 /* BrowserURL.swift */,
 				D58C184728A808F000F52845 /* KeyboardRestoreStrategy.swift */,
+				4A8E49902F0AF69200424D11 /* FKeyManager.swift */,
 				4A8E47682F08814500424D11 /* SwiftUI+FlexibleButtonSizing.swift */,
 			);
 			path = Utilities;
@@ -925,6 +928,7 @@
 				4A2A1781280BA7FA00E13249 /* IndicatorWindowController.swift in Sources */,
 				4A35D55A2819834600DDC108 /* NSRunningApplication.swift in Sources */,
 				4A093079285EE63D00232089 /* RunningApplicationsPicker.swift in Sources */,
+				4A8E49912F0AF69300424D11 /* FKeyManager.swift in Sources */,
 				D525609929B56843009EB7BA /* ISPTextEditor.swift in Sources */,
 				4A4167282813A61F00CCC28C /* BrowserRule.swift in Sources */,
 				4A2A1799280BA7FA00E13249 /* IndicatorVM.swift in Sources */,

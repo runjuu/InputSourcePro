@@ -110,6 +110,8 @@
 "%@ App(s) Selected" = "%@개 앱 선택됨";
 "System-Wide" = "시스템 전체";
 "Default Keyboard" = "기본 입력 소스";
+"Default Function Keys" = "기본 기능 키";
+"Function Keys" = "기능 키";
 "Keyboard Restore Strategy" = "입력 소스 복원 전략";
 "Restore Previously Used Keyboard" = "이전에 사용한 입력 소스 복원";
 "Use Default Keyboard Instead" = "기본 입력 소스 사용";
@@ -119,6 +121,10 @@
 "Punctuation" = "구두점";
 "ASCII Punctuation" = "ASCII 구두점";
 "Force English Punctuation" = "영어 구두점 강제 사용";
+"Use Function Keys" = "기능 키 사용 (F1, F2 등)";
+"Use Media Keys" = "미디어 키 사용 (밝기, 음량 등)";
+"Use Global Setting" = "전역 설정 사용";
+"Function Keys Description" = "F1, F2 등을 미디어 키 대신 표준 기능 키로 사용합니다";
 "Input Monitoring Required" = "입력 모니터링 권한 필요";
 "This feature requires input monitoring permission to work" = "이 기능을 사용하려면 입력 모니터링 권한이 필요합니다";
 "Open Permission Settings" = "권한 설정 열기";

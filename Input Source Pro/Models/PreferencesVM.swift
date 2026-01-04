@@ -217,6 +217,7 @@ struct Preferences {
         static let isCJKVFixEnabled = "isCJKVFixEnabled"
 
         static let systemWideDefaultKeyboardId = "systemWideDefaultKeyboardId"
+        static let isFunctionKeysEnabled = "isFunctionKeysEnabled"
 
         static let browserAddressDefaultKeyboardId = "browserAddressDefaultKeyboardId"
         static let isActiveWhenLongpressLeftMouse = "isActiveWhenLongpressLeftMouse"
@@ -302,6 +303,14 @@ struct Preferences {
 
     @UserDefault(Preferences.Key.isRestorePreviouslyUsedInputSource)
     var isRestorePreviouslyUsedInputSource = false
+
+    @UserDefault(Preferences.Key.isFunctionKeysEnabled)
+    var isFunctionKeysEnabled = FKeyMode.defaultIsFunctionKeysEnabled()
+
+    var functionKeyMode: FKeyMode {
+        get { FKeyMode(isFunctionKeysEnabled: isFunctionKeysEnabled) }
+        set { isFunctionKeysEnabled = newValue.isFunctionKeysEnabled }
+    }
 
     // MARK: - App Rules
 
@@ -498,6 +507,16 @@ extension PreferencesVM {
 
     var browserAddressDefaultKeyboard: InputSource? {
         return InputSource.sources.first { $0.id == preferences.browserAddressDefaultKeyboardId }
+    }
+}
+
+extension PreferencesVM {
+    func functionKeyMode(for appKind: AppKind) -> FKeyMode {
+        if let appMode = getAppCustomization(app: appKind.getApp())?.functionKeyMode {
+            return appMode
+        }
+
+        return preferences.functionKeyMode
     }
 }
 

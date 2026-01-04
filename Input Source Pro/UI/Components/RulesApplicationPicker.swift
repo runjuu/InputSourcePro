@@ -54,6 +54,12 @@ struct ApplicationPicker: View {
                         }
                     }
 
+                    if let functionKeyMode = app.functionKeyMode {
+                        let systemName = functionKeyMode == .functionKeys ? "keyboard" : "sun.max"
+                        SwiftUI.Image(systemName: systemName)
+                            .opacity(0.7)
+                    }
+
                     if let icon = app.forcedKeyboard?.icon {
                         SwiftUI.Image(nsImage: icon)
                             .resizable()

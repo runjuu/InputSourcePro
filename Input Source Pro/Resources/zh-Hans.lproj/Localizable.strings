@@ -112,6 +112,8 @@
 "%@ App(s) Selected" = "已选中 %@ 个应用";
 "System-Wide" = "全局";
 "Default Keyboard" = "默认输入法";
+"Default Function Keys" = "默认功能键";
+"Function Keys" = "功能键";
 "Keyboard Restore Strategy" = "输入法恢复策略";
 "Restore Previously Used Keyboard" = "自动恢复应用上次使用的输入法";
 "Use Default Keyboard Instead" = "总是切换至默认输入法";
@@ -121,6 +123,10 @@
 "Punctuation" = "标点符号";
 "ASCII Punctuation" = "ASCII 标点符号";
 "Force English Punctuation" = "强制使用英文标点符号";
+"Use Function Keys" = "使用功能键 (F1、F2 等)";
+"Use Media Keys" = "使用媒体键 (亮度、音量等)";
+"Use Global Setting" = "使用全局设置";
+"Function Keys Description" = "将 F1、F2 等用作标准功能键，而不是媒体键";
 "Input Monitoring Required" = "需要输入监控权限";
 "This feature requires input monitoring permission to work" = "此功能需要输入监控权限才能使用";
 "Open Permission Settings" = "打开权限设置";

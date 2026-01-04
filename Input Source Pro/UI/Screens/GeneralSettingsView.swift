@@ -65,6 +65,19 @@ struct GeneralSettingsView: View {
                     }
                     .padding()
                 }
+                
+                SettingsSection(title: "Default Function Keys") {
+                    VStack(alignment: .leading) {
+                        HStack {
+                            Toggle("", isOn: $preferencesVM.preferences.isFunctionKeysEnabled)
+
+                            Text("Function Keys Description".i18n())
+
+                            Spacer()
+                        }
+                    }
+                    .padding()
+                }
 
                 Group {
                     SettingsSection(title: "Indicator Triggers") {

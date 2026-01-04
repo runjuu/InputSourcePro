@@ -110,6 +110,8 @@
 "%@ App(s) Selected" = "%@ App(s) Selected";
 "System-Wide" = "System-Wide";
 "Default Keyboard" = "Default Input Source";
+"Default Function Keys" = "Default Function Keys";
+"Function Keys" = "Function Keys";
 "Keyboard Restore Strategy" = "Input Source Restore Strategy";
 "Restore Previously Used Keyboard" = "Restore Previously Used Keyboard";
 "Use Default Keyboard Instead" = "Use Default Input Source";
@@ -119,6 +121,10 @@
 "Punctuation" = "Punctuation";
 "ASCII Punctuation" = "ASCII Punctuation";
 "Force English Punctuation" = "Force English Punctuation";
+"Use Function Keys" = "Use Function Keys (F1, F2, etc.)";
+"Use Media Keys" = "Use Media Keys (brightness, volume, etc.)";
+"Use Global Setting" = "Use Global Setting";
+"Function Keys Description" = "Use F1, F2, etc. as standard function keys instead of media keys";
 "Input Monitoring Required" = "Input Monitoring Required";
 "This feature requires input monitoring permission to work" = "This feature requires input monitoring permission to work";
 "Open Permission Settings" = "Open Permission Settings";
