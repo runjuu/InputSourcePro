@@ -29,14 +29,23 @@ final class ApplicationVM: ObservableObject {
 
 extension ApplicationVM {
     private func watchApplicationChange() {
-        let axNotification = windowAXNotificationPublisher.mapToVoid()
+        let axNotification = windowAXNotificationPublisher
+            .mapToVoid()
 
-        let workspaceNotification = NSWorkspace.shared.notificationCenter
+        let didActivateAppNotification = NSWorkspace.shared.notificationCenter
             .publisher(for: NSWorkspace.didActivateApplicationNotification, object: NSWorkspace.shared)
             .mapToVoid()
 
+        let activeSpaceDidChangeNotification = NSWorkspace.shared.notificationCenter
+            .publisher(for: NSWorkspace.activeSpaceDidChangeNotification, object: NSWorkspace.shared)
+            .mapToVoid()
+
         Publishers
-            .Merge(axNotification, workspaceNotification)
+            .MergeMany([
+                axNotification.eraseToAnyPublisher(),
+                didActivateAppNotification.eraseToAnyPublisher(),
+                activeSpaceDidChangeNotification.eraseToAnyPublisher()
+            ])
             .compactMap { [weak self] _ -> NSRunningApplication? in
                 guard self?.preferencesVM.preferences.isEnhancedModeEnabled == true,
                       let elm: UIElement = try? systemWideElement.attribute(.focusedApplication),
