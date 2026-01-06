@@ -141,7 +141,11 @@ private extension PreferencesVM {
 
             let offset: CGFloat = 12
             let padding: CGFloat = 5
-            let maxXPoint = screen.visibleFrame.origin.x + screen.visibleFrame.width
+            let visibleFrame = screen.visibleFrame
+            let maxXPoint = visibleFrame.maxX
+            let minXPoint = visibleFrame.minX
+            let maxYPoint = visibleFrame.maxY
+            let minYPoint = visibleFrame.minY
 
             var mousePoint = CGPoint(x: NSEvent.mouseLocation.x, y: NSEvent.mouseLocation.y)
 
@@ -154,7 +158,9 @@ private extension PreferencesVM {
 
             // avoid overflow
             mousePoint.x = min(maxXPoint - size.width - padding, mousePoint.x)
-            mousePoint.y = max(padding, mousePoint.y)
+            mousePoint.x = max(minXPoint + padding, mousePoint.x)
+            mousePoint.y = min(maxYPoint - size.height - padding, mousePoint.y)
+            mousePoint.y = max(minYPoint + padding, mousePoint.y)
 
             observer.send(mousePoint)
             observer.send(completion: .finished)
@@ -171,13 +177,11 @@ private extension PreferencesVM {
             .map { [weak self] windowInfo -> CGPoint? in
                 guard let self = self,
                       let windowBounds = windowInfo?.bounds,
-                      let screen = NSScreen.getScreenInclude(rect: windowBounds)
+                      NSScreen.getScreenInclude(rect: windowBounds) != nil
                 else { return nil }
 
-                let rect = windowBounds.relativeTo(screen: screen)
-
                 return self.getPositionWithin(
-                    rect: rect,
+                    rect: windowBounds,
                     size: size,
                     alignment: self.preferences.indicatorPositionAlignment ?? .bottomRight
                 )
@@ -210,7 +214,7 @@ private extension PreferencesVM {
     func getPositionAround(rect: CGRect) -> (NSScreen, CGPoint)? {
         guard let screen = NSScreen.getScreenInclude(rect: rect) else { return nil }
 
-        return (screen, rect.relativeTo(screen: screen).origin)
+        return (screen, rect.origin)
     }
 
     func getPositionAroundFloatingWindow(
@@ -267,7 +271,7 @@ private extension PreferencesVM {
         case .center:
             return CGPoint(
                 x: rect.midX - size.width / 2,
-                y: rect.midY + size.height / 2
+                y: rect.midY - size.height / 2
             )
         case .centerLeft:
             return CGPoint(

@@ -20,7 +20,9 @@ extension NSScreen {
 extension NSScreen {
     /// The screen whose bottom left is at (0, 0).
     static var primary: NSScreen? {
-        return NSScreen.screens.first
+        return NSScreen.screens.first(where: { $0.frame.origin == .zero }) ??
+            NSScreen.main ??
+            NSScreen.screens.first
     }
 
     /// Converts the rectangle from Quartz "display space" to Cocoa "screen space".
