@@ -98,7 +98,7 @@ enum BrowserThatCanWatchBrowserAddressFocus: CaseIterable {
         return nil
     }
 
-    case Safari, SafariTechnologyPreview, Chrome, Chromium, Brave, BraveBeta, BraveNightly, Edge, Vivaldi, Arc, Opera, Firefox, FirefoxNightly, FirefoxDeveloperEdition, Zen, Dia
+    case Safari, SafariTechnologyPreview, Chrome, Chromium, Brave, BraveBeta, BraveNightly, Edge, Vivaldi, Arc, Opera, Firefox, FirefoxNightly, FirefoxDeveloperEdition, Zen, Dia, Atlas
 
     var bundleIdentifier: String {
         return browser.rawValue
@@ -138,6 +138,8 @@ enum BrowserThatCanWatchBrowserAddressFocus: CaseIterable {
             return .Zen
         case .Dia:
             return .Dia
+        case .Atlas:
+            return .Atlas
         }
     }
 
@@ -159,7 +161,7 @@ enum BrowserThatCanWatchBrowserAddressFocus: CaseIterable {
         case .Opera:
             return focusedElement.domClassList().contains("AddressTextfieldView")
 
-        case .Chromium, .Chrome, .Brave, .BraveBeta, .BraveNightly, .Edge, .Dia:
+        case .Chromium, .Chrome, .Brave, .BraveBeta, .BraveNightly, .Edge, .Dia, .Atlas:
             if focusedElement.domClassList().contains("OmniboxViewViews") {
                 if let description = focusedElement.safeString(attribute: .description),
                    chromiumSearchBarDescMap[description] == true

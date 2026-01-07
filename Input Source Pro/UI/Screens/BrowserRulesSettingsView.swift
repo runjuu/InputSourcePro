@@ -179,6 +179,8 @@ struct BrowserRulesSettingsView: View {
                 $0.isEnableURLSwitchForZen = isEnable
             case .Dia:
                 $0.isEnableURLSwitchForDia = isEnable
+            case .Atlas:
+                $0.isEnableURLSwitchForAtlas = isEnable
             }
         }
     }

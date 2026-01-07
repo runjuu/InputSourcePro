@@ -121,6 +121,8 @@ extension PreferencesVM {
             return preferences.isEnableURLSwitchForZen
         case .Dia:
             return preferences.isEnableURLSwitchForDia
+        case .Atlas:
+            return preferences.isEnableURLSwitchForAtlas
         }
     }
 

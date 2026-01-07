@@ -176,11 +176,18 @@ extension PreferencesVM {
             guard preferences.isEnableURLSwitchForZen else { return nil }
         case .Dia:
             guard preferences.isEnableURLSwitchForDia else { return nil }
+        case .Atlas:
+            guard preferences.isEnableURLSwitchForAtlas else { return nil }
         }
 
         if let application = application,
            let focusedWindow: UIElement = try? application.attribute(.focusedWindow),
-           let url = browser.getCurrentTabURL(focusedWindow: focusedWindow)
+           let url = {
+               if browser == .Atlas {
+                   browser.registerAtlasAddressBarObserver(application: application, focusedWindow: focusedWindow)
+               }
+               return browser.getCurrentTabURL(focusedWindow: focusedWindow)
+           }()
         {
             return url
         } else {
@@ -244,6 +251,7 @@ struct Preferences {
         static let isEnableURLSwitchForFirefoxNightly = "isEnableURLSwitchForFirefoxNightly"
         static let isEnableURLSwitchForZen = "isEnableURLSwitchForZen"
         static let isEnableURLSwitchForDia = "isEnableURLSwitchForDia"
+        static let isEnableURLSwitchForAtlas = "isEnableURLSwitchForAtlas"
 
         static let isAutoAppearanceMode = "isAutoAppearanceMode"
         static let appearanceMode = "appearanceMode"
@@ -363,6 +371,9 @@ struct Preferences {
     
     @UserDefault(Preferences.Key.isEnableURLSwitchForDia)
     var isEnableURLSwitchForDia = false
+
+    @UserDefault(Preferences.Key.isEnableURLSwitchForAtlas)
+    var isEnableURLSwitchForAtlas = false
 
     // MARK: - Appearance
 
