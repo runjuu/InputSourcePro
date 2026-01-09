@@ -142,7 +142,7 @@ final class ShortcutTriggerManager {
 
     /// Maximum duration (in seconds) a modifier can be held for the shortcut to trigger
     /// If held longer, user may have forgotten or changed their mind
-    private let maxHoldDuration: TimeInterval = 1.0
+    private let maxHoldDuration: TimeInterval = 0.8
     /// Prevent triggering if any other key was pressed shortly before the modifier release
     private let otherKeyPressSuppressInterval: TimeInterval = 0.2
 
