@@ -143,11 +143,15 @@ final class ShortcutTriggerManager {
     /// Maximum duration (in seconds) a modifier can be held for the shortcut to trigger
     /// If held longer, user may have forgotten or changed their mind
     private let maxHoldDuration: TimeInterval = 1.0
+    /// Prevent triggering if any other key was pressed shortly before the modifier release
+    private let otherKeyPressSuppressInterval: TimeInterval = 0.2
 
     /// Tracks which modifier keys are currently pressed down (key: modifier key, value: press timestamp)
     private var pressedModifiers: [SingleModifierKey: TimeInterval] = [:]
     /// Tracks whether a non-modifier key was pressed while a modifier was held
     private var modifierInvalidated: Set<SingleModifierKey> = []
+    /// Timestamp of the most recent key-down per keyCode (includes modifier keys).
+    private var lastKeyDownTimestamps: [UInt16: TimeInterval] = [:]
 
     /// Event monitors for flagsChanged
     private var globalFlagsMonitor: Any?
@@ -210,6 +214,7 @@ final class ShortcutTriggerManager {
         modifierTapTimestamps.removeAll()
         pressedModifiers.removeAll()
         modifierInvalidated.removeAll()
+        lastKeyDownTimestamps.removeAll()
         removeAllMonitors()
         KeyboardShortcuts.removeAllHandlers()
 
@@ -339,7 +344,17 @@ final class ShortcutTriggerManager {
         // mouseDown: when user clicks (e.g., Shift+click for text selection)
         // scrollWheel: when user scrolls (e.g., Shift+scroll for horizontal scrolling)
         switch type {
-        case .keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel:
+        case .keyDown:
+            let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
+            let eventTimestamp = ProcessInfo.processInfo.systemUptime
+            // Invalidate all currently pressed modifiers
+            // This is called from the CGEvent callback, which may be on a different thread
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.lastKeyDownTimestamps[keyCode] = eventTimestamp
+                self.invalidateAllPressedModifiers()
+            }
+        case .leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel:
             // Invalidate all currently pressed modifiers
             // This is called from the CGEvent callback, which may be on a different thread
             DispatchQueue.main.async { [weak self] in
@@ -364,14 +379,18 @@ final class ShortcutTriggerManager {
         lastEventTimestamp = event.timestamp
         lastEventKeyCode = event.keyCode
 
-        guard let key = SingleModifierKey.from(keyCode: event.keyCode),
-            let binding = currentBindingsByKey[key]
-        else { return }
+        guard let key = SingleModifierKey.from(keyCode: event.keyCode) else { return }
 
         var flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         flags.remove(.capsLock)
 
         let isKeyDown = flags.contains(key.modifierFlag)
+
+        if isKeyDown {
+            lastKeyDownTimestamps[event.keyCode] = event.timestamp
+        }
+
+        guard let binding = currentBindingsByKey[key] else { return }
 
         if isKeyDown {
             // Modifier key pressed down
@@ -406,6 +425,11 @@ final class ShortcutTriggerManager {
                 return
             }
 
+            if didPressOtherKeyRecently(before: event.timestamp, excluding: key) {
+                modifierTapTimestamps.removeValue(forKey: key)
+                return
+            }
+
             handleSingleModifierTrigger(
                 key: key,
                 timestamp: event.timestamp,
@@ -413,6 +437,19 @@ final class ShortcutTriggerManager {
                 action: binding.onTrigger
             )
         }
+    }
+
+    private func didPressOtherKeyRecently(
+        before timestamp: TimeInterval,
+        excluding key: SingleModifierKey
+    ) -> Bool {
+        let lastOtherKeyTimestamp = lastKeyDownTimestamps
+            .filter { $0.key != key.keyCode }
+            .map(\.value)
+            .max()
+
+        guard let lastOtherKeyTimestamp else { return false }
+        return timestamp - lastOtherKeyTimestamp <= otherKeyPressSuppressInterval
     }
 
     private func handleSingleModifierTrigger(
