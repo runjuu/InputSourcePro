@@ -46,14 +46,32 @@
 <hr />
 
 ## Features
+
 ### 🥷 Automatic Context-Aware Switching
-Automatically switch input sources based on custom rules for each **application** or **website**.
+- Set a default input source per **application**.
+- Set input sources per **website** when using supported browsers (Safari, Chrome, Arc, Edge, Vivaldi, Opera, Brave, Firefox, Zen, Dia, and more).
+- Switch automatically as you move between apps/websites.
 
 ### 🐈‍⬛ Elegant Input Source Indicator
-Clearly displays your current input source with a sleek, customizable on-screen indicator.
+- Shows your current input source with a clean on-screen indicator.
+- Customizable and designed to stay out of your way.
+
+### ✍️ App-Aware Punctuation Modes
+Keep punctuation consistent across different languages by enabling **Force English Punctuation** for specific apps.
+- Automatically types standard symbols (`, . ; ' " [ ]`) even when your current input source would normally produce localized or full-width characters.
+- Enable it only for the apps where you need it, such as code editors or terminal windows.
+
+### 🎛️ App-Based Function Key Switching
+Automatically switch your macOS function key mode per app.
+- Choose whether an app should use **F1–F12** as:
+    - **Standard Function Keys**: Acts as standard F1–F12 keys. Ideal for IDEs (e.g., VSCode) and games.
+    - **Media Keys**: Triggers special features printed on the keys (e.g., brightness, volume, playback). Ideal for general daily use.
+- Falls back to your system-wide/default setting when an app has no override.
 
 ### ⌨️ Custom Shortcuts
-Quickly toggle between input languages with configurable keyboard shortcuts.
+Switch input sources via either:
+- **Keyboard Shortcuts**: Use standard key combinations.
+- **Single Modifier Shortcuts**: Use a single key (Shift, Control, Option, or Command), triggered by pressing once or double-tapping.
 
 ### 😎 And Much More...
 
