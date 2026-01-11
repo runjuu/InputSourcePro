@@ -13,4 +13,23 @@ extension NSEvent {
                 return AnyCancellable { NSEvent.removeMonitor(monitor!) }
             }
     }
+
+    static func watchLocal(matching: NSEvent.EventTypeMask) -> AnyPublisher<NSEvent, Never> {
+        AnyPublisher<NSEvent, Never>
+            .create { observer in
+                let monitor = self.addLocalMonitorForEvents(
+                    matching: matching,
+                    handler: { event in
+                        observer.send(event)
+                        return event
+                    }
+                )
+
+                return AnyCancellable {
+                    if let monitor = monitor {
+                        NSEvent.removeMonitor(monitor)
+                    }
+                }
+            }
+    }
 }

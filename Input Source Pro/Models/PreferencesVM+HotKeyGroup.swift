@@ -16,6 +16,7 @@ extension PreferencesVM {
     }
 
     func deleteHotKeyGroup(_ group: HotKeyGroup) {
+        removeShortcutConfig(for: group)
         container.viewContext.delete(group)
         saveContext()
     }

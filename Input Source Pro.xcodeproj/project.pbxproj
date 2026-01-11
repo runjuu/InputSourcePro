@@ -8,11 +8,11 @@
 
 /* Begin PBXBuildFile section */
 		25C5A6B52E678D86005AB80E /* PunctuationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25C5A6B42E678D86005AB80E /* PunctuationService.swift */; };
+		3D25B151766744F888171177 /* ShortcutTrigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18B53A0848947E3A2D4EFA8 /* ShortcutTrigger.swift */; };
 		4A093071285DACAA00232089 /* NSToggleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A093070285DACAA00232089 /* NSToggleView.swift */; };
 		4A093073285E166E00232089 /* PreferencesVM+AppKeyboardCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A093072285E166E00232089 /* PreferencesVM+AppKeyboardCache.swift */; };
 		4A093075285EE55A00232089 /* RulesApplicationPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A093074285EE55A00232089 /* RulesApplicationPicker.swift */; };
 		4A093077285EE58000232089 /* RulesApplicationDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A093076285EE58000232089 /* RulesApplicationDetail.swift */; };
-		D5F1A1B33A4B5C6D7E8F9012 /* RuleSettingIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5F1A1B23A4B5C6D7E8F9012 /* RuleSettingIcon.swift */; };
 		4A093079285EE63D00232089 /* RunningApplicationsPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A093078285EE63D00232089 /* RunningApplicationsPicker.swift */; };
 		4A09307B285F31E800232089 /* NSToolbarItem+Identifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A09307A285F31E800232089 /* NSToolbarItem+Identifier.swift */; };
 		4A09307D285F32B100232089 /* PreferencesWindowController+NSToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A09307C285F32B100232089 /* PreferencesWindowController+NSToolbar.swift */; };
@@ -58,7 +58,6 @@
 		4A2A1796280BA7FA00E13249 /* AppMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2A176F280BA7FA00E13249 /* AppMenu.swift */; };
 		4A2A1797280BA7FA00E13249 /* PreferencesVM+AppCustomization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2A1771280BA7FA00E13249 /* PreferencesVM+AppCustomization.swift */; };
 		4A2A1798280BA7FA00E13249 /* InputSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2A1772280BA7FA00E13249 /* InputSource.swift */; };
-		D5F4A1CA2F0B1234001B2C3D /* InputSourceSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5F4A1C92F0B1234001B2C3D /* InputSourceSwitcher.swift */; };
 		4A2A1799280BA7FA00E13249 /* IndicatorVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2A1773280BA7FA00E13249 /* IndicatorVM.swift */; };
 		4A2A179A280BA7FA00E13249 /* PreferencesVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2A1774280BA7FA00E13249 /* PreferencesVM.swift */; };
 		4A2A179B280BA7FA00E13249 /* RulesSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2A1777280BA7FA00E13249 /* RulesSettingsView.swift */; };
@@ -119,6 +118,7 @@
 		4ADDC324281AC39A0075528A /* IndicatorViewConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ADDC323281AC39A0075528A /* IndicatorViewConfig.swift */; };
 		4ADDC326281AC4DD0075528A /* NSApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ADDC325281AC4DD0075528A /* NSApplication.swift */; };
 		4AEEE08428126A4900C883F8 /* BrowserURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AEEE08328126A4900C883F8 /* BrowserURL.swift */; };
+		B7F201B136534D7A8A40F340 /* PreferencesVM+ShortcutTrigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B665FC5A40B248929C5EB938 /* PreferencesVM+ShortcutTrigger.swift */; };
 		D50821F229FE29C40078ADEC /* EnhancedModeToggle.swift in Sources */ = {isa = PBXBuildFile; fileRef = D50821F129FE29C40078ADEC /* EnhancedModeToggle.swift */; };
 		D508B6A32A140289002E272E /* FileManager+Ext.swift in Sources */ = {isa = PBXBuildFile; fileRef = D508B6A22A140289002E272E /* FileManager+Ext.swift */; };
 		D5115A142A32F70300D94E51 /* PositionSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5115A132A32F70300D94E51 /* PositionSettingsView.swift */; };
@@ -161,6 +161,8 @@
 		D5DEFF7028A3A47D005B2B15 /* PreferencesVM+BrowserAddress.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5DEFF6F28A3A47D005B2B15 /* PreferencesVM+BrowserAddress.swift */; };
 		D5E8C9302A29B268008BDABE /* FeedbackVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5E8C92F2A29B268008BDABE /* FeedbackVM.swift */; };
 		D5E8C9332A29BC38008BDABE /* AXSwift in Frameworks */ = {isa = PBXBuildFile; productRef = D5E8C9322A29BC38008BDABE /* AXSwift */; };
+		D5F1A1B33A4B5C6D7E8F9012 /* RuleSettingIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5F1A1B23A4B5C6D7E8F9012 /* RuleSettingIcon.swift */; };
+		D5F4A1CA2F0B1234001B2C3D /* InputSourceSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5F4A1C92F0B1234001B2C3D /* InputSourceSwitcher.swift */; };
 		D5F73B022A2C1DCD00BBC10A /* InputSourceVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5F73B012A2C1DCD00BBC10A /* InputSourceVM.swift */; };
 		D5FC8F552A4134B5002AE1F2 /* IndicatorSize.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5FC8F542A4134B5002AE1F2 /* IndicatorSize.swift */; };
 /* End PBXBuildFile section */
@@ -184,7 +186,6 @@
 		4A093072285E166E00232089 /* PreferencesVM+AppKeyboardCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesVM+AppKeyboardCache.swift"; sourceTree = "<group>"; };
 		4A093074285EE55A00232089 /* RulesApplicationPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesApplicationPicker.swift; sourceTree = "<group>"; };
 		4A093076285EE58000232089 /* RulesApplicationDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesApplicationDetail.swift; sourceTree = "<group>"; };
-		D5F1A1B23A4B5C6D7E8F9012 /* RuleSettingIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuleSettingIcon.swift; sourceTree = "<group>"; };
 		4A093078285EE63D00232089 /* RunningApplicationsPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunningApplicationsPicker.swift; sourceTree = "<group>"; };
 		4A09307A285F31E800232089 /* NSToolbarItem+Identifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSToolbarItem+Identifier.swift"; sourceTree = "<group>"; };
 		4A09307C285F32B100232089 /* PreferencesWindowController+NSToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesWindowController+NSToolbar.swift"; sourceTree = "<group>"; };
@@ -231,7 +232,6 @@
 		4A2A176F280BA7FA00E13249 /* AppMenu.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppMenu.swift; sourceTree = "<group>"; };
 		4A2A1771280BA7FA00E13249 /* PreferencesVM+AppCustomization.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "PreferencesVM+AppCustomization.swift"; sourceTree = "<group>"; };
 		4A2A1772280BA7FA00E13249 /* InputSource.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InputSource.swift; sourceTree = "<group>"; };
-		D5F4A1C92F0B1234001B2C3D /* InputSourceSwitcher.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InputSourceSwitcher.swift; sourceTree = "<group>"; };
 		4A2A1773280BA7FA00E13249 /* IndicatorVM.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = IndicatorVM.swift; sourceTree = "<group>"; };
 		4A2A1774280BA7FA00E13249 /* PreferencesVM.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PreferencesVM.swift; sourceTree = "<group>"; };
 		4A2A1777280BA7FA00E13249 /* RulesSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RulesSettingsView.swift; sourceTree = "<group>"; };
@@ -288,6 +288,8 @@
 		4ADDC323281AC39A0075528A /* IndicatorViewConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndicatorViewConfig.swift; sourceTree = "<group>"; };
 		4ADDC325281AC4DD0075528A /* NSApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NSApplication.swift; sourceTree = "<group>"; };
 		4AEEE08328126A4900C883F8 /* BrowserURL.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserURL.swift; sourceTree = "<group>"; };
+		B18B53A0848947E3A2D4EFA8 /* ShortcutTrigger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutTrigger.swift; sourceTree = "<group>"; };
+		B665FC5A40B248929C5EB938 /* PreferencesVM+ShortcutTrigger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesVM+ShortcutTrigger.swift"; sourceTree = "<group>"; };
 		D50821F129FE29C40078ADEC /* EnhancedModeToggle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnhancedModeToggle.swift; sourceTree = "<group>"; };
 		D508B6A22A140289002E272E /* FileManager+Ext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FileManager+Ext.swift"; sourceTree = "<group>"; };
 		D5115A132A32F70300D94E51 /* PositionSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositionSettingsView.swift; sourceTree = "<group>"; };
@@ -327,6 +329,8 @@
 		D5DEFF6F28A3A47D005B2B15 /* PreferencesVM+BrowserAddress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesVM+BrowserAddress.swift"; sourceTree = "<group>"; };
 		D5E8C92F2A29B268008BDABE /* FeedbackVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackVM.swift; sourceTree = "<group>"; };
 		D5EAAC512A47BF7E00A41BC1 /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = ko.lproj/Localizable.strings; sourceTree = "<group>"; };
+		D5F1A1B23A4B5C6D7E8F9012 /* RuleSettingIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuleSettingIcon.swift; sourceTree = "<group>"; };
+		D5F4A1C92F0B1234001B2C3D /* InputSourceSwitcher.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InputSourceSwitcher.swift; sourceTree = "<group>"; };
 		D5F6E8D429EC812500DE042B /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/Localizable.strings; sourceTree = "<group>"; };
 		D5F73B012A2C1DCD00BBC10A /* InputSourceVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSourceVM.swift; sourceTree = "<group>"; };
 		D5FC8F542A4134B5002AE1F2 /* IndicatorSize.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndicatorSize.swift; sourceTree = "<group>"; };
@@ -452,6 +456,7 @@
 				4A2A1766280BA7FA00E13249 /* i18n.swift */,
 				4AEEE08328126A4900C883F8 /* BrowserURL.swift */,
 				D58C184728A808F000F52845 /* KeyboardRestoreStrategy.swift */,
+				B18B53A0848947E3A2D4EFA8 /* ShortcutTrigger.swift */,
 				4A8E49902F0AF69200424D11 /* FKeyManager.swift */,
 				4A8E47682F08814500424D11 /* SwiftUI+FlexibleButtonSizing.swift */,
 			);
@@ -490,6 +495,7 @@
 				4A881A92288BC55E00B76498 /* PreferencesVM+KeyboardConfig.swift */,
 				4A0C1CD0284B249D00833A16 /* PreferencesVM+IndicatorPosition.swift */,
 				4AD6B06A2D2653C000B829CC /* PreferencesVM+HotKeyGroup.swift */,
+				B665FC5A40B248929C5EB938 /* PreferencesVM+ShortcutTrigger.swift */,
 				4A39D1CA281F7E650050F115 /* PermissionsVM.swift */,
 				4AC2614E28707CD30032AAFE /* ApplicationVM.swift */,
 				4A0930942868780600232089 /* ApplicationVM+AXNotification.swift */,
@@ -852,6 +858,7 @@
 				4A0C1CC5284A121B00833A16 /* IndicatorPositionEditor.swift in Sources */,
 				D5E8C9302A29B268008BDABE /* FeedbackVM.swift in Sources */,
 				4AD6B06B2D2653C000B829CC /* PreferencesVM+HotKeyGroup.swift in Sources */,
+				B7F201B136534D7A8A40F340 /* PreferencesVM+ShortcutTrigger.swift in Sources */,
 				4A41672E2813BBC000CCC28C /* BrowserRuleEditView.swift in Sources */,
 				D5CC44982A340409007FF839 /* InputSourcesAppearanceSettingsView.swift in Sources */,
 				D5FC8F552A4134B5002AE1F2 /* IndicatorSize.swift in Sources */,
@@ -862,6 +869,7 @@
 				4A20AD6128904B3A00620D14 /* NoAnimation.swift in Sources */,
 				4A20AD6328926DFA00620D14 /* NavigationVM.swift in Sources */,
 				D58C184828A808F000F52845 /* KeyboardRestoreStrategy.swift in Sources */,
+				3D25B151766744F888171177 /* ShortcutTrigger.swift in Sources */,
 				D52E2C57293D31E00017CB7E /* FocusAwareTextField.swift in Sources */,
 				4A881A91288BC50B00B76498 /* KeyboardConfig.swift in Sources */,
 				4A093071285DACAA00232089 /* NSToggleView.swift in Sources */,

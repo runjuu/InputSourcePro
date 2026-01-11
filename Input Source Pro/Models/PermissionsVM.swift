@@ -21,9 +21,11 @@ final class PermissionsVM: ObservableObject {
     }
 
     @Published var isAccessibilityEnabled = PermissionsVM.checkAccessibility(prompt: false)
+    @Published var isInputMonitoringEnabled = PermissionsVM.checkInputMonitoring(prompt: false)
 
     init() {
         watchAccessibilityChange()
+        watchInputMonitoringChange()
     }
 
     private func watchAccessibilityChange() {
@@ -35,5 +37,16 @@ final class PermissionsVM: ObservableObject {
             .filter { $0 }
             .first()
             .assign(to: &$isAccessibilityEnabled)
+    }
+
+    private func watchInputMonitoringChange() {
+        guard !isInputMonitoringEnabled else { return }
+
+        Timer
+            .interval(seconds: 1)
+            .map { _ in Self.checkInputMonitoring(prompt: false) }
+            .filter { $0 }
+            .first()
+            .assign(to: &$isInputMonitoringEnabled)
     }
 }

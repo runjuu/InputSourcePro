@@ -1,14 +1,13 @@
 import AppKit
 import AXSwift
-import Carbon
 import Combine
 import CombineExt
-import KeyboardShortcuts
 import os
 
 @MainActor
 final class IndicatorVM: ObservableObject {
     private var cancelBag = CancelBag()
+    private lazy var shortcutTriggerManager = ShortcutTriggerManager(preferencesVM: preferencesVM)
 
     let applicationVM: ApplicationVM
     let preferencesVM: PreferencesVM
@@ -273,30 +272,68 @@ extension IndicatorVM {
 
         refreshShortcutSubject
             .sink { [weak self] _ in
-                KeyboardShortcuts.removeAllHandlers()
+                guard let self = self else { return }
 
-                for inputSource in InputSource.sources {
-                    KeyboardShortcuts.onKeyUp(for: .init(inputSource.id)) {
-                        self?.send(.switchInputSourceByShortcut(inputSource))
-                    }
-                }
-
-                self?.preferencesVM.getHotKeyGroups().forEach { group in
-                    KeyboardShortcuts.onKeyUp(for: .init(group.id!)) {
-                        guard group.inputSources.count > 0 else { return }
-
-                        let currIps = InputSource.getCurrentInputSource()
-                        let nextIdx = (
-                            (group.inputSources.firstIndex(where: { currIps.id == $0.id }) ?? -1) + 1
-                        ) % group.inputSources.count
-
-                        self?.send(.switchInputSourceByShortcut(group.inputSources[nextIdx]))
-                    }
-                }
+                self.shortcutTriggerManager.updateBindings(self.shortcutBindings())
             }
             .store(in: cancelBag)
 
         refreshShortcut()
         send(.start)
+    }
+
+    private func shortcutBindings() -> [ShortcutBinding] {
+        var bindings: [ShortcutBinding] = []
+
+        for inputSource in InputSource.sources {
+            let mode = preferencesVM.shortcutMode(for: inputSource)
+            let trigger = preferencesVM.singleModifierTrigger(for: inputSource)
+            let modifierKey = preferencesVM.singleModifierKey(for: inputSource)
+
+            bindings.append(
+                ShortcutBinding(
+                    id: inputSource.id,
+                    mode: mode,
+                    singleModifierKey: modifierKey,
+                    singleModifierTrigger: trigger,
+                    onTrigger: { [weak self] in
+                        self?.send(.switchInputSourceByShortcut(inputSource))
+                    }
+                )
+            )
+        }
+
+        for group in preferencesVM.getHotKeyGroups() {
+            guard let id = group.id else { continue }
+
+            let mode = preferencesVM.shortcutMode(for: group)
+            let trigger = preferencesVM.singleModifierTrigger(for: group)
+            let modifierKey = preferencesVM.singleModifierKey(for: group)
+
+            bindings.append(
+                ShortcutBinding(
+                    id: id,
+                    mode: mode,
+                    singleModifierKey: modifierKey,
+                    singleModifierTrigger: trigger,
+                    onTrigger: { [weak self] in
+                        self?.triggerHotKeyGroup(group)
+                    }
+                )
+            )
+        }
+
+        return bindings
+    }
+
+    private func triggerHotKeyGroup(_ group: HotKeyGroup) {
+        guard group.inputSources.count > 0 else { return }
+
+        let currentInputSource = InputSource.getCurrentInputSource()
+        let nextIndex = (
+            (group.inputSources.firstIndex(where: { currentInputSource.id == $0.id }) ?? -1) + 1
+        ) % group.inputSources.count
+
+        send(.switchInputSourceByShortcut(group.inputSources[nextIndex]))
     }
 }

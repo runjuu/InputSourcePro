@@ -246,6 +246,15 @@ struct Preferences {
         static let isEnableURLSwitchForZen = "isEnableURLSwitchForZen"
         static let isEnableURLSwitchForDia = "isEnableURLSwitchForDia"
 
+        static let shortcutTriggerMode = "shortcutTriggerMode"
+        static let singleModifierTrigger = "singleModifierTrigger"
+        static let shortcutModeInputSourceMapping = "shortcutModeInputSourceMapping"
+        static let shortcutModeGroupMapping = "shortcutModeGroupMapping"
+        static let singleModifierTriggerInputSourceMapping = "singleModifierTriggerInputSourceMapping"
+        static let singleModifierTriggerGroupMapping = "singleModifierTriggerGroupMapping"
+        static let singleModifierInputSourceMapping = "singleModifierInputSourceMapping"
+        static let singleModifierGroupMapping = "singleModifierGroupMapping"
+
         static let isAutoAppearanceMode = "isAutoAppearanceMode"
         static let appearanceMode = "appearanceMode"
         static let isShowInputSourcesLabel = "isShowInputSourcesLabel"
@@ -311,6 +320,32 @@ struct Preferences {
         get { FKeyMode(isFunctionKeysEnabled: isFunctionKeysEnabled) }
         set { isFunctionKeysEnabled = newValue.isFunctionKeysEnabled }
     }
+
+    // MARK: - Shortcuts
+
+    @CodableUserDefault(Preferences.Key.shortcutTriggerMode)
+    var shortcutTriggerMode = ShortcutTriggerMode.keyboardShortcut
+
+    @CodableUserDefault(Preferences.Key.singleModifierTrigger)
+    var singleModifierTrigger = SingleModifierTrigger.singlePress
+
+    @CodableUserDefault(Preferences.Key.shortcutModeInputSourceMapping)
+    var shortcutModeInputSourceMapping = [String: ShortcutTriggerMode]()
+
+    @CodableUserDefault(Preferences.Key.shortcutModeGroupMapping)
+    var shortcutModeGroupMapping = [String: ShortcutTriggerMode]()
+
+    @CodableUserDefault(Preferences.Key.singleModifierTriggerInputSourceMapping)
+    var singleModifierTriggerInputSourceMapping = [String: SingleModifierTrigger]()
+
+    @CodableUserDefault(Preferences.Key.singleModifierTriggerGroupMapping)
+    var singleModifierTriggerGroupMapping = [String: SingleModifierTrigger]()
+
+    @CodableUserDefault(Preferences.Key.singleModifierInputSourceMapping)
+    var singleModifierInputSourceMapping = [String: SingleModifierKey]()
+
+    @CodableUserDefault(Preferences.Key.singleModifierGroupMapping)
+    var singleModifierGroupMapping = [String: SingleModifierKey]()
 
     // MARK: - App Rules
 
