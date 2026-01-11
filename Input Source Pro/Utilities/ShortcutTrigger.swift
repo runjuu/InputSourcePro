@@ -353,12 +353,14 @@ final class ShortcutTriggerManager {
                 guard let self = self else { return }
                 self.lastKeyDownTimestamps[keyCode] = eventTimestamp
                 self.invalidateAllPressedModifiers()
+                self.modifierTapTimestamps.removeAll()
             }
         case .leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel:
             // Invalidate all currently pressed modifiers
             // This is called from the CGEvent callback, which may be on a different thread
             DispatchQueue.main.async { [weak self] in
                 self?.invalidateAllPressedModifiers()
+                self?.modifierTapTimestamps.removeAll()
             }
         default:
             break
@@ -400,6 +402,8 @@ final class ShortcutTriggerManager {
                 modifierInvalidated.remove(key)
             } else {
                 // Multiple modifiers pressed - invalidate
+                invalidateAllPressedModifiers()
+                modifierTapTimestamps.removeAll()
                 modifierInvalidated.insert(key)
             }
         } else {
@@ -411,6 +415,7 @@ final class ShortcutTriggerManager {
             // Check if this modifier was invalidated (another key was pressed while held)
             if modifierInvalidated.contains(key) {
                 modifierInvalidated.remove(key)
+                modifierTapTimestamps.removeValue(forKey: key)
                 return
             }
 
