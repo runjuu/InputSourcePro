@@ -17,15 +17,14 @@ class PunctuationService: ObservableObject {
     private var inputSourceCacheTime: TimeInterval = 0
     private let inputSourceCacheTimeout: TimeInterval = 0.5 // Cache for 500ms
     
-    private let cjkvToEnglishPunctuationMap: [UInt16: String] = [
-        // Correct macOS keyCode mappings for punctuation marks
-        43: ",",    // 0x2B - Comma key -> ,
-        47: ".",    // 0x2F - Period key -> .
-        41: ";",    // 0x29 - Semicolon key -> ;
-        39: "'",    // 0x27 - Single Quote key -> '
-        42: "\"",   // 0x2A - Double Quote key -> "
-        33: "[",    // 0x21 - Left Bracket key -> [
-        30: "]"     // 0x1E - Right Bracket key -> ]
+    private let cjkvToEnglishPunctuationMap: [UInt16: (normal: String, shifted: String)] = [
+        43: (",", "<"),    // 0x2B - Comma key
+        47: (".", ">"),    // 0x2F - Period key
+        41: (";", ":"),    // 0x29 - Semicolon key
+        39: ("'", "\""),   // 0x27 - Quote key
+        42: ("\\", "|"),   // 0x2A - Backslash key
+        33: ("[", "{"),    // 0x21 - Left Bracket key
+        30: ("]", "}")     // 0x1E - Right Bracket key
     ]
     
     init(preferencesVM: PreferencesVM) {
@@ -162,10 +161,12 @@ class PunctuationService: ObservableObject {
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
         
         // Check if this is a punctuation key we want to intercept
-        guard let englishReplacement = cjkvToEnglishPunctuationMap[UInt16(keyCode)] else {
+        guard let mapping = cjkvToEnglishPunctuationMap[UInt16(keyCode)] else {
             // Not a punctuation key we're interested in
             return Unmanaged.passUnretained(event)
         }
+        
+        let englishReplacement = event.flags.contains(.maskShift) ? mapping.shifted : mapping.normal
         
         // Check if we're in a Chinese/CJKV input method (with caching for performance)
         let currentInputSource = getCachedCurrentInputSource()
@@ -253,7 +254,7 @@ class PunctuationService: ObservableObject {
             - CGEvent Permission Check: \(permissionViaCGEvent ? "✅ Passed" : "❌ Failed")  
             - Accessibility Permission: \(accessibilityEnabled ? "✅ Granted" : "❌ Denied")
             - Current Input Source: \(currentInputSource.name) (CJKV: \(currentInputSource.isCJKVR))
-            - Monitored Keys: \(cjkvToEnglishPunctuationMap.map { "\($0.key)→'\($0.value)'" }.joined(separator: ", "))
+            - Monitored Keys: \(cjkvToEnglishPunctuationMap.map { "\($0.key)→'\($0.value.normal)'/'\($0.value.shifted)'" }.joined(separator: ", "))
             """ }
     }
 }
