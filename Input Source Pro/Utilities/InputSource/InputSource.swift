@@ -61,14 +61,8 @@ class InputSource {
         }()
     }
 
-    @discardableResult
-    func select(useCJKVFix: Bool) -> Bool {
-        Self.logger.debug { "Select \(id)" }
-        let didSwitch = InputSourceSwitcher.switchToInputSource(self, useCJKVFix: useCJKVFix)
-        if !didSwitch {
-            Self.logger.debug { "Failed to select \(id)" }
-        }
-        return didSwitch
+    func select(useCJKVFix: Bool) {
+        InputSourceSwitcher.switchToInputSource(self, useCJKVFix: useCJKVFix)
     }
 }
 

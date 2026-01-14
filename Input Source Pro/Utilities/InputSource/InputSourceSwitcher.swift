@@ -22,12 +22,6 @@ enum InputSourceSwitcher {
         let modifiers: CGEventFlags
     }
 
-    enum ShortcutKind: String {
-        case previous
-        case next
-        case custom
-    }
-
     private struct SwitchTarget {
         let localizedName: String
         let sourceID: String
@@ -35,16 +29,7 @@ enum InputSourceSwitcher {
         let isCJKV: Bool
     }
 
-    private struct InputSourceIdentity {
-        let sourceID: String
-        let inputModeID: String?
-    }
-
     private static let logger = ISPLogger(category: String(describing: InputSourceSwitcher.self))
-    private static let focusStabilizationDelay: TimeInterval = 0.05
-
-    private static let fallbackKeyCodeKey = "inputSourceFallbackShortcutKeyCode"
-    private static let fallbackModifierKey = "inputSourceFallbackShortcutModifiers"
 
     static func discoverInputSources() -> [Descriptor] {
         return inputSourceList().map { source in
@@ -64,11 +49,10 @@ enum InputSourceSwitcher {
         logger.debug { "Discovered input sources (\(sources.count)):\n\(description)" }
     }
 
-    @discardableResult
-    static func switchToInputSource(sourceID: String, useCJKVFix: Bool = true) -> Bool {
+    static func switchToInputSource(sourceID: String, useCJKVFix: Bool = true) {
         guard let tisTarget = resolveInputSourceBySourceID(sourceID) else {
             logger.debug { "No input source found for sourceID=\(sourceID)" }
-            return false
+            return
         }
 
         let target = SwitchTarget(
@@ -78,18 +62,17 @@ enum InputSourceSwitcher {
             isCJKV: isCJKVInputSource(tisTarget)
         )
 
-        return switchToTarget(
+        switchToTarget(
             target,
             tisTarget: tisTarget,
             allowShortcutFallback: useCJKVFix
         )
     }
 
-    @discardableResult
-    static func switchToInputMode(modeID: String, useCJKVFix: Bool = true) -> Bool {
+    static func switchToInputMode(modeID: String, useCJKVFix: Bool = true) {
         guard let tisTarget = resolveInputSourceByModeID(modeID) else {
             logger.debug { "No input source found for modeID=\(modeID)" }
-            return false
+            return
         }
 
         let target = SwitchTarget(
@@ -99,15 +82,14 @@ enum InputSourceSwitcher {
             isCJKV: isCJKVInputSource(tisTarget)
         )
 
-        return switchToTarget(
+        switchToTarget(
             target,
             tisTarget: tisTarget,
             allowShortcutFallback: useCJKVFix
         )
     }
 
-    @discardableResult
-    static func switchToInputSource(_ inputSource: InputSource, useCJKVFix: Bool) -> Bool {
+    static func switchToInputSource(_ inputSource: InputSource, useCJKVFix: Bool) {
         let target = SwitchTarget(
             localizedName: inputSource.name,
             sourceID: inputSource.id,
@@ -119,7 +101,7 @@ enum InputSourceSwitcher {
             return switchToInputMode(modeID: modeID, useCJKVFix: useCJKVFix)
         }
 
-        return switchToTarget(
+        switchToTarget(
             target,
             tisTarget: inputSource.tisInputSource,
             allowShortcutFallback: useCJKVFix
@@ -130,48 +112,21 @@ enum InputSourceSwitcher {
         _ target: SwitchTarget,
         tisTarget: TISInputSource,
         allowShortcutFallback: Bool
-    ) -> Bool {
-        stabilizeFocusIfNeeded()
-
-        if isTargetAlreadyActive(target) {
-            logger.debug { "Already using input source: \(target.localizedName) (\(target.sourceID))" }
-            return true
-        }
-
-        if !tisTarget.isEnabled {
-            logger.debug { "Input source not enabled: \(target.localizedName) (\(target.sourceID))" }
-            return false
-        }
-
+    ) {
         if target.isCJKV,
            allowShortcutFallback,
-           let previousShortcut = systemSelectPreviousShortcut()
+           let previousShortcut = systemSelectPreviousShortcut(),
+           let nonCJKVSource = resolveNonCJKVSource(),
+           canPostShortcuts()
         {
-            if let nonCJKVSource = resolveNonCJKVSource() {
-                logger.debug { "Applying CJKV fix using previous input source shortcut" }
-                _ = selectInputSource(tisTarget, reason: "CJKV target")
-                _ = selectInputSource(nonCJKVSource, reason: "CJKV bounce")
-                if canPostShortcuts() {
-                    _ = postShortcut(previousShortcut)
-                }
-                return true
-            }
+            logger.debug { "Applying CJKV fix using previous input source shortcut" }
+            _ = selectInputSource(tisTarget, reason: "CJKV target")
+            _ = selectInputSource(nonCJKVSource, reason: "CJKV bounce")
+            _ = postShortcut(previousShortcut)
+            return
         }
 
-        let status = selectInputSource(tisTarget, reason: "target")
-        if status == noErr {
-            return true
-        }
-
-        guard allowShortcutFallback else {
-            return false
-        }
-
-        return attemptShortcutFallback()
-    }
-
-    private static func isTargetAlreadyActive(_ target: SwitchTarget) -> Bool {
-        return matchesTarget(target)
+        _ = selectInputSource(tisTarget, reason: "target")
     }
 
     @discardableResult
@@ -181,34 +136,6 @@ enum InputSourceSwitcher {
             logger.debug { "TISSelectInputSource failed (\(reason)) with status \(status)" }
         }
         return status
-    }
-
-    private static func matchesTarget(_ target: SwitchTarget) -> Bool {
-        guard let current = currentIdentity() else { return false }
-
-        if let targetModeID = target.inputModeID {
-            return current.inputModeID == targetModeID
-        }
-
-        return current.sourceID == target.sourceID
-    }
-
-    private static func attemptShortcutFallback() -> Bool {
-        guard let (shortcut, kind) = resolveSwitchShortcut() else {
-            logger.debug { "No input source shortcut available for fallback." }
-            return false
-        }
-
-        guard canPostShortcuts() else {
-            return false
-        }
-
-        logger.debug { "Attempting shortcut fallback using \(kind.rawValue) input source shortcut." }
-        guard postShortcut(shortcut) else {
-            return false
-        }
-
-        return true
     }
 
     private static func canPostShortcuts() -> Bool {
@@ -228,28 +155,8 @@ enum InputSourceSwitcher {
         return true
     }
 
-    private static func resolveSwitchShortcut() -> (Shortcut, ShortcutKind)? {
-        if let previous = systemSelectPreviousShortcut() {
-            return (previous, .previous)
-        }
-
-        if let next = systemSelectNextShortcut() {
-            return (next, .next)
-        }
-
-        if let fallback = fallbackShortcutFromDefaults() {
-            return (fallback, .custom)
-        }
-
-        return nil
-    }
-
     static func systemSelectPreviousShortcut() -> Shortcut? {
         return symbolicHotkeyShortcut(symbolicKey: "60")
-    }
-
-    static func systemSelectNextShortcut() -> Shortcut? {
-        return symbolicHotkeyShortcut(symbolicKey: "61")
     }
 
     private static func symbolicHotkeyShortcut(symbolicKey: String) -> Shortcut? {
@@ -273,24 +180,6 @@ enum InputSourceSwitcher {
         )
     }
 
-    private static func fallbackShortcutFromDefaults() -> Shortcut? {
-        registerFallbackDefaultsIfNeeded()
-
-        let keyCodeValue = UserDefaults.standard.integer(forKey: fallbackKeyCodeKey)
-        let modifierValue = UserDefaults.standard.integer(forKey: fallbackModifierKey)
-
-        return Shortcut(
-            keyCode: CGKeyCode(keyCodeValue),
-            modifiers: CGEventFlags(rawValue: UInt64(modifierValue))
-        )
-    }
-
-    private static func registerFallbackDefaultsIfNeeded() {
-        UserDefaults.standard.register(defaults: [
-            fallbackKeyCodeKey: Int(kVK_Space),
-            fallbackModifierKey: Int(CGEventFlags.maskControl.rawValue)
-        ])
-    }
 
     private static func postShortcut(_ shortcut: Shortcut) -> Bool {
         guard let source = CGEventSource(stateID: .hidSystemState) else {
@@ -384,21 +273,4 @@ enum InputSourceSwitcher {
         return lang == "ru" || lang == "ko" || lang == "ja" || lang == "vi" || lang.hasPrefix("zh")
     }
 
-    private static func currentIdentity() -> InputSourceIdentity? {
-        let currentSource = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
-        return InputSourceIdentity(
-            sourceID: currentSource.id,
-            inputModeID: currentSource.inputModeID
-        )
-    }
-
-    private static func stabilizeFocusIfNeeded() {
-        guard focusStabilizationDelay > 0 else { return }
-        wait(focusStabilizationDelay)
-    }
-
-    private static func wait(_ delay: TimeInterval) {
-        let deadline = Date().addingTimeInterval(delay)
-        RunLoop.current.run(until: deadline)
-    }
 }
