@@ -42,7 +42,6 @@ enum InputSourceSwitcher {
 
     private static let logger = ISPLogger(category: String(describing: InputSourceSwitcher.self))
     private static let focusStabilizationDelay: TimeInterval = 0.05
-    private static let verificationDelays: [TimeInterval] = [0.05, 0.1, 0.2]
 
     private static let fallbackKeyCodeKey = "inputSourceFallbackShortcutKeyCode"
     private static let fallbackModifierKey = "inputSourceFallbackShortcutModifiers"
@@ -155,15 +154,12 @@ enum InputSourceSwitcher {
                 if canPostShortcuts() {
                     _ = postShortcut(previousShortcut)
                 }
-                if verifyWithRetry(target) {
-                    return true
-                }
+                return true
             }
         }
 
-        _ = selectInputSource(tisTarget, reason: "target")
-
-        if verifyWithRetry(target) {
+        let status = selectInputSource(tisTarget, reason: "target")
+        if status == noErr {
             return true
         }
 
@@ -171,27 +167,11 @@ enum InputSourceSwitcher {
             return false
         }
 
-        return attemptShortcutFallback(target: target)
+        return attemptShortcutFallback()
     }
 
     private static func isTargetAlreadyActive(_ target: SwitchTarget) -> Bool {
         return matchesTarget(target)
-    }
-
-    private static func verifyWithRetry(_ target: SwitchTarget) -> Bool {
-        if matchesTarget(target) {
-            return true
-        }
-
-        for delay in verificationDelays {
-            wait(delay)
-            if matchesTarget(target) {
-                return true
-            }
-        }
-
-        logMismatch(target)
-        return false
     }
 
     @discardableResult
@@ -213,21 +193,7 @@ enum InputSourceSwitcher {
         return current.sourceID == target.sourceID
     }
 
-    private static func logMismatch(_ target: SwitchTarget) {
-        guard let current = currentIdentity() else {
-            logger.debug { "Failed to read current input source during verification." }
-            return
-        }
-
-        let targetMode = target.inputModeID ?? "nil"
-        let currentMode = current.inputModeID ?? "nil"
-        logger.debug {
-            "Switch verification failed. Target sourceID=\(target.sourceID), modeID=\(targetMode). " +
-                "Current sourceID=\(current.sourceID), modeID=\(currentMode)."
-        }
-    }
-
-    private static func attemptShortcutFallback(target: SwitchTarget) -> Bool {
+    private static func attemptShortcutFallback() -> Bool {
         guard let (shortcut, kind) = resolveSwitchShortcut() else {
             logger.debug { "No input source shortcut available for fallback." }
             return false
@@ -242,7 +208,7 @@ enum InputSourceSwitcher {
             return false
         }
 
-        return verifyWithRetry(target)
+        return true
     }
 
     private static func canPostShortcuts() -> Bool {
