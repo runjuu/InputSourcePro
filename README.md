@@ -71,7 +71,7 @@ Automatically switch your macOS function key mode per app.
 ### ⌨️ Custom Shortcuts
 Switch input sources via either:
 - **Keyboard Shortcuts**: Use standard key combinations.
-- **Single Modifier Shortcuts**: Use a single key (Shift, Control, Option, or Command), triggered by pressing once or double-tapping.
+- **Modifier Shortcuts**: Use single or combined modifier keys (e.g., Shift, Command, or Shift + Command), triggered by pressing once or double-tapping.
 
 ### 😎 And Much More...
 
