@@ -20,14 +20,14 @@ struct KeyboardsSettingsView: View {
         // Check input sources
         for inputSource in InputSource.sources {
             if preferencesVM.shortcutMode(for: inputSource) == .singleModifier,
-               preferencesVM.singleModifierKey(for: inputSource) != nil {
+               preferencesVM.modifierCombo(for: inputSource) != nil {
                 return true
             }
         }
         // Check hot key groups
         for group in hotKeyGroups {
             if preferencesVM.shortcutMode(for: group) == .singleModifier,
-               preferencesVM.singleModifierKey(for: group) != nil {
+               preferencesVM.modifierCombo(for: group) != nil {
                 return true
             }
         }
@@ -67,7 +67,7 @@ struct KeyboardsSettingsView: View {
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundColor(.orange)
-                Text("Single Modifier shortcuts require additional permissions to work reliably.".i18n())
+                    Text("Modifier shortcuts require additional permissions to work reliably.".i18n())
             }
             
             VStack(alignment: .leading, spacing: 12) {
@@ -126,9 +126,12 @@ struct KeyboardsSettingsView: View {
                         mode: preferencesVM.shortcutMode(for: inputSource),
                         modeBinding: shortcutModeBinding(for: inputSource),
                         triggerBinding: singleModifierTriggerBinding(for: inputSource),
-                        modifierSelection: preferencesVM.singleModifierKey(for: inputSource),
+                        modifierSelection: preferencesVM.modifierCombo(for: inputSource),
                         onModifierSelect: { selection in
-                            preferencesVM.updateSingleModifierKey(selection, for: inputSource)
+                            preferencesVM.updateModifierCombo(selection, for: inputSource)
+                            if let selection, selection.keys.count > 1 {
+                                preferencesVM.updateSingleModifierTrigger(.singlePress, for: inputSource)
+                            }
                             indicatorVM.refreshShortcut()
                         },
                         recorderId: inputSource.id
@@ -159,9 +162,12 @@ struct KeyboardsSettingsView: View {
                                 mode: preferencesVM.shortcutMode(for: group),
                                 modeBinding: shortcutModeBinding(for: group),
                                 triggerBinding: singleModifierTriggerBinding(for: group),
-                                modifierSelection: preferencesVM.singleModifierKey(for: group),
+                                modifierSelection: preferencesVM.modifierCombo(for: group),
                                 onModifierSelect: { selection in
-                                    preferencesVM.updateSingleModifierKey(selection, for: group)
+                                    preferencesVM.updateModifierCombo(selection, for: group)
+                                    if let selection, selection.keys.count > 1 {
+                                        preferencesVM.updateSingleModifierTrigger(.singlePress, for: group)
+                                    }
                                     indicatorVM.refreshShortcut()
                                 },
                                 recorderId: groupId
@@ -187,28 +193,16 @@ struct KeyboardsSettingsView: View {
         }
     }
 
-    func modifierPicker(
-        selection: SingleModifierKey?,
-        onSelect: @escaping (SingleModifierKey?) -> Void
+    func modifierComboPicker(
+        selection: ModifierCombo?,
+        onSelect: @escaping (ModifierCombo?) -> Void
     ) -> some View {
-        let selectionBinding = Binding(
-            get: { selection },
-            set: { newValue in
-                onSelect(newValue)
-            }
+        ModifierComboPicker(
+            selection: Binding(
+                get: { selection },
+                set: { onSelect($0) }
+            )
         )
-
-        return Picker("Modifier".i18n(), selection: selectionBinding) {
-            Text("None".i18n())
-                .tag(Optional<SingleModifierKey>.none)
-
-            ForEach(SingleModifierKey.allCases, id: \.self) { item in
-                Text(item.name)
-                    .tag(Optional(item))
-            }
-        }
-        .labelsHidden()
-        .pickerStyle(.menu)
     }
 
     func shortcutModeBinding(for inputSource: InputSource) -> Binding<ShortcutTriggerMode> {
@@ -256,10 +250,15 @@ struct KeyboardsSettingsView: View {
         mode: ShortcutTriggerMode,
         modeBinding: Binding<ShortcutTriggerMode>,
         triggerBinding: Binding<SingleModifierTrigger>,
-        modifierSelection: SingleModifierKey?,
-        onModifierSelect: @escaping (SingleModifierKey?) -> Void,
+        modifierSelection: ModifierCombo?,
+        onModifierSelect: @escaping (ModifierCombo?) -> Void,
         recorderId: String
     ) -> some View {
+        let isComboSelection = (modifierSelection?.keys.count ?? 0) > 1
+        let triggerOptions = isComboSelection
+            ? [SingleModifierTrigger.singlePress]
+            : SingleModifierTrigger.allCases
+
         VStack(alignment: .trailing, spacing: 8) {
             LazyVGrid(columns: shortcutControlColumns, alignment: .leading, spacing: 6) {
                 Text("Shortcut Type".i18n())
@@ -277,8 +276,8 @@ struct KeyboardsSettingsView: View {
                         indicatorVM.refreshShortcut()
                     })
                 } else {
-                    Text("Modifier".i18n())
-                    modifierPicker(
+                    Text("Shortcut".i18n())
+                    modifierComboPicker(
                         selection: modifierSelection,
                         onSelect: onModifierSelect
                     )
@@ -286,12 +285,13 @@ struct KeyboardsSettingsView: View {
 
                     Text("Trigger".i18n())
                     Picker("Trigger".i18n(), selection: triggerBinding) {
-                        ForEach(SingleModifierTrigger.allCases) { option in
+                        ForEach(triggerOptions) { option in
                             Text(option.name).tag(option)
                         }
                     }
                     .labelsHidden()
                     .flexibleButtonSizing()
+                    .disabled(isComboSelection)
                 }
             }
             
@@ -299,6 +299,11 @@ struct KeyboardsSettingsView: View {
             if mode == .singleModifier && modifierSelection != nil && (needsAccessibilityPermission || needsInputMonitoringPermission) {
                 Text("Disabled until permissions are granted".i18n())
                                         .foregroundColor(.orange)
+            }
+        }
+        .onChange(of: modifierSelection?.keys.count ?? 0) { newCount in
+            if newCount > 1 && triggerBinding.wrappedValue != .singlePress {
+                triggerBinding.wrappedValue = .singlePress
             }
         }
     }

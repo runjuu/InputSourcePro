@@ -29,6 +29,7 @@
 		4A15EE412E0E123B007B76C3 /* CursorLagFixView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A15EE402E0E123B007B76C3 /* CursorLagFixView.swift */; };
 		4A15EE432E0E1309007B76C3 /* RebootRequiredBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A15EE422E0E1309007B76C3 /* RebootRequiredBadge.swift */; };
 		4A1BD908287AD20200E4D8C2 /* KeyboardCustomization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A1BD907287AD20200E4D8C2 /* KeyboardCustomization.swift */; };
+		66A637AB8EE9446FA7D8EF7F /* ModifierComboPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25018ACF8C9046C29F0F3462 /* ModifierComboPicker.swift */; };
 		4A1BD90B287AD33C00E4D8C2 /* Boutique in Frameworks */ = {isa = PBXBuildFile; productRef = 4A1BD90A287AD33C00E4D8C2 /* Boutique */; };
 		4A1BD90F287BD14000E4D8C2 /* CustomizedIndicatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A1BD90E287BD14000E4D8C2 /* CustomizedIndicatorView.swift */; };
 		4A1F25222830C3E400001BAB /* Bundle+Version.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A1F25212830C3E400001BAB /* Bundle+Version.swift */; };
@@ -202,6 +203,7 @@
 		4A15EE402E0E123B007B76C3 /* CursorLagFixView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLagFixView.swift; sourceTree = "<group>"; };
 		4A15EE422E0E1309007B76C3 /* RebootRequiredBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RebootRequiredBadge.swift; sourceTree = "<group>"; };
 		4A1BD907287AD20200E4D8C2 /* KeyboardCustomization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardCustomization.swift; sourceTree = "<group>"; };
+		25018ACF8C9046C29F0F3462 /* ModifierComboPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModifierComboPicker.swift; sourceTree = "<group>"; };
 		4A1BD90E287BD14000E4D8C2 /* CustomizedIndicatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomizedIndicatorView.swift; sourceTree = "<group>"; };
 		4A1F25212830C3E400001BAB /* Bundle+Version.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Bundle+Version.swift"; sourceTree = "<group>"; };
 		4A20AD6028904B3A00620D14 /* NoAnimation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoAnimation.swift; sourceTree = "<group>"; };
@@ -556,6 +558,7 @@
 				4A093078285EE63D00232089 /* RunningApplicationsPicker.swift */,
 				4A09308A28680A3200232089 /* NSViewHoverable.swift */,
 				4A1BD907287AD20200E4D8C2 /* KeyboardCustomization.swift */,
+				25018ACF8C9046C29F0F3462 /* ModifierComboPicker.swift */,
 				4A20AD64289283C600620D14 /* LoopingPlayerNSView.swift */,
 				D58168D02894FD2F00E84058 /* ColorBlock.swift */,
 				D58168D228957C5300E84058 /* CJKVFixEnableFailedView.swift */,
@@ -920,6 +923,7 @@
 				4A1BD90F287BD14000E4D8C2 /* CustomizedIndicatorView.swift in Sources */,
 				4A15EE432E0E1309007B76C3 /* RebootRequiredBadge.swift in Sources */,
 				4A1BD908287AD20200E4D8C2 /* KeyboardCustomization.swift in Sources */,
+				66A637AB8EE9446FA7D8EF7F /* ModifierComboPicker.swift in Sources */,
 				4A09307F286359F800232089 /* Accessibility.swift in Sources */,
 				4A2A1792280BA7FA00E13249 /* FloatWindowController.swift in Sources */,
 				4ADDC324281AC39A0075528A /* IndicatorViewConfig.swift in Sources */,

@@ -342,10 +342,10 @@ struct Preferences {
     var singleModifierTriggerGroupMapping = [String: SingleModifierTrigger]()
 
     @CodableUserDefault(Preferences.Key.singleModifierInputSourceMapping)
-    var singleModifierInputSourceMapping = [String: SingleModifierKey]()
+    var singleModifierInputSourceMapping = [String: ModifierCombo]()
 
     @CodableUserDefault(Preferences.Key.singleModifierGroupMapping)
-    var singleModifierGroupMapping = [String: SingleModifierKey]()
+    var singleModifierGroupMapping = [String: ModifierCombo]()
 
     // MARK: - App Rules
 

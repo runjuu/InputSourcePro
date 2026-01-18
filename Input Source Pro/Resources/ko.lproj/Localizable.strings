@@ -189,9 +189,11 @@
 "Shortcut Type" = "단축키 유형";
 "Shortcut" = "단축키";
 "Modifier" = "수정 키";
+"Choose modifier combination" = "수정 키 조합 선택";
 "Trigger" = "트리거";
 "Keyboard Shortcuts" = "키보드 단축키";
 "Single Modifier" = "단일 수정 키";
+"Modifier Combination" = "수정 키 조합";
 "Modifier Trigger" = "수정 키 트리거";
 "Press Once" = "한 번 누르기";
 "Press Twice" = "두 번 누르기";
@@ -205,6 +207,7 @@
 "Left Command" = "왼쪽 Command";
 "Right Command" = "오른쪽 Command";
 "Single Modifier shortcuts require additional permissions to work reliably." = "단일 수정 키 단축키가 안정적으로 작동하려면 추가 권한이 필요합니다.";
+"Modifier shortcuts require additional permissions to work reliably." = "수정 키 단축키가 안정적으로 작동하려면 추가 권한이 필요합니다.";
 "Accessibility" = "접근성";
 "Open Accessibility Settings" = "접근성 설정 열기";
 "Open Accessibility Settings, find \"Input Source Pro\" in the list and enable the toggle." = "접근성 설정을 열고 목록에서 \"Input Source Pro\"를 찾아 토글을 켜세요.";

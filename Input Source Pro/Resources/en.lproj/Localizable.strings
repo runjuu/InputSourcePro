@@ -189,9 +189,11 @@
 "Shortcut Type" = "Shortcut Type";
 "Shortcut" = "Shortcut";
 "Modifier" = "Modifier";
+"Choose modifier combination" = "Choose modifier combination";
 "Trigger" = "Trigger";
 "Keyboard Shortcuts" = "Keyboard Shortcuts";
 "Single Modifier" = "Single Modifier";
+"Modifier Combination" = "Modifier Combination";
 "Modifier Trigger" = "Modifier Trigger";
 "Press Once" = "Press Once";
 "Press Twice" = "Press Twice";
@@ -205,6 +207,7 @@
 "Left Command" = "Left Command";
 "Right Command" = "Right Command";
 "Single Modifier shortcuts require additional permissions to work reliably." = "Single Modifier shortcuts require additional permissions to work reliably.";
+"Modifier shortcuts require additional permissions to work reliably." = "Modifier shortcuts require additional permissions to work reliably.";
 "Accessibility" = "Accessibility";
 "Open Accessibility Settings" = "Open Accessibility Settings";
 "Open Accessibility Settings, find \"Input Source Pro\" in the list and enable the toggle." = "Open Accessibility Settings, find \"Input Source Pro\" in the list and enable the toggle.";

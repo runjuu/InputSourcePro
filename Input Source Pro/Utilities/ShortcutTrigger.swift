@@ -14,7 +14,7 @@ enum ShortcutTriggerMode: String, CaseIterable, Identifiable, Codable {
         case .keyboardShortcut:
             return "Keyboard Shortcuts".i18n()
         case .singleModifier:
-            return "Single Modifier".i18n()
+            return "Modifier Combination".i18n()
         }
     }
 }
@@ -65,6 +65,27 @@ enum SingleModifierKey: String, CaseIterable, Identifiable, Codable {
             return "Left Command".i18n()
         case .rightCommand:
             return "Right Command".i18n()
+        }
+    }
+
+    var sortOrder: Int {
+        switch self {
+        case .leftShift:
+            return 0
+        case .rightShift:
+            return 1
+        case .leftControl:
+            return 2
+        case .rightControl:
+            return 3
+        case .leftOption:
+            return 4
+        case .rightOption:
+            return 5
+        case .leftCommand:
+            return 6
+        case .rightCommand:
+            return 7
         }
     }
 
@@ -126,10 +147,71 @@ enum SingleModifierKey: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+struct ModifierCombo: Hashable, Codable, Identifiable {
+    let keys: Set<SingleModifierKey>
+
+    init(keys: Set<SingleModifierKey>) {
+        self.keys = keys
+    }
+
+    var id: String {
+        orderedKeys.map(\.rawValue).joined(separator: "+")
+    }
+
+    var orderedKeys: [SingleModifierKey] {
+        keys.sorted { $0.sortOrder < $1.sortOrder }
+    }
+
+    var displayName: String {
+        orderedKeys.map(\.name).joined(separator: " + ")
+    }
+
+    var isSingle: Bool {
+        keys.count == 1
+    }
+
+    var singleKey: SingleModifierKey? {
+        guard keys.count == 1 else { return nil }
+        return keys.first
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+
+        if let single = try? container.decode(SingleModifierKey.self) {
+            keys = [single]
+            return
+        }
+
+        if let array = try? container.decode([SingleModifierKey].self) {
+            keys = Set(array)
+            return
+        }
+
+        if let set = try? container.decode(Set<SingleModifierKey>.self) {
+            keys = set
+            return
+        }
+
+        keys = []
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        let ordered = orderedKeys
+
+        if ordered.count == 1 {
+            try container.encode(ordered[0])
+        } else {
+            try container.encode(ordered)
+        }
+    }
+}
+
 struct ShortcutBinding {
     let id: String
     let mode: ShortcutTriggerMode
-    let singleModifierKey: SingleModifierKey?
+    let modifierCombo: ModifierCombo?
     let singleModifierTrigger: SingleModifierTrigger
     let onTrigger: () -> Void
 }
@@ -148,8 +230,12 @@ final class ShortcutTriggerManager {
 
     /// Tracks which modifier keys are currently pressed down (key: modifier key, value: press timestamp)
     private var pressedModifiers: [SingleModifierKey: TimeInterval] = [:]
-    /// Tracks whether a non-modifier key was pressed while a modifier was held
-    private var modifierInvalidated: Set<SingleModifierKey> = []
+    /// Tracks whether a combo has been invalidated by extra modifiers or other key activity
+    private var comboInvalidated: Set<ModifierCombo> = []
+    /// Tracks whether all keys in a combo were pressed at least once during the current hold cycle
+    private var comboCompleted: Set<ModifierCombo> = []
+    /// Tracks the earliest press timestamp for each combo in the current hold cycle
+    private var comboPressTimestamps: [ModifierCombo: TimeInterval] = [:]
     /// Timestamp of the most recent key-down per keyCode (includes modifier keys).
     private var lastKeyDownTimestamps: [UInt16: TimeInterval] = [:]
 
@@ -162,7 +248,8 @@ final class ShortcutTriggerManager {
     private var keyEventRunLoopSource: CFRunLoopSource?
 
     /// Current bindings
-    private var currentBindingsByKey: [SingleModifierKey: ShortcutBinding] = [:]
+    private var currentBindingsByCombo: [ModifierCombo: ShortcutBinding] = [:]
+    private var currentCombos: Set<ModifierCombo> = []
 
     /// Track last processed flagsChanged event to deduplicate
     private var lastEventTimestamp: TimeInterval = 0
@@ -213,7 +300,9 @@ final class ShortcutTriggerManager {
     func updateBindings(_ bindings: [ShortcutBinding]) {
         modifierTapTimestamps.removeAll()
         pressedModifiers.removeAll()
-        modifierInvalidated.removeAll()
+        comboInvalidated.removeAll()
+        comboCompleted.removeAll()
+        comboPressTimestamps.removeAll()
         lastKeyDownTimestamps.removeAll()
         removeAllMonitors()
         KeyboardShortcuts.removeAllHandlers()
@@ -232,7 +321,8 @@ final class ShortcutTriggerManager {
             localFlagsMonitor = nil
         }
         removeKeyEventTap()
-        currentBindingsByKey.removeAll()
+        currentBindingsByCombo.removeAll()
+        currentCombos.removeAll()
         pendingBindings.removeAll()
     }
 
@@ -258,15 +348,16 @@ final class ShortcutTriggerManager {
     }
 
     private func registerSingleModifierShortcuts(_ bindings: [ShortcutBinding]) {
-        currentBindingsByKey = Dictionary(
-            bindings.compactMap { binding -> (SingleModifierKey, ShortcutBinding)? in
-                guard let key = binding.singleModifierKey else { return nil }
-                return (key, binding)
+        currentBindingsByCombo = Dictionary(
+            bindings.compactMap { binding -> (ModifierCombo, ShortcutBinding)? in
+                guard let combo = binding.modifierCombo, !combo.keys.isEmpty else { return nil }
+                return (combo, binding)
             },
             uniquingKeysWith: { _, new in new }
         )
+        currentCombos = Set(currentBindingsByCombo.keys)
 
-        guard !currentBindingsByKey.isEmpty else { return }
+        guard !currentBindingsByCombo.isEmpty else { return }
 
         // Store bindings for potential re-registration after permission grant
         pendingBindings = bindings
@@ -295,7 +386,7 @@ final class ShortcutTriggerManager {
 
     private func setupKeyEventTapIfNeeded() {
         guard !isKeyEventTapEnabled else { return }
-        guard !currentBindingsByKey.isEmpty else { return }
+        guard !currentBindingsByCombo.isEmpty else { return }
 
         // Create event tap for keyDown, keyUp, mouse button, and scroll events
         // Mouse events: handle Shift+click for text selection
@@ -352,14 +443,14 @@ final class ShortcutTriggerManager {
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
                 self.lastKeyDownTimestamps[keyCode] = eventTimestamp
-                self.invalidateAllPressedModifiers()
+                self.invalidateCombosForPressedModifiers()
                 self.modifierTapTimestamps.removeAll()
             }
         case .leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel:
             // Invalidate all currently pressed modifiers
             // This is called from the CGEvent callback, which may be on a different thread
             DispatchQueue.main.async { [weak self] in
-                self?.invalidateAllPressedModifiers()
+                self?.invalidateCombosForPressedModifiers()
                 self?.modifierTapTimestamps.removeAll()
             }
         default:
@@ -367,9 +458,15 @@ final class ShortcutTriggerManager {
         }
     }
 
-    private func invalidateAllPressedModifiers() {
-        for key in pressedModifiers.keys {
-            modifierInvalidated.insert(key)
+    private func invalidateCombosForPressedModifiers() {
+        let pressedKeys = Set(pressedModifiers.keys)
+        guard !pressedKeys.isEmpty else { return }
+
+        for combo in currentCombos {
+            guard !pressedKeys.isDisjoint(with: combo.keys) else { continue }
+            comboInvalidated.insert(combo)
+            comboCompleted.remove(combo)
+            comboPressTimestamps.removeValue(forKey: combo)
         }
     }
 
@@ -392,53 +489,95 @@ final class ShortcutTriggerManager {
             lastKeyDownTimestamps[event.keyCode] = event.timestamp
         }
 
-        guard let binding = currentBindingsByKey[key] else { return }
-
         if isKeyDown {
             // Modifier key pressed down
-            // Only track if this is the ONLY modifier pressed
-            if flags == key.modifierFlag {
+            if pressedModifiers[key] == nil {
                 pressedModifiers[key] = event.timestamp
-                modifierInvalidated.remove(key)
-            } else {
-                // Multiple modifiers pressed - invalidate
-                invalidateAllPressedModifiers()
-                modifierTapTimestamps.removeAll()
-                modifierInvalidated.insert(key)
             }
+            updateComboState(pressedKeys: Set(pressedModifiers.keys), timestamp: event.timestamp)
         } else {
             // Modifier key released
-            guard let pressTimestamp = pressedModifiers.removeValue(forKey: key) else {
-                return
-            }
+            guard pressedModifiers.removeValue(forKey: key) != nil else { return }
 
-            // Check if this modifier was invalidated (another key was pressed while held)
-            if modifierInvalidated.contains(key) {
-                modifierInvalidated.remove(key)
-                modifierTapTimestamps.removeValue(forKey: key)
-                return
-            }
+            let pressedKeys = Set(pressedModifiers.keys)
 
             // Check if any other modifiers are still held
-            if !flags.isEmpty {
+            if !pressedKeys.isEmpty {
+                updateComboState(pressedKeys: pressedKeys, timestamp: event.timestamp)
                 return
             }
 
-            // Check if modifier was held for too long (user may have forgotten or changed mind)
-            let holdDuration = event.timestamp - pressTimestamp
+            triggerCompletedCombos(at: event.timestamp)
+            comboInvalidated.removeAll()
+            comboCompleted.removeAll()
+            comboPressTimestamps.removeAll()
+        }
+    }
+
+    private func updateComboState(pressedKeys: Set<SingleModifierKey>, timestamp: TimeInterval) {
+        var didInvalidate = false
+
+        for combo in currentCombos {
+            if pressedKeys.isDisjoint(with: combo.keys) {
+                comboInvalidated.remove(combo)
+                comboCompleted.remove(combo)
+                comboPressTimestamps.removeValue(forKey: combo)
+                continue
+            }
+
+            if comboInvalidated.contains(combo) {
+                continue
+            }
+
+            if !pressedKeys.isSubset(of: combo.keys) {
+                comboInvalidated.insert(combo)
+                comboCompleted.remove(combo)
+                comboPressTimestamps.removeValue(forKey: combo)
+                didInvalidate = true
+                continue
+            }
+
+            if comboPressTimestamps[combo] == nil {
+                let earliestPress = combo.keys.compactMap { pressedModifiers[$0] }.min() ?? timestamp
+                comboPressTimestamps[combo] = earliestPress
+            }
+
+            if pressedKeys.isSuperset(of: combo.keys) {
+                comboCompleted.insert(combo)
+            }
+        }
+
+        if didInvalidate {
+            modifierTapTimestamps.removeAll()
+        }
+    }
+
+    private func triggerCompletedCombos(at timestamp: TimeInterval) {
+        for combo in comboCompleted {
+            guard !comboInvalidated.contains(combo) else { continue }
+            guard let binding = currentBindingsByCombo[combo] else { continue }
+
+            let pressTimestamp = comboPressTimestamps[combo] ?? timestamp
+            let holdDuration = timestamp - pressTimestamp
             if holdDuration > maxHoldDuration {
-                return
+                continue
             }
 
-            if didPressOtherKeyRecently(before: event.timestamp, excluding: key) {
-                modifierTapTimestamps.removeValue(forKey: key)
-                return
+            if didPressOtherKeyRecently(before: timestamp, excluding: combo.keys) {
+                if let key = combo.singleKey {
+                    modifierTapTimestamps.removeValue(forKey: key)
+                }
+                continue
             }
+
+            let effectiveTrigger: SingleModifierTrigger = combo.keys.count > 1
+                ? .singlePress
+                : binding.singleModifierTrigger
 
             handleSingleModifierTrigger(
-                key: key,
-                timestamp: event.timestamp,
-                trigger: binding.singleModifierTrigger,
+                combo: combo,
+                timestamp: timestamp,
+                trigger: effectiveTrigger,
                 action: binding.onTrigger
             )
         }
@@ -446,10 +585,11 @@ final class ShortcutTriggerManager {
 
     private func didPressOtherKeyRecently(
         before timestamp: TimeInterval,
-        excluding key: SingleModifierKey
+        excluding keys: Set<SingleModifierKey>
     ) -> Bool {
+        let excludedKeyCodes = Set(keys.map(\.keyCode))
         let lastOtherKeyTimestamp = lastKeyDownTimestamps
-            .filter { $0.key != key.keyCode }
+            .filter { !excludedKeyCodes.contains($0.key) }
             .map(\.value)
             .max()
 
@@ -458,11 +598,16 @@ final class ShortcutTriggerManager {
     }
 
     private func handleSingleModifierTrigger(
-        key: SingleModifierKey,
+        combo: ModifierCombo,
         timestamp: TimeInterval,
         trigger: SingleModifierTrigger,
         action: () -> Void
     ) {
+        guard let key = combo.singleKey else {
+            action()
+            return
+        }
+
         switch trigger {
         case .singlePress:
             action()

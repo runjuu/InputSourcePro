@@ -191,9 +191,11 @@
 "Shortcut Type" = "快捷键类型";
 "Shortcut" = "快捷键";
 "Modifier" = "修饰键";
+"Choose modifier combination" = "选择修饰键组合";
 "Trigger" = "触发";
 "Keyboard Shortcuts" = "键盘快捷键";
 "Single Modifier" = "单一修饰键";
+"Modifier Combination" = "修饰键组合";
 "Modifier Trigger" = "修饰键触发";
 "Press Once" = "按一次";
 "Press Twice" = "按两次";
@@ -207,6 +209,7 @@
 "Left Command" = "左 Command";
 "Right Command" = "右 Command";
 "Single Modifier shortcuts require additional permissions to work reliably." = "单一修饰键快捷键需要额外权限才能可靠运行。";
+"Modifier shortcuts require additional permissions to work reliably." = "修饰键快捷键需要额外权限才能可靠运行。";
 "Accessibility" = "辅助功能";
 "Open Accessibility Settings" = "打开「辅助功能」设置";
 "Open Accessibility Settings, find \"Input Source Pro\" in the list and enable the toggle." = "打开「辅助功能」设置，在列表中找到“Input Source Pro”，并开启开关。";

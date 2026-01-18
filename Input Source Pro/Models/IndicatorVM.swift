@@ -288,13 +288,13 @@ extension IndicatorVM {
         for inputSource in InputSource.sources {
             let mode = preferencesVM.shortcutMode(for: inputSource)
             let trigger = preferencesVM.singleModifierTrigger(for: inputSource)
-            let modifierKey = preferencesVM.singleModifierKey(for: inputSource)
+            let modifierCombo = preferencesVM.modifierCombo(for: inputSource)
 
             bindings.append(
                 ShortcutBinding(
                     id: inputSource.id,
                     mode: mode,
-                    singleModifierKey: modifierKey,
+                    modifierCombo: modifierCombo,
                     singleModifierTrigger: trigger,
                     onTrigger: { [weak self] in
                         self?.send(.switchInputSourceByShortcut(inputSource))
@@ -308,13 +308,13 @@ extension IndicatorVM {
 
             let mode = preferencesVM.shortcutMode(for: group)
             let trigger = preferencesVM.singleModifierTrigger(for: group)
-            let modifierKey = preferencesVM.singleModifierKey(for: group)
+            let modifierCombo = preferencesVM.modifierCombo(for: group)
 
             bindings.append(
                 ShortcutBinding(
                     id: id,
                     mode: mode,
-                    singleModifierKey: modifierKey,
+                    modifierCombo: modifierCombo,
                     singleModifierTrigger: trigger,
                     onTrigger: { [weak self] in
                         self?.triggerHotKeyGroup(group)

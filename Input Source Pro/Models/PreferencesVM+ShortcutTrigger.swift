@@ -37,11 +37,11 @@ extension PreferencesVM {
         return preferences.singleModifierTrigger ?? .singlePress
     }
 
-    func singleModifierKey(for inputSource: InputSource) -> SingleModifierKey? {
+    func modifierCombo(for inputSource: InputSource) -> ModifierCombo? {
         return (preferences.singleModifierInputSourceMapping ?? [:])[inputSource.id]
     }
 
-    func singleModifierKey(for group: HotKeyGroup) -> SingleModifierKey? {
+    func modifierCombo(for group: HotKeyGroup) -> ModifierCombo? {
         guard let id = group.id else { return nil }
         return (preferences.singleModifierGroupMapping ?? [:])[id]
     }
@@ -94,7 +94,7 @@ extension PreferencesVM {
         }
     }
 
-    func updateSingleModifierKey(_ key: SingleModifierKey?, for inputSource: InputSource) {
+    func updateModifierCombo(_ combo: ModifierCombo?, for inputSource: InputSource) {
         update { preferences in
             var inputSourceMapping = preferences.singleModifierInputSourceMapping ?? [:]
             var groupMapping = preferences.singleModifierGroupMapping ?? [:]
@@ -116,18 +116,18 @@ extension PreferencesVM {
                 return fallbackMode == .singleModifier
             }
 
-            if let key = key {
+            if let combo = combo {
                 let duplicateInputSourceKeys = inputSourceMapping
-                    .filter { $0.value == key && usesSingleModifierInputSource($0.key) }
+                    .filter { $0.value == combo && usesSingleModifierInputSource($0.key) }
                     .map(\.key)
                 let duplicateGroupKeys = groupMapping
-                    .filter { $0.value == key && usesSingleModifierGroup($0.key) }
+                    .filter { $0.value == combo && usesSingleModifierGroup($0.key) }
                     .map(\.key)
 
                 duplicateInputSourceKeys.forEach { inputSourceMapping.removeValue(forKey: $0) }
                 duplicateGroupKeys.forEach { groupMapping.removeValue(forKey: $0) }
 
-                inputSourceMapping[inputSource.id] = key
+                inputSourceMapping[inputSource.id] = combo
             } else {
                 inputSourceMapping.removeValue(forKey: inputSource.id)
             }
@@ -137,7 +137,7 @@ extension PreferencesVM {
         }
     }
 
-    func updateSingleModifierKey(_ key: SingleModifierKey?, for group: HotKeyGroup) {
+    func updateModifierCombo(_ combo: ModifierCombo?, for group: HotKeyGroup) {
         guard let id = group.id else { return }
 
         update { preferences in
@@ -161,18 +161,18 @@ extension PreferencesVM {
                 return fallbackMode == .singleModifier
             }
 
-            if let key = key {
+            if let combo = combo {
                 let duplicateInputSourceKeys = inputSourceMapping
-                    .filter { $0.value == key && usesSingleModifierInputSource($0.key) }
+                    .filter { $0.value == combo && usesSingleModifierInputSource($0.key) }
                     .map(\.key)
                 let duplicateGroupKeys = groupMapping
-                    .filter { $0.value == key && usesSingleModifierGroup($0.key) }
+                    .filter { $0.value == combo && usesSingleModifierGroup($0.key) }
                     .map(\.key)
 
                 duplicateInputSourceKeys.forEach { inputSourceMapping.removeValue(forKey: $0) }
                 duplicateGroupKeys.forEach { groupMapping.removeValue(forKey: $0) }
 
-                groupMapping[id] = key
+                groupMapping[id] = combo
             } else {
                 groupMapping.removeValue(forKey: id)
             }

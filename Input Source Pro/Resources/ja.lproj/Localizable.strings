@@ -189,9 +189,11 @@
 "Shortcut Type" = "ショートカットの種類";
 "Shortcut" = "ショートカット";
 "Modifier" = "修飾キー";
+"Choose modifier combination" = "修飾キーの組み合わせを選択";
 "Trigger" = "トリガー";
 "Keyboard Shortcuts" = "キーボードショートカット";
 "Single Modifier" = "単一修飾キー";
+"Modifier Combination" = "修飾キーの組み合わせ";
 "Modifier Trigger" = "修飾キーのトリガー";
 "Press Once" = "1回押す";
 "Press Twice" = "2回押す";
@@ -205,6 +207,7 @@
 "Left Command" = "左 Command";
 "Right Command" = "右 Command";
 "Single Modifier shortcuts require additional permissions to work reliably." = "単一修飾キーのショートカットを安定して動作させるには追加の権限が必要です。";
+"Modifier shortcuts require additional permissions to work reliably." = "修飾キーのショートカットを安定して動作させるには追加の権限が必要です。";
 "Accessibility" = "アクセシビリティ";
 "Open Accessibility Settings" = "アクセシビリティ設定を開く";
 "Open Accessibility Settings, find \"Input Source Pro\" in the list and enable the toggle." = "アクセシビリティ設定を開き、一覧で「Input Source Pro」を探してトグルを有効にしてください。";
