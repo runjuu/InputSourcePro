@@ -49,7 +49,7 @@
 
 ### 🥷 Automatic Context-Aware Switching
 - Set a default input source per **application**.
-- Set input sources per **website** when using supported browsers (Safari, Chrome, Arc, Edge, Vivaldi, Opera, Brave, Firefox, Zen, Dia, and more).
+- Set input sources per **website** when using browsers (Safari, Chrome, Arc, Edge, Vivaldi, Opera, Brave, Firefox, Zen, Dia, and more).
 - Switch automatically as you move between apps/websites.
 
 ### 🐈‍⬛ Elegant Input Source Indicator
@@ -63,8 +63,8 @@ Keep punctuation consistent across different languages by enabling **Force Engli
 
 ### 🎛️ App-Based Function Key Switching
 Automatically switch your macOS function key mode per app.
-- Choose whether an app should use **F1–F12** as:
-    - **Standard Function Keys**: Acts as standard F1–F12 keys. Ideal for IDEs (e.g., VSCode) and games.
+- Choose whether an app should use **F1 ~ F12** as:
+    - **Standard Function Keys**: Acts as standard F1 ~ F12 keys. Ideal for IDEs (e.g., VSCode) and games.
     - **Media Keys**: Triggers special features printed on the keys (e.g., brightness, volume, playback). Ideal for general daily use.
 - Falls back to your system-wide/default setting when an app has no override.
 
@@ -118,6 +118,16 @@ git clone git@github.com:runjuu/InputSourcePro.git
 ```
 
 Then open the project in Xcode and hit Build. 🍻
+
+## Star History
+
+<a href="https://www.star-history.com/#runjuu/InputSourcePro&type=date&legend=bottom-right">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=runjuu/InputSourcePro&type=date&theme=dark&legend=bottom-right" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=runjuu/InputSourcePro&type=date&legend=bottom-right" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=runjuu/InputSourcePro&type=date&legend=bottom-right" />
+ </picture>
+</a>
 
 ## License
 Input Source Pro is licensed under the [GPL-3.0 License](LICENSE).
