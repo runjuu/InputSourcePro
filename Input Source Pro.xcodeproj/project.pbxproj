@@ -29,7 +29,6 @@
 		4A15EE412E0E123B007B76C3 /* CursorLagFixView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A15EE402E0E123B007B76C3 /* CursorLagFixView.swift */; };
 		4A15EE432E0E1309007B76C3 /* RebootRequiredBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A15EE422E0E1309007B76C3 /* RebootRequiredBadge.swift */; };
 		4A1BD908287AD20200E4D8C2 /* KeyboardCustomization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A1BD907287AD20200E4D8C2 /* KeyboardCustomization.swift */; };
-		66A637AB8EE9446FA7D8EF7F /* ModifierComboPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25018ACF8C9046C29F0F3462 /* ModifierComboPicker.swift */; };
 		4A1BD90B287AD33C00E4D8C2 /* Boutique in Frameworks */ = {isa = PBXBuildFile; productRef = 4A1BD90A287AD33C00E4D8C2 /* Boutique */; };
 		4A1BD90F287BD14000E4D8C2 /* CustomizedIndicatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A1BD90E287BD14000E4D8C2 /* CustomizedIndicatorView.swift */; };
 		4A1F25222830C3E400001BAB /* Bundle+Version.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A1F25212830C3E400001BAB /* Bundle+Version.swift */; };
@@ -119,6 +118,7 @@
 		4ADDC324281AC39A0075528A /* IndicatorViewConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ADDC323281AC39A0075528A /* IndicatorViewConfig.swift */; };
 		4ADDC326281AC4DD0075528A /* NSApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ADDC325281AC4DD0075528A /* NSApplication.swift */; };
 		4AEEE08428126A4900C883F8 /* BrowserURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AEEE08328126A4900C883F8 /* BrowserURL.swift */; };
+		66A637AB8EE9446FA7D8EF7F /* ModifierComboPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25018ACF8C9046C29F0F3462 /* ModifierComboPicker.swift */; };
 		B7F201B136534D7A8A40F340 /* PreferencesVM+ShortcutTrigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B665FC5A40B248929C5EB938 /* PreferencesVM+ShortcutTrigger.swift */; };
 		D50821F229FE29C40078ADEC /* EnhancedModeToggle.swift in Sources */ = {isa = PBXBuildFile; fileRef = D50821F129FE29C40078ADEC /* EnhancedModeToggle.swift */; };
 		D508B6A32A140289002E272E /* FileManager+Ext.swift in Sources */ = {isa = PBXBuildFile; fileRef = D508B6A22A140289002E272E /* FileManager+Ext.swift */; };
@@ -182,6 +182,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		25018ACF8C9046C29F0F3462 /* ModifierComboPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModifierComboPicker.swift; sourceTree = "<group>"; };
 		25C5A6B42E678D86005AB80E /* PunctuationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PunctuationService.swift; sourceTree = "<group>"; };
 		4A093070285DACAA00232089 /* NSToggleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NSToggleView.swift; sourceTree = "<group>"; };
 		4A093072285E166E00232089 /* PreferencesVM+AppKeyboardCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesVM+AppKeyboardCache.swift"; sourceTree = "<group>"; };
@@ -203,7 +204,6 @@
 		4A15EE402E0E123B007B76C3 /* CursorLagFixView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLagFixView.swift; sourceTree = "<group>"; };
 		4A15EE422E0E1309007B76C3 /* RebootRequiredBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RebootRequiredBadge.swift; sourceTree = "<group>"; };
 		4A1BD907287AD20200E4D8C2 /* KeyboardCustomization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardCustomization.swift; sourceTree = "<group>"; };
-		25018ACF8C9046C29F0F3462 /* ModifierComboPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModifierComboPicker.swift; sourceTree = "<group>"; };
 		4A1BD90E287BD14000E4D8C2 /* CustomizedIndicatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomizedIndicatorView.swift; sourceTree = "<group>"; };
 		4A1F25212830C3E400001BAB /* Bundle+Version.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Bundle+Version.swift"; sourceTree = "<group>"; };
 		4A20AD6028904B3A00620D14 /* NoAnimation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoAnimation.swift; sourceTree = "<group>"; };
@@ -1112,7 +1112,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Input Source Pro/Resources/Signing.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 600;
+				CURRENT_PROJECT_VERSION = 605;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"Input Source Pro/Preview Content\"";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1133,7 +1133,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 2.8.0;
+				MARKETING_VERSION = 2.9.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.runjuu.Input-Source-Pro";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1149,7 +1149,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Input Source Pro/Resources/Signing.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 600;
+				CURRENT_PROJECT_VERSION = 605;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"Input Source Pro/Preview Content\"";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1170,7 +1170,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 2.8.0;
+				MARKETING_VERSION = 2.9.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.runjuu.Input-Source-Pro";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
