@@ -51,7 +51,8 @@ struct KeyboardsSettingsView: View {
                 if hasSingleModifierShortcuts && (needsAccessibilityPermission || needsInputMonitoringPermission) {
                     permissionWarningSection
                 }
-                
+
+                shortcutOptionsSection
                 normalSection
                 groupSection
                 AddSwitchingGroupButton(onSelect: preferencesVM.addHotKeyGroup)
@@ -59,6 +60,35 @@ struct KeyboardsSettingsView: View {
             .padding()
         }
         .background(NSColor.background1.color)
+        .toggleStyle(.switch)
+    }
+
+    @ViewBuilder
+    var shortcutOptionsSection: some View {
+        let isShortcutTriggerOnKeyDown = Binding(
+            get: { preferencesVM.preferences.isShortcutTriggerOnKeyDown },
+            set: { newValue in
+                preferencesVM.update { $0.isShortcutTriggerOnKeyDown = newValue }
+                indicatorVM.refreshShortcut()
+            }
+        )
+
+        SettingsSection(title: "") {
+            HStack(alignment: .firstTextBaseline) {
+                Toggle("",
+                    isOn: isShortcutTriggerOnKeyDown
+                )
+                VStack(alignment: .leading, spacing: 6) {
+                  Text("Trigger on Key Press".i18n())
+                  Text(.init("Trigger on Key Press Description".i18n()))
+                      .font(.system(size: 12))
+                      .opacity(0.8)
+                }
+                Spacer()
+            }
+            .padding()
+        }
+        .padding(.bottom)
     }
     
     @ViewBuilder

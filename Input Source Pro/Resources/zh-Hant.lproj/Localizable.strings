@@ -217,3 +217,6 @@
 "Open Input Monitoring Settings" = "打開「輸入監控」設定";
 "Open Input Monitoring Settings, click the \"+\" button and add \"Input Source Pro\" to the list." = "打開「輸入監控」設定，點擊「+」按鈕並將「Input Source Pro」加入列表。";
 "Disabled until permissions are granted" = "權限授予前將被停用";
+
+"Trigger on Key Press" = "按下時觸發";
+"Trigger on Key Press Description" = "啟用時，按下按鍵立即觸發快捷鍵。停用時，放開按鍵時觸發快捷鍵。";

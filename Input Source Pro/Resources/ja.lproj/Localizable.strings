@@ -215,3 +215,6 @@
 "Open Input Monitoring Settings" = "入力監視設定を開く";
 "Open Input Monitoring Settings, click the \"+\" button and add \"Input Source Pro\" to the list." = "入力監視設定を開き、「+」ボタンをクリックして一覧に「Input Source Pro」を追加してください。";
 "Disabled until permissions are granted" = "権限が付与されるまで無効";
+
+"Trigger on Key Press" = "キーを押したときにトリガー";
+"Trigger on Key Press Description" = "有効にすると、キーを押した瞬間にショートカットがトリガーされます。無効にすると、キーを離したときにトリガーされます。";
