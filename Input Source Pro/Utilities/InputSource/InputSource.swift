@@ -98,15 +98,6 @@ extension InputSource {
     static func anotherCJKVSource(current: InputSource) -> InputSource? {
         return sources.first(where: { $0 != current && $0.isCJKVR })
     }
-
-    // from read-symbolichotkeys script of Karabiner
-    // github.com/tekezo/Karabiner/blob/master/src/util/read-symbolichotkeys/read-symbolichotkeys/main.m
-    static func getSelectPreviousShortcut() -> (Int, UInt64)? {
-        guard let shortcut = InputSourceSwitcher.systemSelectPreviousShortcut() else {
-            return nil
-        }
-        return (Int(shortcut.keyCode), shortcut.modifiers.rawValue)
-    }
 }
 
 private extension URL {

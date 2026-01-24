@@ -17,11 +17,6 @@ enum InputSourceSwitcher {
         }
     }
 
-    struct Shortcut {
-        let keyCode: CGKeyCode
-        let modifiers: CGEventFlags
-    }
-
     private struct SwitchTarget {
         let localizedName: String
         let sourceID: String
@@ -30,6 +25,7 @@ enum InputSourceSwitcher {
     }
 
     private static let logger = ISPLogger(category: String(describing: InputSourceSwitcher.self))
+    private static var pendingWorkItems: [DispatchWorkItem] = []
 
     static func discoverInputSources() -> [Descriptor] {
         return inputSourceList().map { source in
@@ -50,6 +46,7 @@ enum InputSourceSwitcher {
     }
 
     static func switchToInputSource(sourceID: String, useCJKVFix: Bool = true) {
+        cancelPendingWorkItems()
         guard let tisTarget = resolveInputSourceBySourceID(sourceID) else {
             logger.debug { "No input source found for sourceID=\(sourceID)" }
             return
@@ -90,6 +87,7 @@ enum InputSourceSwitcher {
     }
 
     static func switchToInputSource(_ inputSource: InputSource, useCJKVFix: Bool) {
+        cancelPendingWorkItems()
         let target = SwitchTarget(
             localizedName: inputSource.name,
             sourceID: inputSource.id,
@@ -115,18 +113,22 @@ enum InputSourceSwitcher {
     ) {
         if target.isCJKV,
            allowShortcutFallback,
-           let previousShortcut = systemSelectPreviousShortcut(),
+           let previousShortcut = getPreviousInputSourceShortcut(),
            let nonCJKVSource = resolveNonCJKVSource(),
            canPostShortcuts()
         {
             logger.debug { "Applying CJKV fix using previous input source shortcut" }
-            _ = selectInputSource(tisTarget, reason: "CJKV target")
-            _ = selectInputSource(nonCJKVSource, reason: "CJKV bounce")
-            _ = postShortcut(previousShortcut)
-            return
+            selectInputSource(tisTarget, reason: "CJKV target")
+            selectInputSource(nonCJKVSource, reason: "CJKV bounce")
+            
+            scheduleWorkItem(after: 0.05, execute: {
+                triggerShortcut(previousShortcut, onFinish: {
+                    selectInputSource(tisTarget, reason: "CJKV target restoration")
+                })
+            })
+        } else {
+            selectInputSource(tisTarget, reason: "target")
         }
-
-        _ = selectInputSource(tisTarget, reason: "target")
     }
 
     @discardableResult
@@ -139,103 +141,12 @@ enum InputSourceSwitcher {
     }
 
     private static func canPostShortcuts() -> Bool {
-        // Posting CGEvents requires Accessibility permission. Input Monitoring is recommended
-        // for reliable key event delivery on newer macOS versions.
-        let hasAccessibility = PermissionsVM.checkAccessibility(prompt: false)
-        if !hasAccessibility {
+        if PermissionsVM.checkAccessibility(prompt: false) {
+            return true
+        } else {
             logger.debug { "Accessibility permission missing; cannot post input source shortcut." }
-            return false
+            return true
         }
-
-        let hasInputMonitoring = PermissionsVM.checkInputMonitoring(prompt: false)
-        if !hasInputMonitoring {
-            logger.debug { "Input Monitoring permission missing; shortcut posting may be unreliable." }
-        }
-
-        return true
-    }
-
-    static func systemSelectPreviousShortcut() -> Shortcut? {
-        return symbolicHotkeyShortcut(symbolicKey: "60")
-    }
-
-    private static func symbolicHotkeyShortcut(symbolicKey: String) -> Shortcut? {
-        guard let dict = UserDefaults.standard.persistentDomain(forName: "com.apple.symbolichotkeys"),
-              let symbolichotkeys = dict["AppleSymbolicHotKeys"] as? NSDictionary,
-              let symbolichotkey = symbolichotkeys[symbolicKey] as? NSDictionary,
-              let enabled = symbolichotkey["enabled"] as? NSNumber,
-              enabled.intValue == 1,
-              let value = symbolichotkey["value"] as? NSDictionary,
-              let parameters = value["parameters"] as? NSArray,
-              parameters.count >= 3,
-              let keyCode = (parameters[1] as? NSNumber)?.intValue,
-              let modifiers = (parameters[2] as? NSNumber)?.uint64Value
-        else {
-            return nil
-        }
-
-        return Shortcut(
-            keyCode: CGKeyCode(keyCode),
-            modifiers: CGEventFlags(rawValue: modifiers)
-        )
-    }
-
-
-    private static func postShortcut(_ shortcut: Shortcut) -> Bool {
-        guard let source = CGEventSource(stateID: .hidSystemState) else {
-            logger.debug { "Failed to create CGEventSource for shortcut posting." }
-            return false
-        }
-
-        let modifiers = modifierKeyCodes(from: shortcut.modifiers)
-        for keyCode in modifiers {
-            CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true)?
-                .post(tap: .cghidEventTap)
-        }
-
-        guard let keyDown = CGEvent(
-            keyboardEventSource: source,
-            virtualKey: shortcut.keyCode,
-            keyDown: true
-        ), let keyUp = CGEvent(
-            keyboardEventSource: source,
-            virtualKey: shortcut.keyCode,
-            keyDown: false
-        ) else {
-            return false
-        }
-
-        keyDown.flags = shortcut.modifiers
-        keyUp.flags = shortcut.modifiers
-
-        keyDown.post(tap: .cghidEventTap)
-        keyUp.post(tap: .cghidEventTap)
-
-        for keyCode in modifiers.reversed() {
-            CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)?
-                .post(tap: .cghidEventTap)
-        }
-
-        return true
-    }
-
-    private static func modifierKeyCodes(from flags: CGEventFlags) -> [CGKeyCode] {
-        var keyCodes: [CGKeyCode] = []
-
-        if flags.contains(.maskShift) {
-            keyCodes.append(CGKeyCode(kVK_Shift))
-        }
-        if flags.contains(.maskControl) {
-            keyCodes.append(CGKeyCode(kVK_Control))
-        }
-        if flags.contains(.maskAlternate) {
-            keyCodes.append(CGKeyCode(kVK_Option))
-        }
-        if flags.contains(.maskCommand) {
-            keyCodes.append(CGKeyCode(kVK_Command))
-        }
-
-        return keyCodes
     }
 
     private static func resolveNonCJKVSource() -> TISInputSource? {
@@ -273,4 +184,113 @@ enum InputSourceSwitcher {
         return lang == "ru" || lang == "ko" || lang == "ja" || lang == "vi" || lang.hasPrefix("zh")
     }
 
+    private static func cancelPendingWorkItems() {
+        guard !pendingWorkItems.isEmpty else { return }
+        pendingWorkItems.forEach { $0.cancel() }
+        pendingWorkItems.removeAll()
+    }
+
+    private static func scheduleWorkItem(after delay: TimeInterval, execute work: @escaping () -> Void) {
+        var workItem: DispatchWorkItem?
+        workItem = DispatchWorkItem {
+            guard let item = workItem else { return }
+            defer { removePendingWorkItem(item) }
+            guard !item.isCancelled else { return }
+            work()
+        }
+
+        guard let item = workItem else { return }
+        pendingWorkItems.append(item)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
+    }
+
+    private static func removePendingWorkItem(_ item: DispatchWorkItem) {
+        if let index = pendingWorkItems.firstIndex(where: { $0 === item }) {
+            pendingWorkItems.remove(at: index)
+        }
+    }
+}
+
+extension InputSourceSwitcher {
+    struct HotKeyInfo {
+        let keyCode: CGKeyCode
+        let modifiers: CGEventFlags
+    }
+
+    /// Retrieves the "Select Previous Input Source" shortcut from system defaults.
+    /// Target ID 60 is the system standard for "Select Previous Input Source".
+    static func getPreviousInputSourceShortcut() -> HotKeyInfo? {
+        guard let dict = UserDefaults.standard.persistentDomain(forName: "com.apple.symbolichotkeys"),
+              let hotKeys = dict["AppleSymbolicHotKeys"] as? [String: Any],
+              let inputSourceDict = hotKeys["60"] as? [String: Any] else {
+            
+            logger.debug { "Could not find Input Source shortcut in global preferences." }
+            return nil
+        }
+        
+        if let enabled = inputSourceDict["enabled"] as? Bool, !enabled {
+            logger.debug { "The 'Select Previous Input Source' shortcut is currently disabled in System Settings." }
+            return nil
+        }
+        
+        guard let value = inputSourceDict["value"] as? [String: Any],
+              let parameters = value["parameters"] as? [Int],
+              parameters.count >= 3 else {
+            logger.debug { "Invalid parameter format found in plist." }
+            return nil
+        }
+        
+        let rawKeyCode = parameters[1]
+        let rawModifiers = parameters[2]
+        let cgModifiers = convertCarbonModifiersToCGFlags(carbonFlags: rawModifiers)
+        
+        return HotKeyInfo(keyCode: CGKeyCode(rawKeyCode), modifiers: cgModifiers)
+    }
+
+    /// Helper to convert legacy Carbon modifier integers to modern CGEventFlags
+    static func convertCarbonModifiersToCGFlags(carbonFlags: Int) -> CGEventFlags {
+        var flags = CGEventFlags()
+        
+        // Carbon modifier bitmasks
+        if (carbonFlags & 131072) != 0 { flags.insert(.maskShift) }
+        if (carbonFlags & 262144) != 0 { flags.insert(.maskControl) }
+        if (carbonFlags & 524288) != 0 { flags.insert(.maskAlternate) } // Option key
+        if (carbonFlags & 1048576) != 0 { flags.insert(.maskCommand) }
+        
+        return flags
+    }
+
+    /// Triggers the specified keyboard shortcut programmatically.
+    static func triggerShortcut(_ hotKey: HotKeyInfo, onFinish: @escaping (() -> Void)) {
+        let source = CGEventSource(stateID: .hidSystemState)
+        
+        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: hotKey.keyCode, keyDown: true),
+              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: hotKey.keyCode, keyDown: false)
+        else {
+            logger.debug { "Failed to create key press event." }
+            return
+        }
+        
+        keyDown.flags = hotKey.modifiers
+        keyUp.flags = hotKey.modifiers
+        keyDown.post(tap: .cghidEventTap)
+        keyUp.post(tap: .cghidEventTap)
+        
+        scheduleWorkItem(after: 0.05, execute: {
+            let kVK_Command: CGKeyCode = 55
+            if let cmdDown = CGEvent(keyboardEventSource: source, virtualKey: kVK_Command, keyDown: true),
+               let cmdUp = CGEvent(keyboardEventSource: source, virtualKey: kVK_Command, keyDown: false) {
+                cmdDown.flags = .maskCommand
+                cmdUp.flags = []
+                cmdDown.post(tap: .cghidEventTap)
+                cmdUp.post(tap: .cghidEventTap)
+            } else {
+                logger.debug {
+                    "Failed to create Command event."
+                }
+            }
+            
+            scheduleWorkItem(after: 0.05, execute: onFinish)
+        })
+    }
 }

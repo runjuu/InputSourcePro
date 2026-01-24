@@ -54,7 +54,7 @@ struct TroubleshootingSettingsView: View {
 
     func onToggleCJKVFix(_ isCJKVFixEnabled: Bool) {
         if isCJKVFixEnabled {
-            if InputSource.getSelectPreviousShortcut() == nil {
+            if InputSourceSwitcher.getPreviousInputSourceShortcut() == nil {
                 isShowCJKVFixEnableFailedView = true
             } else {
                 preferencesVM.update {
