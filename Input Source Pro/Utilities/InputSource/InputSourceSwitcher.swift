@@ -121,7 +121,7 @@ enum InputSourceSwitcher {
             selectInputSource(tisTarget, reason: "CJKV target")
             selectInputSource(nonCJKVSource, reason: "CJKV bounce")
             
-            scheduleWorkItem(after: 0.05, execute: {
+            scheduleWorkItem(after: 0.1, execute: {
                 triggerShortcut(previousShortcut, onFinish: {
                     selectInputSource(tisTarget, reason: "CJKV target restoration")
                 })
@@ -276,7 +276,7 @@ extension InputSourceSwitcher {
         keyDown.post(tap: .cghidEventTap)
         keyUp.post(tap: .cghidEventTap)
         
-        scheduleWorkItem(after: 0.05, execute: {
+        scheduleWorkItem(after: 0.1, execute: {
             let kVK_Command: CGKeyCode = 55
             if let cmdDown = CGEvent(keyboardEventSource: source, virtualKey: kVK_Command, keyDown: true),
                let cmdUp = CGEvent(keyboardEventSource: source, virtualKey: kVK_Command, keyDown: false) {
@@ -290,7 +290,7 @@ extension InputSourceSwitcher {
                 }
             }
             
-            scheduleWorkItem(after: 0.05, execute: onFinish)
+            scheduleWorkItem(after: 0.1, execute: onFinish)
         })
     }
 }
