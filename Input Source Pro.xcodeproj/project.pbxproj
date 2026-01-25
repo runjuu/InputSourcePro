@@ -1112,7 +1112,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Input Source Pro/Resources/Signing.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 610;
+				CURRENT_PROJECT_VERSION = 611;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"Input Source Pro/Preview Content\"";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1133,7 +1133,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = "2.9.1-beta";
+				MARKETING_VERSION = "2.9.1-beta2";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.runjuu.Input-Source-Pro";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1149,7 +1149,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Input Source Pro/Resources/Signing.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 610;
+				CURRENT_PROJECT_VERSION = 611;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"Input Source Pro/Preview Content\"";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1170,7 +1170,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = "2.9.1-beta";
+				MARKETING_VERSION = "2.9.1-beta2";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.runjuu.Input-Source-Pro";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
