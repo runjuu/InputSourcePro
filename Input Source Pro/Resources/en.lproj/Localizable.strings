@@ -215,3 +215,6 @@
 "Open Input Monitoring Settings" = "Open Input Monitoring Settings";
 "Open Input Monitoring Settings, click the \"+\" button and add \"Input Source Pro\" to the list." = "Open Input Monitoring Settings, click the \"+\" button and add \"Input Source Pro\" to the list.";
 "Disabled until permissions are granted" = "Disabled until permissions are granted";
+
+"Trigger on Key Press" = "Trigger on Key Press";
+"Trigger on Key Press Description" = "When enabled, shortcuts trigger immediately when keys are pressed. When disabled, shortcuts trigger when keys are released.";

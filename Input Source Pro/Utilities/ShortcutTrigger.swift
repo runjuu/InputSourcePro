@@ -340,9 +340,16 @@ final class ShortcutTriggerManager {
     }
 
     private func registerKeyboardShortcuts(_ bindings: [ShortcutBinding]) {
+        let triggerOnKeyDown = preferencesVM.preferences.isShortcutTriggerOnKeyDown
         for binding in bindings {
-            KeyboardShortcuts.onKeyUp(for: .init(binding.id)) {
-                binding.onTrigger()
+            if triggerOnKeyDown {
+                KeyboardShortcuts.onKeyDown(for: .init(binding.id)) {
+                    binding.onTrigger()
+                }
+            } else {
+                KeyboardShortcuts.onKeyUp(for: .init(binding.id)) {
+                    binding.onTrigger()
+                }
             }
         }
     }
@@ -484,6 +491,7 @@ final class ShortcutTriggerManager {
         flags.remove(.capsLock)
 
         let isKeyDown = flags.contains(key.modifierFlag)
+        let triggerOnKeyDown = preferencesVM.preferences.isShortcutTriggerOnKeyDown
 
         if isKeyDown {
             lastKeyDownTimestamps[event.keyCode] = event.timestamp
@@ -495,6 +503,10 @@ final class ShortcutTriggerManager {
                 pressedModifiers[key] = event.timestamp
             }
             updateComboState(pressedKeys: Set(pressedModifiers.keys), timestamp: event.timestamp)
+
+            if triggerOnKeyDown {
+                triggerCompletedCombos(at: event.timestamp, isKeyDown: true)
+            }
         } else {
             // Modifier key released
             guard pressedModifiers.removeValue(forKey: key) != nil else { return }
@@ -507,7 +519,9 @@ final class ShortcutTriggerManager {
                 return
             }
 
-            triggerCompletedCombos(at: event.timestamp)
+            if !triggerOnKeyDown {
+                triggerCompletedCombos(at: event.timestamp)
+            }
             comboInvalidated.removeAll()
             comboCompleted.removeAll()
             comboPressTimestamps.removeAll()
@@ -552,15 +566,18 @@ final class ShortcutTriggerManager {
         }
     }
 
-    private func triggerCompletedCombos(at timestamp: TimeInterval) {
+    private func triggerCompletedCombos(at timestamp: TimeInterval, isKeyDown: Bool = false) {
         for combo in comboCompleted {
             guard !comboInvalidated.contains(combo) else { continue }
             guard let binding = currentBindingsByCombo[combo] else { continue }
 
-            let pressTimestamp = comboPressTimestamps[combo] ?? timestamp
-            let holdDuration = timestamp - pressTimestamp
-            if holdDuration > maxHoldDuration {
-                continue
+            // Only check hold duration on key up
+            if !isKeyDown {
+                let pressTimestamp = comboPressTimestamps[combo] ?? timestamp
+                let holdDuration = timestamp - pressTimestamp
+                if holdDuration > maxHoldDuration {
+                    continue
+                }
             }
 
             if didPressOtherKeyRecently(before: timestamp, excluding: combo.keys) {
@@ -574,12 +591,17 @@ final class ShortcutTriggerManager {
                 ? .singlePress
                 : binding.singleModifierTrigger
 
-            handleSingleModifierTrigger(
+            let didTrigger = handleSingleModifierTrigger(
                 combo: combo,
                 timestamp: timestamp,
                 trigger: effectiveTrigger,
                 action: binding.onTrigger
             )
+
+            // Invalidate the combo after triggering on key down to prevent double-triggering
+            if isKeyDown && didTrigger {
+                comboInvalidated.insert(combo)
+            }
         }
     }
 
@@ -597,28 +619,33 @@ final class ShortcutTriggerManager {
         return timestamp - lastOtherKeyTimestamp <= otherKeyPressSuppressInterval
     }
 
+    /// Returns true if action was triggered
+    @discardableResult
     private func handleSingleModifierTrigger(
         combo: ModifierCombo,
         timestamp: TimeInterval,
         trigger: SingleModifierTrigger,
         action: () -> Void
-    ) {
+    ) -> Bool {
         guard let key = combo.singleKey else {
             action()
-            return
+            return true
         }
 
         switch trigger {
         case .singlePress:
             action()
+            return true
         case .doublePress:
             if let lastTap = modifierTapTimestamps[key],
                 timestamp - lastTap <= doublePressInterval
             {
                 modifierTapTimestamps.removeValue(forKey: key)
                 action()
+                return true
             } else {
                 modifierTapTimestamps[key] = timestamp
+                return false
             }
         }
     }
