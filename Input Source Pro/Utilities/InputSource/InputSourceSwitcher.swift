@@ -122,8 +122,10 @@ enum InputSourceSwitcher {
             selectInputSource(nonCJKVSource, reason: "CJKV bounce")
             
             scheduleWorkItem(after: 0.1, execute: {
-                triggerShortcut(previousShortcut, onFinish: {
-                    selectInputSource(tisTarget, reason: "CJKV target restoration")
+                triggerShortcut(previousShortcut, onFinish: { currentInputSouce in
+                    if currentInputSouce.tisInputSource.id != tisTarget.id {
+                        selectInputSource(tisTarget, reason: "CJKV target mismatch fallback")
+                    }
                 })
             })
         } else {
@@ -261,7 +263,7 @@ extension InputSourceSwitcher {
     }
 
     /// Triggers the specified keyboard shortcut programmatically.
-    static func triggerShortcut(_ hotKey: HotKeyInfo, onFinish: @escaping (() -> Void)) {
+    static func triggerShortcut(_ hotKey: HotKeyInfo, onFinish: @escaping ((InputSource) -> Void)) {
         let source = CGEventSource(stateID: .hidSystemState)
         
         guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: hotKey.keyCode, keyDown: true),
@@ -290,7 +292,9 @@ extension InputSourceSwitcher {
                 }
             }
             
-            scheduleWorkItem(after: 0.1, execute: onFinish)
+            scheduleWorkItem(after: 0.1, execute: {
+                onFinish(InputSource.getCurrentInputSource())
+            })
         })
     }
 }
