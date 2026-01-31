@@ -215,3 +215,6 @@
 "Open Input Monitoring Settings" = "입력 모니터링 설정 열기";
 "Open Input Monitoring Settings, click the \"+\" button and add \"Input Source Pro\" to the list." = "입력 모니터링 설정을 열고 \"+\" 버튼을 클릭한 다음 목록에 \"Input Source Pro\"를 추가하세요.";
 "Disabled until permissions are granted" = "권한이 허용될 때까지 비활성화됨";
+
+"Trigger on Key Press" = "키를 누를 때 트리거";
+"Trigger on Key Press Description" = "활성화하면 키를 누르는 즉시 단축키가 트리거됩니다. 비활성화하면 키를 뗄 때 단축키가 트리거됩니다.";

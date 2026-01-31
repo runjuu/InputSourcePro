@@ -254,6 +254,7 @@ struct Preferences {
         static let singleModifierTriggerGroupMapping = "singleModifierTriggerGroupMapping"
         static let singleModifierInputSourceMapping = "singleModifierInputSourceMapping"
         static let singleModifierGroupMapping = "singleModifierGroupMapping"
+        static let isShortcutTriggerOnKeyDown = "isShortcutTriggerOnKeyDown"
 
         static let isAutoAppearanceMode = "isAutoAppearanceMode"
         static let appearanceMode = "appearanceMode"
@@ -346,6 +347,9 @@ struct Preferences {
 
     @CodableUserDefault(Preferences.Key.singleModifierGroupMapping)
     var singleModifierGroupMapping = [String: ModifierCombo]()
+
+    @UserDefault(Preferences.Key.isShortcutTriggerOnKeyDown)
+    var isShortcutTriggerOnKeyDown = false
 
     // MARK: - App Rules
 
