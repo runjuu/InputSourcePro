@@ -27,6 +27,11 @@ enum InputSourceSwitcher {
     private static let logger = ISPLogger(category: String(describing: InputSourceSwitcher.self))
     private static var pendingWorkItems: [DispatchWorkItem] = []
 
+    /// End time for the synthetic event suppression window.
+    /// ShortcutTriggerManager checks this to ignore flagsChanged events generated
+    /// by synthetic keyboard events during CJKV input source fix.
+    static var syntheticEventEndTime: TimeInterval = 0
+
     static func discoverInputSources() -> [Descriptor] {
         return inputSourceList().map { source in
             Descriptor(
@@ -117,6 +122,10 @@ enum InputSourceSwitcher {
            let nonCJKVSource = resolveNonCJKVSource(),
            canPostShortcuts()
         {
+            // Suppress modifier event processing in ShortcutTriggerManager for the duration
+            // of the CJKV fix sequence (~300ms) to prevent synthetic keyboard events from
+            // corrupting modifier tracking state and blocking subsequent shortcut triggers.
+            syntheticEventEndTime = ProcessInfo.processInfo.systemUptime + 0.35
             logger.debug { "Applying CJKV fix using previous input source shortcut" }
             selectInputSource(tisTarget, reason: "CJKV target")
             selectInputSource(nonCJKVSource, reason: "CJKV bounce")
@@ -187,6 +196,7 @@ enum InputSourceSwitcher {
     }
 
     private static func cancelPendingWorkItems() {
+        syntheticEventEndTime = 0
         guard !pendingWorkItems.isEmpty else { return }
         pendingWorkItems.forEach { $0.cancel() }
         pendingWorkItems.removeAll()

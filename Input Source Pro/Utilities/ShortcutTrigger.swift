@@ -407,6 +407,14 @@ final class ShortcutTriggerManager {
                         return Unmanaged.passUnretained(event)
                     }
 
+                    // Skip synthetic events posted by our own process (e.g., keyboard events
+                    // from InputSourceSwitcher during CJKV fix). Without this filter, those
+                    // events pollute lastKeyDownTimestamps and invalidate active modifier combos.
+                    let eventPID = event.getIntegerValueField(.eventSourceUnixProcessID)
+                    if eventPID == Int64(ProcessInfo.processInfo.processIdentifier) {
+                        return Unmanaged.passUnretained(event)
+                    }
+
                     let manager = Unmanaged<ShortcutTriggerManager>.fromOpaque(refcon)
                         .takeUnretainedValue()
                     manager.handleKeyEvent(type: type, event: event)
@@ -507,7 +515,12 @@ final class ShortcutTriggerManager {
                 return
             }
 
-            triggerCompletedCombos(at: event.timestamp)
+            // During CJKV fix synthetic event window: keep pressedModifiers in sync
+            // but suppress triggers to prevent phantom switches from synthetic Cmd events.
+            let inSyntheticWindow = ProcessInfo.processInfo.systemUptime < InputSourceSwitcher.syntheticEventEndTime
+            if !inSyntheticWindow {
+                triggerCompletedCombos(at: event.timestamp)
+            }
             comboInvalidated.removeAll()
             comboCompleted.removeAll()
             comboPressTimestamps.removeAll()
@@ -515,6 +528,7 @@ final class ShortcutTriggerManager {
     }
 
     private func updateComboState(pressedKeys: Set<SingleModifierKey>, timestamp: TimeInterval) {
+        let inSyntheticWindow = ProcessInfo.processInfo.systemUptime < InputSourceSwitcher.syntheticEventEndTime
         var didInvalidate = false
 
         for combo in currentCombos {
@@ -530,6 +544,13 @@ final class ShortcutTriggerManager {
             }
 
             if !pressedKeys.isSubset(of: combo.keys) {
+                if inSyntheticWindow {
+                    // During CJKV fix: don't invalidate combos for extra modifiers
+                    // caused by synthetic Cmd key events from InputSourceSwitcher.
+                    // The synthetic modifier will be released shortly; normal combo
+                    // tracking resumes once pressedKeys returns to a valid subset.
+                    continue
+                }
                 comboInvalidated.insert(combo)
                 comboCompleted.remove(combo)
                 comboPressTimestamps.removeValue(forKey: combo)
@@ -588,6 +609,11 @@ final class ShortcutTriggerManager {
         excluding keys: Set<SingleModifierKey>
     ) -> Bool {
         let excludedKeyCodes = Set(keys.map(\.keyCode))
+
+        // Evict entries older than the suppress interval to prevent unbounded growth
+        let cutoff = timestamp - otherKeyPressSuppressInterval
+        lastKeyDownTimestamps = lastKeyDownTimestamps.filter { $0.value >= cutoff }
+
         let lastOtherKeyTimestamp = lastKeyDownTimestamps
             .filter { !excludedKeyCodes.contains($0.key) }
             .map(\.value)
