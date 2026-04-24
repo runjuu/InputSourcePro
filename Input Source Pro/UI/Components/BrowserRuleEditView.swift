@@ -24,7 +24,9 @@ struct BrowserRuleEditView: View {
 
     var inputSourceItems: [PickerItem] {
         [PickerItem.empty]
-            + InputSource.sources.map { PickerItem(id: $0.id, title: $0.name, toolTip: $0.id) }
+            + InputSource.sources.map {
+                PickerItem(id: $0.persistentIdentifier, title: $0.name, toolTip: $0.persistentIdentifier)
+            }
     }
 
     var restoreStrategyItems: [PickerItem] {
@@ -199,7 +201,11 @@ struct BrowserRuleEditView: View {
             hideIndicator = rule?.hideIndicator ?? false
 
             if let inputSource = rule?.forcedKeyboard {
-                inputSourceItem = PickerItem(id: inputSource.id, title: inputSource.name, toolTip: inputSource.id)
+                inputSourceItem = PickerItem(
+                    id: inputSource.persistentIdentifier,
+                    title: inputSource.name,
+                    toolTip: inputSource.persistentIdentifier
+                )
             }
 
             if let keyboardRestoreStrategy = rule?.keyboardRestoreStrategy {

@@ -31,7 +31,7 @@ class BrowserRuleMenuItem: NSMenuItem {
     }
 
     @objc func forceKeyboard(_: Any) {
-        let inputSourceId = inputSource?.id ?? ""
+        let inputSourceId = inputSource?.persistentIdentifier ?? ""
         let host = url.host ?? ""
 
         if let browserRule = browserRule {
@@ -69,6 +69,6 @@ class BrowserRuleMenuItem: NSMenuItem {
     }
 
     func updateState() {
-        state = browserRule?.inputSourceId == inputSource?.id ? .on : .off
+        state = browserRule?.forcedKeyboard?.persistentIdentifier == inputSource?.persistentIdentifier ? .on : .off
     }
 }

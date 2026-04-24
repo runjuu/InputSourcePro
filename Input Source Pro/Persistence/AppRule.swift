@@ -11,9 +11,7 @@ extension AppRule {
 extension AppRule {
     @MainActor
     var forcedKeyboard: InputSource? {
-        guard let inputSourceId = inputSourceId else { return nil }
-
-        return InputSource.sources.first { $0.id == inputSourceId }
+        return InputSource.resolvePersistedIdentifier(inputSourceId)
     }
 
     var functionKeyMode: FKeyMode? {

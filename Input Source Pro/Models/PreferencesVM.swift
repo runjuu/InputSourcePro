@@ -537,11 +537,11 @@ extension Preferences {
 
 extension PreferencesVM {
     var systemWideDefaultKeyboard: InputSource? {
-        return InputSource.sources.first { $0.id == preferences.systemWideDefaultKeyboardId }
+        return InputSource.resolvePersistedIdentifier(preferences.systemWideDefaultKeyboardId)
     }
 
     var browserAddressDefaultKeyboard: InputSource? {
-        return InputSource.sources.first { $0.id == preferences.browserAddressDefaultKeyboardId }
+        return InputSource.resolvePersistedIdentifier(preferences.browserAddressDefaultKeyboardId)
     }
 }
 

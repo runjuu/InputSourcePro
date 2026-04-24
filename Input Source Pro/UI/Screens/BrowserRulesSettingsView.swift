@@ -18,7 +18,9 @@ struct BrowserRulesSettingsView: View {
 
     var inputSourceItems: [PickerItem] {
         [PickerItem.empty]
-            + InputSource.sources.map { PickerItem(id: $0.id, title: $0.name, toolTip: $0.id) }
+            + InputSource.sources.map {
+                PickerItem(id: $0.persistentIdentifier, title: $0.name, toolTip: $0.persistentIdentifier)
+            }
     }
 
     var body: some View {
@@ -39,7 +41,9 @@ struct BrowserRulesSettingsView: View {
                     PopUpButtonPicker<PickerItem?>(
                         items: inputSourceItems,
                         width: 150,
-                        isItemSelected: { $0?.id == preferencesVM.preferences.browserAddressDefaultKeyboardId },
+                        isItemSelected: {
+                            $0?.id == (preferencesVM.browserAddressDefaultKeyboard?.persistentIdentifier ?? PickerItem.empty.id)
+                        },
                         getTitle: { $0?.title ?? "" },
                         getToolTip: { $0?.toolTip },
                         onSelect: handleBrowserAddressDefaultKeyboardSelect
