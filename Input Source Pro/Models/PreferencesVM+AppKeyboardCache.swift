@@ -34,7 +34,7 @@ extension PreferencesVM {
         let defaultKeyboard = getAppDefaultKeyboard(appKind)
 
         if appNeedCacheKeyboard(appKind),
-           defaultKeyboard?.id != keyboard.id
+           defaultKeyboard?.persistentIdentifier != keyboard.persistentIdentifier
         {
             appKeyboardCache.save(appKind, keyboard: keyboard)
         } else {

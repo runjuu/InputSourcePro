@@ -8,7 +8,9 @@ struct GeneralSettingsView: View {
 
     var items: [PickerItem] {
         [PickerItem.empty]
-            + InputSource.sources.map { PickerItem(id: $0.id, title: $0.name, toolTip: $0.id) }
+            + InputSource.sources.map {
+                PickerItem(id: $0.persistentIdentifier, title: $0.name, toolTip: $0.persistentIdentifier)
+            }
     }
 
     var body: some View {
@@ -41,7 +43,9 @@ struct GeneralSettingsView: View {
 
                         PopUpButtonPicker<PickerItem?>(
                             items: items,
-                            isItemSelected: { $0?.id == preferencesVM.preferences.systemWideDefaultKeyboardId },
+                            isItemSelected: {
+                                $0?.id == (preferencesVM.systemWideDefaultKeyboard?.persistentIdentifier ?? PickerItem.empty.id)
+                            },
                             getTitle: { $0?.title ?? "" },
                             getToolTip: { $0?.toolTip },
                             onSelect: handleSystemWideDefaultKeyboardSelect

@@ -18,7 +18,7 @@ class AppKeyboardCache {
     func save(_ kind: AppKind, keyboard: InputSource?) {
         guard let id = kind.getId() else { return }
 
-        if let keyboardId = keyboard?.id {
+        if let keyboardId = keyboard?.persistentIdentifier {
             logger.debug { "Save \(id)#\(keyboardId)" }
             cache[id] = keyboardId
         }
@@ -31,7 +31,7 @@ class AppKeyboardCache {
 
         logger.debug { "Retrieve \(id)#\(keyboardId)" }
 
-        return InputSource.sources.first { $0.id == keyboardId }
+        return InputSource.resolvePersistedIdentifier(keyboardId)
     }
 
     func clear() {

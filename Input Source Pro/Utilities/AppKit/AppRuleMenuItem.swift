@@ -31,7 +31,7 @@ class AppRuleMenuItem: NSMenuItem {
     }
 
     @objc func forceKeyboard(_: Any) {
-        let inputSourceId = inputSource?.id ?? ""
+        let inputSourceId = inputSource?.persistentIdentifier ?? ""
 
         if let appCustomization = appCustomization {
             preferencesVM.setForceKeyboard(appCustomization, inputSourceId)
@@ -56,6 +56,6 @@ class AppRuleMenuItem: NSMenuItem {
     }
 
     func updateState() {
-        state = appCustomization?.inputSourceId == inputSource?.id ? .on : .off
+        state = appCustomization?.forcedKeyboard?.persistentIdentifier == inputSource?.persistentIdentifier ? .on : .off
     }
 }

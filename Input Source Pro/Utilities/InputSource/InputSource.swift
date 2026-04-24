@@ -4,6 +4,8 @@ import CryptoKit
 
 @MainActor
 class InputSource {
+    private static let persistentIdentifierSeparator = "::"
+
     static let logger = ISPLogger(
         category: "🤖 " + String(describing: InputSource.self),
         disabled: true
@@ -16,6 +18,13 @@ class InputSource {
     var id: String { tisInputSource.id }
     var name: String { tisInputSource.name }
     var inputModeID: String? { tisInputSource.inputModeID }
+    var persistentIdentifier: String {
+        if let inputModeID = normalizedInputModeID {
+            return "\(id)\(Self.persistentIdentifierSeparator)\(inputModeID)"
+        }
+
+        return id
+    }
 
     var isCJKVR: Bool {
         guard let lang = tisInputSource.sourceLanguages.first else { return false }
@@ -64,11 +73,16 @@ class InputSource {
     func select(useCJKVFix: Bool) {
         InputSourceSwitcher.switchToInputSource(self, useCJKVFix: useCJKVFix)
     }
+
+    private var normalizedInputModeID: String? {
+        guard let inputModeID, !inputModeID.isEmpty else { return nil }
+        return inputModeID
+    }
 }
 
 extension InputSource: @preconcurrency Equatable {
     static func == (lhs: InputSource, rhs: InputSource) -> Bool {
-        return lhs.id == rhs.id
+        return lhs.persistentIdentifier == rhs.persistentIdentifier
     }
 }
 
@@ -78,6 +92,47 @@ extension InputSource {
     @MainActor
     static func getCurrentInputSource() -> InputSource {
         return InputSource(tisInputSource: TISCopyCurrentKeyboardInputSource().takeRetainedValue())
+    }
+
+    static func resolvePersistedIdentifier(_ persistedIdentifier: String?) -> InputSource? {
+        guard let persistedIdentifier, !persistedIdentifier.isEmpty else { return nil }
+
+        let sources = Self.sources
+        let (sourceID, inputModeID) = splitPersistedIdentifier(persistedIdentifier)
+
+        if let inputModeID {
+            if let exactMatch = sources.first(where: { $0.persistentIdentifier == persistedIdentifier }) {
+                return exactMatch
+            }
+
+            if let modeMatch = sources.first(where: { $0.inputModeID == inputModeID }) {
+                return modeMatch
+            }
+        }
+
+        if let modeMatch = sources.first(where: { $0.inputModeID == persistedIdentifier }) {
+            return modeMatch
+        }
+
+        let matches = sources.filter { $0.id == sourceID }
+
+        guard !matches.isEmpty else { return nil }
+
+        if let inputModeID,
+           let modeMatch = matches.first(where: { $0.inputModeID == inputModeID })
+        {
+            return modeMatch
+        }
+
+        if matches.count > 1 {
+            logger.debug { "Ambiguous persisted input source identifier \(persistedIdentifier); preferring an input-mode match." }
+        }
+
+        if let preferredModeMatch = matches.first(where: { $0.inputModeID != nil }) {
+            return preferredModeMatch
+        }
+
+        return matches.first
     }
 }
 
@@ -98,6 +153,18 @@ extension InputSource {
     static func anotherCJKVSource(current: InputSource) -> InputSource? {
         return sources.first(where: { $0 != current && $0.isCJKVR })
     }
+
+    private static func splitPersistedIdentifier(_ persistedIdentifier: String) -> (sourceID: String, inputModeID: String?) {
+        let components = persistedIdentifier.components(separatedBy: persistentIdentifierSeparator)
+
+        guard components.count >= 2 else {
+            return (persistedIdentifier, nil)
+        }
+
+        let sourceID = components[0]
+        let inputModeID = components.dropFirst().joined(separator: persistentIdentifierSeparator)
+        return (sourceID, inputModeID.isEmpty ? nil : inputModeID)
+    }
 }
 
 private extension URL {
@@ -116,6 +183,6 @@ private extension URL {
 
 extension InputSource: @preconcurrency CustomStringConvertible {
     var description: String {
-        id
+        persistentIdentifier
     }
 }

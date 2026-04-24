@@ -172,7 +172,7 @@ extension IndicatorVM {
             guard appKind1.isSameAppOrWebsite(with: appKind2, detectAddressBar: true)
             else { return false }
 
-            guard lhs.inputSource.id == rhs.inputSource.id
+            guard lhs.inputSource.persistentIdentifier == rhs.inputSource.persistentIdentifier
             else { return false }
 
             return true
@@ -249,7 +249,7 @@ extension IndicatorVM {
                         )
                     }
                 case let .inputSourceChanged(inputSource):
-                    guard inputSource.id != state.inputSource.id else { return state }
+                    guard inputSource.persistentIdentifier != state.inputSource.persistentIdentifier else { return state }
 
                     return updateState(appKind: state.appKind, inputSource: inputSource, inputSourceChangeReason: .system)
                 case let .switchInputSourceByShortcut(inputSource):

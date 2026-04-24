@@ -87,7 +87,7 @@ extension IndicatorVM {
                         }
                     }
 
-                    if previous?.inputSource.id != current.inputSource.id {
+                    if previous?.inputSource.persistentIdentifier != current.inputSource.persistentIdentifier {
                         switch current.inputSourceChangeReason {
                         case .noChanges:
                             return .justHide

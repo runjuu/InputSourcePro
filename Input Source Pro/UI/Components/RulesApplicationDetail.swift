@@ -27,7 +27,7 @@ struct ApplicationDetail: View {
     @State var functionKeyModeItem: PickerItem?
 
     var mixed: Bool {
-        Set(selectedApp.map { $0.forcedKeyboard?.id }).count > 1
+        Set(selectedApp.map { $0.forcedKeyboard?.persistentIdentifier }).count > 1
     }
 
     var isFunctionKeyModeMixed: Bool {
@@ -36,7 +36,9 @@ struct ApplicationDetail: View {
 
     var items: [PickerItem] {
         [mixed ? PickerItem.mixed : nil, PickerItem.empty].compactMap { $0 }
-            + InputSource.sources.map { PickerItem(id: $0.id, title: $0.name, toolTip: $0.id) }
+            + InputSource.sources.map {
+                PickerItem(id: $0.persistentIdentifier, title: $0.name, toolTip: $0.persistentIdentifier)
+            }
     }
 
     var functionKeyItems: [PickerItem] {
@@ -208,7 +210,11 @@ struct ApplicationDetail: View {
         if mixed {
             forceKeyboard = PickerItem.mixed
         } else if let keyboard = selectedApp.first?.forcedKeyboard {
-            forceKeyboard = PickerItem(id: keyboard.id, title: keyboard.name, toolTip: keyboard.id)
+            forceKeyboard = PickerItem(
+                id: keyboard.persistentIdentifier,
+                title: keyboard.name,
+                toolTip: keyboard.persistentIdentifier
+            )
         } else {
             forceKeyboard = PickerItem.empty
         }
