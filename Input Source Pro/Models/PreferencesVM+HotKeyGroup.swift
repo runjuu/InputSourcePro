@@ -53,7 +53,7 @@ extension PreferencesVM {
         do {
             let groups = try container.viewContext.fetch(request)
 
-            saveContext {
+            let didSave = saveContext {
                 for group in groups {
                     let identifiers = group.persistedInputSourceIdentifiers
                     let shouldExpandLegacyIDs = identifiers.allSatisfy {
@@ -72,7 +72,9 @@ extension PreferencesVM {
                 }
             }
 
-            UserDefaults.standard.set(true, forKey: didMigrateModeAwareHotKeyGroupsKey)
+            if didSave {
+                UserDefaults.standard.set(true, forKey: didMigrateModeAwareHotKeyGroupsKey)
+            }
         } catch {
             print("migrateHotKeyGroups error: \(error.localizedDescription)")
         }

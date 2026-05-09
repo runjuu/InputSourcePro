@@ -80,21 +80,28 @@ final class PreferencesVM: ObservableObject {
         preferences = draft
     }
 
-    func saveContext(_ callback: (() -> Void)? = nil) {
+    @discardableResult
+    func saveContext(_ callback: (() -> Void)? = nil) -> Bool {
+        var didSave = false
+
         if let callback = callback {
             container.viewContext.performAndWait {
                 callback()
-                save()
+                didSave = save()
             }
         } else {
-            save()
+            didSave = save()
         }
 
-        func save() {
+        return didSave
+
+        func save() -> Bool {
             do {
                 try container.viewContext.save()
+                return true
             } catch {
                 print("saveAppCustomization error: \(error.localizedDescription)")
+                return false
             }
         }
     }

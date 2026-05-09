@@ -48,7 +48,7 @@ extension PreferencesVM {
             let configs = try container.viewContext.fetch(request)
             var existingIDs = Set(configs.compactMap(\.id))
 
-            saveContext {
+            let didSave = saveContext {
                 for config in configs {
                     guard let legacyID = config.id, !legacyID.isEmpty else { continue }
                     guard !InputSource.hasModeAwareIdentifier(legacyID) else { continue }
@@ -71,7 +71,9 @@ extension PreferencesVM {
                 }
             }
 
-            UserDefaults.standard.set(true, forKey: didMigrateModeAwareKeyboardConfigsKey)
+            if didSave {
+                UserDefaults.standard.set(true, forKey: didMigrateModeAwareKeyboardConfigsKey)
+            }
         } catch {
             print("migrateKeyboardConfigIdentifiers error: \(error.localizedDescription)")
         }

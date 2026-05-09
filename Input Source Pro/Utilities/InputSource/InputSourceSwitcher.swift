@@ -35,6 +35,7 @@ enum InputSourceSwitcher {
 
     private static let logger = ISPLogger(category: String(describing: InputSourceSwitcher.self))
     private static var pendingWorkItems: [DispatchWorkItem] = []
+    private static let syntheticEventUserData: Int64 = 0x49535043534A4B56 // "ISPCSJKV"
 
     /// End time for the synthetic event suppression window.
     /// ShortcutTriggerManager checks this to ignore flagsChanged events generated
@@ -43,6 +44,17 @@ enum InputSourceSwitcher {
 
     static var isSuppressingSyntheticEvents: Bool {
         ProcessInfo.processInfo.systemUptime < syntheticEventEndTime
+    }
+
+    static func isSyntheticEvent(_ event: CGEvent?) -> Bool {
+        guard let event else { return false }
+
+        if event.getIntegerValueField(.eventSourceUserData) == syntheticEventUserData {
+            return true
+        }
+
+        let eventPID = event.getIntegerValueField(.eventSourceUnixProcessID)
+        return isSuppressingSyntheticEvents && eventPID == Int64(ProcessInfo.processInfo.processIdentifier)
     }
 
     static func discoverInputSources() -> [Descriptor] {
@@ -296,6 +308,8 @@ extension InputSourceSwitcher {
             return
         }
         
+        markSyntheticEvent(keyDown)
+        markSyntheticEvent(keyUp)
         keyDown.flags = hotKey.modifiers
         keyUp.flags = hotKey.modifiers
         keyDown.post(tap: .cghidEventTap)
@@ -305,6 +319,8 @@ extension InputSourceSwitcher {
             let kVK_Command: CGKeyCode = 55
             if let cmdDown = CGEvent(keyboardEventSource: source, virtualKey: kVK_Command, keyDown: true),
                let cmdUp = CGEvent(keyboardEventSource: source, virtualKey: kVK_Command, keyDown: false) {
+                markSyntheticEvent(cmdDown)
+                markSyntheticEvent(cmdUp)
                 cmdDown.flags = .maskCommand
                 cmdUp.flags = []
                 cmdDown.post(tap: .cghidEventTap)
@@ -319,5 +335,9 @@ extension InputSourceSwitcher {
                 onFinish(InputSource.getCurrentInputSource())
             })
         })
+    }
+
+    private static func markSyntheticEvent(_ event: CGEvent) {
+        event.setIntegerValueField(.eventSourceUserData, value: syntheticEventUserData)
     }
 }
