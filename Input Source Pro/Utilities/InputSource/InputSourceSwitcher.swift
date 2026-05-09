@@ -22,6 +22,15 @@ enum InputSourceSwitcher {
         let sourceID: String
         let inputModeID: String?
         let isCJKV: Bool
+
+        @MainActor
+        func matches(_ inputSource: InputSource) -> Bool {
+            if let inputModeID {
+                return inputSource.inputModeID == inputModeID
+            }
+
+            return inputSource.id == sourceID
+        }
     }
 
     private static let logger = ISPLogger(category: String(describing: InputSourceSwitcher.self))
@@ -132,7 +141,7 @@ enum InputSourceSwitcher {
             
             scheduleWorkItem(after: 0.1, execute: {
                 triggerShortcut(previousShortcut, onFinish: { currentInputSouce in
-                    if currentInputSouce.tisInputSource.id != tisTarget.id {
+                    if !target.matches(currentInputSouce) {
                         selectInputSource(tisTarget, reason: "CJKV target mismatch fallback")
                     }
                 })

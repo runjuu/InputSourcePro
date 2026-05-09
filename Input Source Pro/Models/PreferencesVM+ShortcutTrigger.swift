@@ -1,8 +1,33 @@
 import Foundation
 
 extension PreferencesVM {
+    private func shortcutPreferenceKey(for inputSource: InputSource) -> String {
+        return inputSource.persistentIdentifier
+    }
+
+    private func legacyShortcutPreferenceKey(for inputSource: InputSource) -> String? {
+        let key = shortcutPreferenceKey(for: inputSource)
+        return key == inputSource.id ? nil : inputSource.id
+    }
+
+    private func legacyShortcutPreferenceKeysByPersistentKey() -> [String: String] {
+        return InputSource.sources.reduce(into: [:]) { result, inputSource in
+            if let legacyKey = legacyShortcutPreferenceKey(for: inputSource) {
+                result[shortcutPreferenceKey(for: inputSource)] = legacyKey
+            }
+        }
+    }
+
     func shortcutMode(for inputSource: InputSource) -> ShortcutTriggerMode {
-        if let mode = (preferences.shortcutModeInputSourceMapping ?? [:])[inputSource.id] {
+        let modes = preferences.shortcutModeInputSourceMapping ?? [:]
+
+        if let mode = modes[shortcutPreferenceKey(for: inputSource)] {
+            return mode
+        }
+
+        if let legacyKey = legacyShortcutPreferenceKey(for: inputSource),
+           let mode = modes[legacyKey]
+        {
             return mode
         }
 
@@ -20,7 +45,15 @@ extension PreferencesVM {
     }
 
     func singleModifierTrigger(for inputSource: InputSource) -> SingleModifierTrigger {
-        if let trigger = (preferences.singleModifierTriggerInputSourceMapping ?? [:])[inputSource.id] {
+        let triggers = preferences.singleModifierTriggerInputSourceMapping ?? [:]
+
+        if let trigger = triggers[shortcutPreferenceKey(for: inputSource)] {
+            return trigger
+        }
+
+        if let legacyKey = legacyShortcutPreferenceKey(for: inputSource),
+           let trigger = triggers[legacyKey]
+        {
             return trigger
         }
 
@@ -38,7 +71,17 @@ extension PreferencesVM {
     }
 
     func modifierCombo(for inputSource: InputSource) -> ModifierCombo? {
-        return (preferences.singleModifierInputSourceMapping ?? [:])[inputSource.id]
+        let mapping = preferences.singleModifierInputSourceMapping ?? [:]
+
+        if let combo = mapping[shortcutPreferenceKey(for: inputSource)] {
+            return combo
+        }
+
+        if let legacyKey = legacyShortcutPreferenceKey(for: inputSource) {
+            return mapping[legacyKey]
+        }
+
+        return nil
     }
 
     func modifierCombo(for group: HotKeyGroup) -> ModifierCombo? {
@@ -47,14 +90,23 @@ extension PreferencesVM {
     }
 
     func updateShortcutMode(_ mode: ShortcutTriggerMode, for inputSource: InputSource) {
+        let key = shortcutPreferenceKey(for: inputSource)
+        let legacyKey = legacyShortcutPreferenceKey(for: inputSource)
+
         update { preferences in
             var inputSourceModes = preferences.shortcutModeInputSourceMapping ?? [:]
-            inputSourceModes[inputSource.id] = mode
+            inputSourceModes[key] = mode
+            if let legacyKey {
+                inputSourceModes.removeValue(forKey: legacyKey)
+            }
             preferences.shortcutModeInputSourceMapping = inputSourceModes
 
             if mode != .singleModifier {
                 var inputSourceMapping = preferences.singleModifierInputSourceMapping ?? [:]
-                inputSourceMapping.removeValue(forKey: inputSource.id)
+                inputSourceMapping.removeValue(forKey: key)
+                if let legacyKey {
+                    inputSourceMapping.removeValue(forKey: legacyKey)
+                }
                 preferences.singleModifierInputSourceMapping = inputSourceMapping
             }
         }
@@ -77,9 +129,15 @@ extension PreferencesVM {
     }
 
     func updateSingleModifierTrigger(_ trigger: SingleModifierTrigger, for inputSource: InputSource) {
+        let key = shortcutPreferenceKey(for: inputSource)
+        let legacyKey = legacyShortcutPreferenceKey(for: inputSource)
+
         update { preferences in
             var triggerMapping = preferences.singleModifierTriggerInputSourceMapping ?? [:]
-            triggerMapping[inputSource.id] = trigger
+            triggerMapping[key] = trigger
+            if let legacyKey {
+                triggerMapping.removeValue(forKey: legacyKey)
+            }
             preferences.singleModifierTriggerInputSourceMapping = triggerMapping
         }
     }
@@ -95,6 +153,10 @@ extension PreferencesVM {
     }
 
     func updateModifierCombo(_ combo: ModifierCombo?, for inputSource: InputSource) {
+        let key = shortcutPreferenceKey(for: inputSource)
+        let legacyKey = legacyShortcutPreferenceKey(for: inputSource)
+        let legacyKeysByPersistentKey = legacyShortcutPreferenceKeysByPersistentKey()
+
         update { preferences in
             var inputSourceMapping = preferences.singleModifierInputSourceMapping ?? [:]
             var groupMapping = preferences.singleModifierGroupMapping ?? [:]
@@ -104,6 +166,11 @@ extension PreferencesVM {
 
             func usesSingleModifierInputSource(_ id: String) -> Bool {
                 if let mode = inputSourceModes[id] {
+                    return mode == .singleModifier
+                }
+                if let legacyKey = legacyKeysByPersistentKey[id],
+                   let mode = inputSourceModes[legacyKey]
+                {
                     return mode == .singleModifier
                 }
                 return fallbackMode == .singleModifier
@@ -127,9 +194,15 @@ extension PreferencesVM {
                 duplicateInputSourceKeys.forEach { inputSourceMapping.removeValue(forKey: $0) }
                 duplicateGroupKeys.forEach { groupMapping.removeValue(forKey: $0) }
 
-                inputSourceMapping[inputSource.id] = combo
+                inputSourceMapping[key] = combo
+                if let legacyKey {
+                    inputSourceMapping.removeValue(forKey: legacyKey)
+                }
             } else {
-                inputSourceMapping.removeValue(forKey: inputSource.id)
+                inputSourceMapping.removeValue(forKey: key)
+                if let legacyKey {
+                    inputSourceMapping.removeValue(forKey: legacyKey)
+                }
             }
 
             preferences.singleModifierInputSourceMapping = inputSourceMapping
@@ -139,6 +212,7 @@ extension PreferencesVM {
 
     func updateModifierCombo(_ combo: ModifierCombo?, for group: HotKeyGroup) {
         guard let id = group.id else { return }
+        let legacyKeysByPersistentKey = legacyShortcutPreferenceKeysByPersistentKey()
 
         update { preferences in
             var inputSourceMapping = preferences.singleModifierInputSourceMapping ?? [:]
@@ -149,6 +223,11 @@ extension PreferencesVM {
 
             func usesSingleModifierInputSource(_ id: String) -> Bool {
                 if let mode = inputSourceModes[id] {
+                    return mode == .singleModifier
+                }
+                if let legacyKey = legacyKeysByPersistentKey[id],
+                   let mode = inputSourceModes[legacyKey]
+                {
                     return mode == .singleModifier
                 }
                 return fallbackMode == .singleModifier

@@ -10,11 +10,10 @@ extension HotKeyGroup {
     @MainActor
     var inputSources: [InputSource] {
         get {
-            return InputSource.sources
-                .filter { ids.contains($0.id) }
+            return ids.compactMap { InputSource.resolvePersistedIdentifier($0) }
         }
         set {
-            inputSourceIds = newValue.map { $0.id }.joined(separator: Self.separator)
+            inputSourceIds = newValue.map { $0.persistentIdentifier }.joined(separator: Self.separator)
         }
     }
 }

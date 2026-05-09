@@ -292,7 +292,7 @@ extension IndicatorVM {
 
             bindings.append(
                 ShortcutBinding(
-                    id: inputSource.id,
+                    id: inputSource.persistentIdentifier,
                     mode: mode,
                     modifierCombo: modifierCombo,
                     singleModifierTrigger: trigger,
@@ -327,13 +327,16 @@ extension IndicatorVM {
     }
 
     private func triggerHotKeyGroup(_ group: HotKeyGroup) {
-        guard group.inputSources.count > 0 else { return }
+        let inputSources = group.inputSources
+        guard inputSources.count > 0 else { return }
 
         let currentInputSource = InputSource.getCurrentInputSource()
         let nextIndex = (
-            (group.inputSources.firstIndex(where: { currentInputSource.id == $0.id }) ?? -1) + 1
-        ) % group.inputSources.count
+            (inputSources.firstIndex {
+                currentInputSource.persistentIdentifier == $0.persistentIdentifier
+            } ?? -1) + 1
+        ) % inputSources.count
 
-        send(.switchInputSourceByShortcut(group.inputSources[nextIndex]))
+        send(.switchInputSourceByShortcut(inputSources[nextIndex]))
     }
 }

@@ -105,34 +105,22 @@ extension InputSource {
                 return exactMatch
             }
 
-            if let modeMatch = sources.first(where: { $0.inputModeID == inputModeID }) {
+            if let modeMatch = sources.first(where: { $0.id == sourceID && $0.inputModeID == inputModeID }) {
                 return modeMatch
             }
+
+            return sources.first(where: { $0.inputModeID == inputModeID })
         }
 
-        if let modeMatch = sources.first(where: { $0.inputModeID == persistedIdentifier }) {
-            return modeMatch
+        if let legacySourceIDMatch = sources.first(where: { $0.id == sourceID }) {
+            return legacySourceIDMatch
         }
 
-        let matches = sources.filter { $0.id == sourceID }
-
-        guard !matches.isEmpty else { return nil }
-
-        if let inputModeID,
-           let modeMatch = matches.first(where: { $0.inputModeID == inputModeID })
-        {
-            return modeMatch
+        if let legacyModeIDMatch = sources.first(where: { $0.inputModeID == persistedIdentifier }) {
+            return legacyModeIDMatch
         }
 
-        if matches.count > 1 {
-            logger.debug { "Ambiguous persisted input source identifier \(persistedIdentifier); preferring an input-mode match." }
-        }
-
-        if let preferredModeMatch = matches.first(where: { $0.inputModeID != nil }) {
-            return preferredModeMatch
-        }
-
-        return matches.first
+        return nil
     }
 }
 

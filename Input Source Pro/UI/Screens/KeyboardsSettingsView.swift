@@ -114,11 +114,11 @@ struct KeyboardsSettingsView: View {
     }
 
     var normalSection: some View {
-        ForEach(InputSource.sources, id: \.id) { inputSource in
+        ForEach(InputSource.sources, id: \.persistentIdentifier) { inputSource in
             SettingsSection(title: "") {
                 HStack(alignment: .top) {
                     CustomizedIndicatorView(inputSource: inputSource)
-                        .help(inputSource.id)
+                        .help(inputSource.persistentIdentifier)
 
                     Spacer()
 
@@ -134,7 +134,7 @@ struct KeyboardsSettingsView: View {
                             }
                             indicatorVM.refreshShortcut()
                         },
-                        recorderId: inputSource.id
+                        recorderId: inputSource.persistentIdentifier
                     )
                 }
                 .padding()
@@ -148,9 +148,9 @@ struct KeyboardsSettingsView: View {
             SettingsSection(title: "") {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading) {
-                        ForEach(group.inputSources, id: \.id) { inputSource in
+                        ForEach(group.inputSources, id: \.persistentIdentifier) { inputSource in
                             CustomizedIndicatorView(inputSource: inputSource)
-                                .help(inputSource.id)
+                                .help(inputSource.persistentIdentifier)
                         }
                     }
 

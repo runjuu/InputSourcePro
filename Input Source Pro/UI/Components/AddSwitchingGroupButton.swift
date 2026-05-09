@@ -22,10 +22,10 @@ struct AddSwitchingGroupButton: View {
                     .frame(width: 500)
 
                 VStack(alignment: .leading) {
-                    ForEach(InputSource.sources, id: \.id) { inputSource in
+                    ForEach(InputSource.sources, id: \.persistentIdentifier) { inputSource in
                         VStack(alignment: .leading) {
                             HStack(spacing: 6) {
-                                if selections.contains(inputSource.id) {
+                                if selections.contains(inputSource.persistentIdentifier) {
                                     Image(systemName: "checkmark.circle.fill")
                                         .foregroundColor(Color.accentColor)
                                         .font(.system(size: 16))
@@ -43,10 +43,10 @@ struct AddSwitchingGroupButton: View {
                         }
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            if selections.contains(inputSource.id) {
-                                selections.remove(inputSource.id)
+                            if selections.contains(inputSource.persistentIdentifier) {
+                                selections.remove(inputSource.persistentIdentifier)
                             } else {
-                                selections.insert(inputSource.id)
+                                selections.insert(inputSource.persistentIdentifier)
                             }
                         }
                     }
@@ -68,7 +68,7 @@ struct AddSwitchingGroupButton: View {
     }
 
     func add() {
-        onSelect(InputSource.sources.filter { selections.contains($0.id) })
+        onSelect(InputSource.sources.filter { selections.contains($0.persistentIdentifier) })
         hide()
     }
 
