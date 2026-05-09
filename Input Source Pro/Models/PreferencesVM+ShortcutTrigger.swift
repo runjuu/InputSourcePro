@@ -1,4 +1,5 @@
 import Foundation
+import KeyboardShortcuts
 
 extension PreferencesVM {
     private func shortcutPreferenceKey(for inputSource: InputSource) -> String {
@@ -10,11 +11,89 @@ extension PreferencesVM {
         return key == inputSource.id ? nil : inputSource.id
     }
 
-    private func legacyShortcutPreferenceKeysByPersistentKey() -> [String: String] {
-        return InputSource.sources.reduce(into: [:]) { result, inputSource in
-            if let legacyKey = legacyShortcutPreferenceKey(for: inputSource) {
-                result[shortcutPreferenceKey(for: inputSource)] = legacyKey
+    private func inputSourceShortcutPreferenceKeyNormalizer() -> (String) -> String {
+        let inputSources = InputSource.sources
+        let persistentKeys = Set(inputSources.map(\.persistentIdentifier))
+        var targetByLegacyKey = [String: String]()
+
+        for inputSource in inputSources {
+            guard inputSource.persistentIdentifier != inputSource.id else { continue }
+
+            // If the source id is still a current persistent key, keep it bound to
+            // that source instead of migrating it to one of the mode-specific rows.
+            if !persistentKeys.contains(inputSource.id), targetByLegacyKey[inputSource.id] == nil {
+                targetByLegacyKey[inputSource.id] = inputSource.persistentIdentifier
             }
+
+            if let inputModeID = inputSource.inputModeID,
+               !persistentKeys.contains(inputModeID),
+               targetByLegacyKey[inputModeID] == nil
+            {
+                targetByLegacyKey[inputModeID] = inputSource.persistentIdentifier
+            }
+        }
+
+        return { key in
+            if persistentKeys.contains(key) {
+                return key
+            }
+
+            return targetByLegacyKey[key] ?? key
+        }
+    }
+
+    private func normalizedInputSourceShortcutMapping<Value>(
+        _ mapping: [String: Value],
+        normalizeKey: (String) -> String
+    ) -> [String: Value] {
+        mapping.reduce(into: [:]) { result, entry in
+            let normalizedKey = normalizeKey(entry.key)
+
+            if result[normalizedKey] == nil || normalizedKey == entry.key {
+                result[normalizedKey] = entry.value
+            }
+        }
+    }
+
+    func migrateShortcutPreferencesIfNeed() {
+        let normalizeKey = inputSourceShortcutPreferenceKeyNormalizer()
+        migrateKeyboardShortcutNames(normalizeKey: normalizeKey)
+
+        update { preferences in
+            preferences.shortcutModeInputSourceMapping = normalizedInputSourceShortcutMapping(
+                preferences.shortcutModeInputSourceMapping ?? [:],
+                normalizeKey: normalizeKey
+            )
+            preferences.singleModifierTriggerInputSourceMapping = normalizedInputSourceShortcutMapping(
+                preferences.singleModifierTriggerInputSourceMapping ?? [:],
+                normalizeKey: normalizeKey
+            )
+            preferences.singleModifierInputSourceMapping = normalizedInputSourceShortcutMapping(
+                preferences.singleModifierInputSourceMapping ?? [:],
+                normalizeKey: normalizeKey
+            )
+        }
+    }
+
+    private func migrateKeyboardShortcutNames(normalizeKey: (String) -> String) {
+        let inputSources = InputSource.sources
+        let persistentKeys = Set(inputSources.map(\.persistentIdentifier))
+        let legacyKeys = Set(inputSources.map(\.id)).subtracting(persistentKeys)
+
+        for legacyKey in legacyKeys {
+            let targetKey = normalizeKey(legacyKey)
+            guard targetKey != legacyKey else { continue }
+
+            let legacyName = KeyboardShortcuts.Name(legacyKey)
+            let targetName = KeyboardShortcuts.Name(targetKey)
+
+            guard let legacyShortcut = KeyboardShortcuts.getShortcut(for: legacyName)
+            else { continue }
+
+            if KeyboardShortcuts.getShortcut(for: targetName) == nil {
+                KeyboardShortcuts.setShortcut(legacyShortcut, for: targetName)
+            }
+            KeyboardShortcuts.setShortcut(nil, for: legacyName)
         }
     }
 
@@ -155,24 +234,26 @@ extension PreferencesVM {
     func updateModifierCombo(_ combo: ModifierCombo?, for inputSource: InputSource) {
         let key = shortcutPreferenceKey(for: inputSource)
         let legacyKey = legacyShortcutPreferenceKey(for: inputSource)
-        let legacyKeysByPersistentKey = legacyShortcutPreferenceKeysByPersistentKey()
+        let normalizeInputSourceKey = inputSourceShortcutPreferenceKeyNormalizer()
 
         update { preferences in
             var inputSourceMapping = preferences.singleModifierInputSourceMapping ?? [:]
             var groupMapping = preferences.singleModifierGroupMapping ?? [:]
             let inputSourceModes = preferences.shortcutModeInputSourceMapping ?? [:]
+            let normalizedInputSourceModes = normalizedInputSourceShortcutMapping(
+                inputSourceModes,
+                normalizeKey: normalizeInputSourceKey
+            )
             let groupModes = preferences.shortcutModeGroupMapping ?? [:]
             let fallbackMode = preferences.shortcutTriggerMode ?? .keyboardShortcut
 
             func usesSingleModifierInputSource(_ id: String) -> Bool {
-                if let mode = inputSourceModes[id] {
+                let normalizedID = normalizeInputSourceKey(id)
+
+                if let mode = normalizedInputSourceModes[normalizedID] {
                     return mode == .singleModifier
                 }
-                if let legacyKey = legacyKeysByPersistentKey[id],
-                   let mode = inputSourceModes[legacyKey]
-                {
-                    return mode == .singleModifier
-                }
+
                 return fallbackMode == .singleModifier
             }
 
@@ -212,24 +293,26 @@ extension PreferencesVM {
 
     func updateModifierCombo(_ combo: ModifierCombo?, for group: HotKeyGroup) {
         guard let id = group.id else { return }
-        let legacyKeysByPersistentKey = legacyShortcutPreferenceKeysByPersistentKey()
+        let normalizeInputSourceKey = inputSourceShortcutPreferenceKeyNormalizer()
 
         update { preferences in
             var inputSourceMapping = preferences.singleModifierInputSourceMapping ?? [:]
             var groupMapping = preferences.singleModifierGroupMapping ?? [:]
             let inputSourceModes = preferences.shortcutModeInputSourceMapping ?? [:]
+            let normalizedInputSourceModes = normalizedInputSourceShortcutMapping(
+                inputSourceModes,
+                normalizeKey: normalizeInputSourceKey
+            )
             let groupModes = preferences.shortcutModeGroupMapping ?? [:]
             let fallbackMode = preferences.shortcutTriggerMode ?? .keyboardShortcut
 
             func usesSingleModifierInputSource(_ id: String) -> Bool {
-                if let mode = inputSourceModes[id] {
+                let normalizedID = normalizeInputSourceKey(id)
+
+                if let mode = normalizedInputSourceModes[normalizedID] {
                     return mode == .singleModifier
                 }
-                if let legacyKey = legacyKeysByPersistentKey[id],
-                   let mode = inputSourceModes[legacyKey]
-                {
-                    return mode == .singleModifier
-                }
+
                 return fallbackMode == .singleModifier
             }
 

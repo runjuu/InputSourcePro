@@ -65,6 +65,7 @@ final class PreferencesVM: ObservableObject {
 
         cleanRemovedAppCustomizationIfNeed()
         migratePreferncesIfNeed()
+        migrateShortcutPreferencesIfNeed()
         migrateBoutiqueIfNeed()
         watchKeyboardConfigsChange()
     }
