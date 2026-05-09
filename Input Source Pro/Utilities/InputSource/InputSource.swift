@@ -98,6 +98,46 @@ extension InputSource {
         guard let persistedIdentifier, !persistedIdentifier.isEmpty else { return nil }
 
         let sources = Self.sources
+        return resolvePersistedIdentifier(persistedIdentifier, in: sources)
+    }
+
+    static func resolvePersistedIdentifiers(
+        _ persistedIdentifiers: [String],
+        expandingLegacySourceIDs: Bool = false
+    ) -> [InputSource] {
+        let sources = Self.sources
+        var result: [InputSource] = []
+        var seen = Set<String>()
+
+        for persistedIdentifier in persistedIdentifiers where !persistedIdentifier.isEmpty {
+            let matches: [InputSource]
+            let (_, inputModeID) = splitPersistedIdentifier(persistedIdentifier)
+
+            if expandingLegacySourceIDs, inputModeID == nil {
+                let legacyMatches = sources.filter { $0.id == persistedIdentifier }
+                matches = legacyMatches.isEmpty
+                    ? resolvePersistedIdentifier(persistedIdentifier, in: sources).map { [$0] } ?? []
+                    : legacyMatches
+            } else {
+                matches = resolvePersistedIdentifier(persistedIdentifier, in: sources).map { [$0] } ?? []
+            }
+
+            for match in matches where seen.insert(match.persistentIdentifier).inserted {
+                result.append(match)
+            }
+        }
+
+        return result
+    }
+
+    static func hasModeAwareIdentifier(_ persistedIdentifier: String) -> Bool {
+        return splitPersistedIdentifier(persistedIdentifier).inputModeID != nil
+    }
+
+    private static func resolvePersistedIdentifier(
+        _ persistedIdentifier: String,
+        in sources: [InputSource]
+    ) -> InputSource? {
         let (sourceID, inputModeID) = splitPersistedIdentifier(persistedIdentifier)
 
         if let inputModeID {

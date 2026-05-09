@@ -492,9 +492,23 @@ final class ShortcutTriggerManager {
         flags.remove(.capsLock)
 
         let isKeyDown = flags.contains(key.modifierFlag)
+        let inSyntheticWindow = InputSourceSwitcher.isSuppressingSyntheticEvents
 
-        if isKeyDown {
+        if isKeyDown, !inSyntheticWindow {
             lastKeyDownTimestamps[event.keyCode] = event.timestamp
+        }
+
+        if inSyntheticWindow {
+            if isKeyDown {
+                pressedModifiers[key] = event.timestamp
+            } else {
+                pressedModifiers.removeValue(forKey: key)
+            }
+
+            comboInvalidated.removeAll()
+            comboCompleted.removeAll()
+            comboPressTimestamps.removeAll()
+            return
         }
 
         if isKeyDown {
@@ -515,12 +529,7 @@ final class ShortcutTriggerManager {
                 return
             }
 
-            // During CJKV fix synthetic event window: keep pressedModifiers in sync
-            // but suppress triggers to prevent phantom switches from synthetic Cmd events.
-            let inSyntheticWindow = ProcessInfo.processInfo.systemUptime < InputSourceSwitcher.syntheticEventEndTime
-            if !inSyntheticWindow {
-                triggerCompletedCombos(at: event.timestamp)
-            }
+            triggerCompletedCombos(at: event.timestamp)
             comboInvalidated.removeAll()
             comboCompleted.removeAll()
             comboPressTimestamps.removeAll()
@@ -528,7 +537,7 @@ final class ShortcutTriggerManager {
     }
 
     private func updateComboState(pressedKeys: Set<SingleModifierKey>, timestamp: TimeInterval) {
-        let inSyntheticWindow = ProcessInfo.processInfo.systemUptime < InputSourceSwitcher.syntheticEventEndTime
+        let inSyntheticWindow = InputSourceSwitcher.isSuppressingSyntheticEvents
         var didInvalidate = false
 
         for combo in currentCombos {

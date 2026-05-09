@@ -47,6 +47,8 @@ final class PreferencesVM: ObservableObject {
             if let error = error {
                 print("Core Data 'Main' failed to load: \(error.localizedDescription)")
             } else {
+                self.migrateHotKeyGroupsIfNeed()
+                self.migrateKeyboardConfigIdentifiersIfNeed()
                 self.mainStorage.refresh()
             }
         }

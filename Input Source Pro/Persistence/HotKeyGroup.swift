@@ -3,17 +3,23 @@ import Cocoa
 extension HotKeyGroup {
     private static let separator = "∆"
 
-    private var ids: [String] {
-        return inputSourceIds?.components(separatedBy: Self.separator) ?? []
+    var persistedInputSourceIdentifiers: [String] {
+        return inputSourceIds?
+            .components(separatedBy: Self.separator)
+            .filter { !$0.isEmpty } ?? []
+    }
+
+    func updatePersistedInputSourceIdentifiers(_ identifiers: [String]) {
+        inputSourceIds = identifiers.joined(separator: Self.separator)
     }
 
     @MainActor
     var inputSources: [InputSource] {
         get {
-            return ids.compactMap { InputSource.resolvePersistedIdentifier($0) }
+            return InputSource.resolvePersistedIdentifiers(persistedInputSourceIdentifiers)
         }
         set {
-            inputSourceIds = newValue.map { $0.persistentIdentifier }.joined(separator: Self.separator)
+            updatePersistedInputSourceIdentifiers(newValue.map { $0.persistentIdentifier })
         }
     }
 }

@@ -41,6 +41,10 @@ enum InputSourceSwitcher {
     /// by synthetic keyboard events during CJKV input source fix.
     static var syntheticEventEndTime: TimeInterval = 0
 
+    static var isSuppressingSyntheticEvents: Bool {
+        ProcessInfo.processInfo.systemUptime < syntheticEventEndTime
+    }
+
     static func discoverInputSources() -> [Descriptor] {
         return inputSourceList().map { source in
             Descriptor(

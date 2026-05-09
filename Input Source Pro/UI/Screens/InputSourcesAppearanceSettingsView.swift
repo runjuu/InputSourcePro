@@ -8,7 +8,7 @@ struct InputSourcesAppearanceSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
-                ForEach(InputSource.sources, id: \.id) { inputSource in
+                ForEach(InputSource.sources, id: \.persistentIdentifier) { inputSource in
                     SettingsSection(title: inputSource.name, noI18N: true) {
                         KeyboardCustomization(inputSource: inputSource)
                     }

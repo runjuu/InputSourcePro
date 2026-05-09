@@ -5,13 +5,17 @@ import Foundation
 import SwiftUI
 
 extension PreferencesVM {
+    private var didMigrateModeAwareKeyboardConfigsKey: String {
+        "didMigrateModeAwareKeyboardConfigs"
+    }
+
     func addKeyboardConfig(_ inputSource: InputSource) -> KeyboardConfig {
         if let config = getKeyboardConfig(inputSource) {
             return config
         } else {
             let config = KeyboardConfig(context: container.viewContext)
 
-            config.id = inputSource.id
+            config.id = inputSource.persistentIdentifier
 
             saveContext()
 
@@ -27,11 +31,50 @@ extension PreferencesVM {
     }
 
     func getKeyboardConfig(_ inputSource: InputSource) -> KeyboardConfig? {
-        return keyboardConfigs.first(where: { $0.id == inputSource.id })
+        return keyboardConfigs.first(where: { $0.id == inputSource.persistentIdentifier })
+            ?? keyboardConfigs.first(where: { $0.id == inputSource.id })
     }
 
     func getOrCreateKeyboardConfig(_ inputSource: InputSource) -> KeyboardConfig {
         return getKeyboardConfig(inputSource) ?? addKeyboardConfig(inputSource)
+    }
+
+    func migrateKeyboardConfigIdentifiersIfNeed() {
+        guard !UserDefaults.standard.bool(forKey: didMigrateModeAwareKeyboardConfigsKey) else { return }
+
+        let request = KeyboardConfig.fetchRequest()
+
+        do {
+            let configs = try container.viewContext.fetch(request)
+            var existingIDs = Set(configs.compactMap(\.id))
+
+            saveContext {
+                for config in configs {
+                    guard let legacyID = config.id, !legacyID.isEmpty else { continue }
+                    guard !InputSource.hasModeAwareIdentifier(legacyID) else { continue }
+
+                    let inputSources = InputSource.resolvePersistedIdentifiers(
+                        [legacyID],
+                        expandingLegacySourceIDs: true
+                    )
+
+                    for inputSource in inputSources {
+                        let targetID = inputSource.persistentIdentifier
+                        guard targetID != legacyID, !existingIDs.contains(targetID) else { continue }
+
+                        let migratedConfig = KeyboardConfig(context: self.container.viewContext)
+                        migratedConfig.id = targetID
+                        migratedConfig.textColorHex = config.textColorHex
+                        migratedConfig.bgColorHex = config.bgColorHex
+                        existingIDs.insert(targetID)
+                    }
+                }
+            }
+
+            UserDefaults.standard.set(true, forKey: didMigrateModeAwareKeyboardConfigsKey)
+        } catch {
+            print("migrateKeyboardConfigIdentifiers error: \(error.localizedDescription)")
+        }
     }
 }
 
@@ -100,7 +143,6 @@ extension PreferencesVM {
               FileManager.default.fileExists(atPath: storagePath.path) else { return }
 
         let store = Store<DeprecatedKeyboardSettings>(storagePath: storagePath)
-        let inputSources = InputSource.sources
 
         store.$items
             .filter { $0.count > 0 }
@@ -108,12 +150,18 @@ extension PreferencesVM {
             .sink { [weak self] items in
                 self?.saveContext {
                     for item in items {
-                        guard let inputSource = inputSources.first(where: { $0.id == item.id }),
-                              let config = self?.getOrCreateKeyboardConfig(inputSource)
-                        else { continue }
+                        let matchedInputSources = InputSource.resolvePersistedIdentifiers(
+                            [item.id],
+                            expandingLegacySourceIDs: true
+                        )
 
-                        config.textColorHex = item.textColorHex
-                        config.bgColorHex = item.bgColorHex
+                        for inputSource in matchedInputSources {
+                            guard let config = self?.getOrCreateKeyboardConfig(inputSource)
+                            else { continue }
+
+                            config.textColorHex = item.textColorHex
+                            config.bgColorHex = item.bgColorHex
+                        }
                     }
                 }
 

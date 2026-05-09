@@ -3,6 +3,10 @@ import AXSwift
 import Foundation
 
 extension PreferencesVM {
+    private var didMigrateModeAwareHotKeyGroupsKey: String {
+        "didMigrateModeAwareHotKeyGroups"
+    }
+
     func addHotKeyGroup(
         inputSources: [InputSource]
     ) {
@@ -38,6 +42,39 @@ extension PreferencesVM {
         } catch {
             print("getHotKeyGroups() error: \(error.localizedDescription)")
             return []
+        }
+    }
+
+    func migrateHotKeyGroupsIfNeed() {
+        guard !UserDefaults.standard.bool(forKey: didMigrateModeAwareHotKeyGroupsKey) else { return }
+
+        let request = NSFetchRequest<HotKeyGroup>(entityName: "HotKeyGroup")
+
+        do {
+            let groups = try container.viewContext.fetch(request)
+
+            saveContext {
+                for group in groups {
+                    let identifiers = group.persistedInputSourceIdentifiers
+                    let shouldExpandLegacyIDs = identifiers.allSatisfy {
+                        !InputSource.hasModeAwareIdentifier($0)
+                    }
+                    let migratedIdentifiers = InputSource
+                        .resolvePersistedIdentifiers(
+                            identifiers,
+                            expandingLegacySourceIDs: shouldExpandLegacyIDs
+                        )
+                        .map(\.persistentIdentifier)
+
+                    if !migratedIdentifiers.isEmpty, migratedIdentifiers != identifiers {
+                        group.updatePersistedInputSourceIdentifiers(migratedIdentifiers)
+                    }
+                }
+            }
+
+            UserDefaults.standard.set(true, forKey: didMigrateModeAwareHotKeyGroupsKey)
+        } catch {
+            print("migrateHotKeyGroups error: \(error.localizedDescription)")
         }
     }
 }
