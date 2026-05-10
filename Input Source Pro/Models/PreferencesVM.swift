@@ -107,6 +107,33 @@ final class PreferencesVM: ObservableObject {
     }
 }
 
+enum CJKVFixStrategy: String, CaseIterable, Codable, Equatable, Identifiable {
+    case previousInputSourceShortcut
+    case temporaryInputWindow // Adapted from https://github.com/laishulu/macism
+
+    var id: String { rawValue }
+
+    static let defaultStrategy: CJKVFixStrategy = .previousInputSourceShortcut
+
+    var name: String {
+        switch self {
+        case .temporaryInputWindow:
+            return "CJKV Fix Method Switching Focus".i18n()
+        case .previousInputSourceShortcut:
+            return "CJKV Fix Method Shortcut Simulation".i18n()
+        }
+    }
+
+    var explanation: String {
+        switch self {
+        case .temporaryInputWindow:
+            return "CJKV Fix Method Switching Focus Description".i18n()
+        case .previousInputSourceShortcut:
+            return "CJKV Fix Method Shortcut Simulation Description".i18n()
+        }
+    }
+}
+
 extension PreferencesVM {
     private func watchKeyboardConfigsChange() {
         mainStorage.keyboardConfigs
@@ -225,6 +252,7 @@ struct Preferences {
         static let isShowIconInMenuBar = "isShowIconInMenuBar"
         static let isEnhancedModeEnabled = "isDetectSpotlightLikeApp"
         static let isCJKVFixEnabled = "isCJKVFixEnabled"
+        static let cJKVFixStrategy = "cJKVFixStrategy"
 
         static let systemWideDefaultKeyboardId = "systemWideDefaultKeyboardId"
         static let isFunctionKeysEnabled = "isFunctionKeysEnabled"
@@ -300,6 +328,19 @@ struct Preferences {
 
     @UserDefault(Preferences.Key.isCJKVFixEnabled)
     var isCJKVFixEnabled = false
+
+    @UserDefault(Preferences.Key.cJKVFixStrategy)
+    private var cJKVFixStrategyRaw = CJKVFixStrategy.defaultStrategy.rawValue
+
+    var cJKVFixStrategy: CJKVFixStrategy {
+        get {
+            return CJKVFixStrategy(rawValue: cJKVFixStrategyRaw) ?? CJKVFixStrategy.defaultStrategy
+        }
+
+        set {
+            cJKVFixStrategyRaw = newValue.rawValue
+        }
+    }
 
     // MARK: - Triggers
 
@@ -545,6 +586,24 @@ extension Preferences {
     }
 }
 
+extension Preferences {
+    mutating func migrateCJKVFixStrategyIfNeed() {
+        guard isCJKVFixEnabled,
+              !Self.hasPersistentValue(forKey: Key.cJKVFixStrategy)
+        else { return }
+
+        cJKVFixStrategy = CJKVFixStrategy.defaultStrategy
+    }
+
+    private static func hasPersistentValue(forKey key: String) -> Bool {
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier,
+              let domain = UserDefaults.standard.persistentDomain(forName: bundleIdentifier)
+        else { return false }
+
+        return domain[key] != nil
+    }
+}
+
 extension PreferencesVM {
     var systemWideDefaultKeyboard: InputSource? {
         return InputSource.resolvePersistedIdentifier(preferences.systemWideDefaultKeyboardId)
@@ -566,8 +625,12 @@ extension PreferencesVM {
 }
 
 extension PreferencesVM {
-    func isUseCJKVFix() -> Bool {
-        return preferences.isEnhancedModeEnabled && preferences.isCJKVFixEnabled
+    func activeCJKVFixStrategy() -> CJKVFixStrategy? {
+        guard preferences.isEnhancedModeEnabled,
+              preferences.isCJKVFixEnabled
+        else { return nil }
+
+        return preferences.cJKVFixStrategy
     }
 
     func isAbleToQueryLocation(_ app: NSRunningApplication) -> Bool {

@@ -131,6 +131,10 @@ extension PreferencesVM {
     }
 
     func migratePreferncesIfNeed() {
+        update {
+            $0.migrateCJKVFixStrategyIfNeed()
+        }
+
         if preferences.prevInstalledBuildVersion <= 462 {
             update {
                 $0.indicatorInfo = $0.isShowInputSourcesLabel ? .iconAndTitle : .iconOnly

@@ -53,6 +53,9 @@ extension ApplicationVM {
                 else { return NSWorkspace.shared.frontmostApplication }
                 return NSRunningApplication(processIdentifier: pid)
             }
+            .filter { app in
+                !InputSourceSwitcher.isTemporaryInputWindowApplicationActivation(app)
+            }
             .removeDuplicates()
             .flatMapLatest { [weak self] (app: NSRunningApplication) -> AnyPublisher<AppKind, Never> in
                 guard let preferencesVM = self?.preferencesVM

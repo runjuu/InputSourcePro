@@ -7,7 +7,7 @@ struct CJKVFixEnableFailedView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Text("Enabled CJKV Fix Failed Desc")
+            Text("CJKV Fix Shortcut Method Failed Desc".i18n())
 
             Image("Enabled CJKV Fix Shortcut Img".i18n())
                 .resizable()

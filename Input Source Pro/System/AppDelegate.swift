@@ -49,6 +49,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_: Notification) {
+        guard !InputSourceSwitcher.isHandlingTemporaryInputWindowActivation else { return }
+
         statusItemController.openPreferences()
     }
 

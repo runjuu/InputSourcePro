@@ -30,7 +30,7 @@ class InputSourceVM: ObservableObject {
         selectInputSourceSubject
             .tap { [weak self] in
                 if let self {
-                    $0.select(useCJKVFix: self.preferencesVM.isUseCJKVFix())
+                    $0.select(cJKVFixStrategy: self.preferencesVM.activeCJKVFixStrategy())
                 }
             }
             .flatMapLatest({ _ in

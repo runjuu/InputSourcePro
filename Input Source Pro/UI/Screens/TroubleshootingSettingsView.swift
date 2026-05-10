@@ -10,11 +10,15 @@ struct TroubleshootingSettingsView: View {
             get: { preferencesVM.preferences.isCJKVFixEnabled },
             set: { onToggleCJKVFix($0) }
         )
+        let cJKVFixStrategyBinding = Binding(
+            get: { preferencesVM.preferences.cJKVFixStrategy },
+            set: { onSelectCJKVFixStrategy($0) }
+        )
 
         ScrollView {
             VStack(spacing: 18) {
                 SettingsSection(title: "") {
-                    VStack(alignment: .leading) {
+                    VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Toggle("", isOn: isCJKVFixEnabledBinding)
                                 .disabled(!preferencesVM.preferences.isEnhancedModeEnabled)
@@ -32,6 +36,33 @@ struct TroubleshootingSettingsView: View {
                         Text(.init("Enabled CJKV Fix Description".i18n()))
                             .font(.system(size: 12))
                             .opacity(0.8)
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("CJKV Fix Method".i18n())
+                                .font(.subheadline)
+
+                            Picker("", selection: cJKVFixStrategyBinding) {
+                                ForEach(CJKVFixStrategy.allCases) { strategy in
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(strategy.name)
+                                            .font(.subheadline.weight(.semibold))
+
+                                        Text(strategy.explanation)
+                                            .font(.system(size: 12))
+                                            .foregroundColor(.secondary)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                    .tag(strategy)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.radioGroup)
+                            .accessibilityLabel("CJKV Fix Method".i18n())
+                            .disabled(
+                                !preferencesVM.preferences.isEnhancedModeEnabled ||
+                                    !preferencesVM.preferences.isCJKVFixEnabled
+                            )
+                        }
                     }
                     .padding()
                 }
@@ -54,17 +85,33 @@ struct TroubleshootingSettingsView: View {
 
     func onToggleCJKVFix(_ isCJKVFixEnabled: Bool) {
         if isCJKVFixEnabled {
-            if InputSourceSwitcher.getPreviousInputSourceShortcut() == nil {
+            let selectedStrategy = preferencesVM.preferences.cJKVFixStrategy
+
+            if selectedStrategy == .previousInputSourceShortcut,
+               InputSourceSwitcher.getPreviousInputSourceShortcut() == nil {
                 isShowCJKVFixEnableFailedView = true
             } else {
                 preferencesVM.update {
                     $0.isCJKVFixEnabled = true
+                    $0.cJKVFixStrategy = selectedStrategy
                 }
             }
         } else {
             preferencesVM.update {
                 $0.isCJKVFixEnabled = false
             }
+        }
+    }
+
+    func onSelectCJKVFixStrategy(_ cJKVFixStrategy: CJKVFixStrategy) {
+        if cJKVFixStrategy == .previousInputSourceShortcut,
+           InputSourceSwitcher.getPreviousInputSourceShortcut() == nil {
+            isShowCJKVFixEnableFailedView = true
+            return
+        }
+
+        preferencesVM.update {
+            $0.cJKVFixStrategy = cJKVFixStrategy
         }
     }
 }

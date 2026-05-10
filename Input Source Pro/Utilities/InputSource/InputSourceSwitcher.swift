@@ -35,7 +35,25 @@ enum InputSourceSwitcher {
 
     private static let logger = ISPLogger(category: String(describing: InputSourceSwitcher.self))
     private static var pendingWorkItems: [DispatchWorkItem] = []
+    private static var temporaryInputWindow: NSWindow?
+    private static var temporaryInputWindowPreviousApplication: NSRunningApplication?
+    private static let temporaryInputWindowDuration: TimeInterval = 0.08
+    // App activation notifications can arrive after the hidden window has already closed.
+    private static let temporaryInputWindowActivationSuppressionDuration: TimeInterval = 0.5
+    private static var temporaryInputWindowActivationSuppressionEndTime: TimeInterval = 0
     private static let syntheticEventUserData: Int64 = 0x49535043534A4B56 // "ISPCSJKV"
+
+    private(set) static var isShowingTemporaryInputWindow = false
+
+    static var isHandlingTemporaryInputWindowActivation: Bool {
+        isShowingTemporaryInputWindow ||
+            ProcessInfo.processInfo.systemUptime < temporaryInputWindowActivationSuppressionEndTime
+    }
+
+    static func isTemporaryInputWindowApplicationActivation(_ application: NSRunningApplication) -> Bool {
+        guard isHandlingTemporaryInputWindowActivation else { return false }
+        return application.bundleIdentifier == Bundle.main.bundleIdentifier
+    }
 
     /// End time for the synthetic event suppression window.
     /// ShortcutTriggerManager checks this to ignore flagsChanged events generated
@@ -75,7 +93,10 @@ enum InputSourceSwitcher {
         logger.debug { "Discovered input sources (\(sources.count)):\n\(description)" }
     }
 
-    static func switchToInputSource(sourceID: String, useCJKVFix: Bool = true) {
+    static func switchToInputSource(
+        sourceID: String,
+        cJKVFixStrategy: CJKVFixStrategy? = CJKVFixStrategy.defaultStrategy
+    ) {
         cancelPendingWorkItems()
         guard let tisTarget = resolveInputSourceBySourceID(sourceID) else {
             logger.debug { "No input source found for sourceID=\(sourceID)" }
@@ -92,11 +113,14 @@ enum InputSourceSwitcher {
         switchToTarget(
             target,
             tisTarget: tisTarget,
-            allowShortcutFallback: useCJKVFix
+            cJKVFixStrategy: cJKVFixStrategy
         )
     }
 
-    static func switchToInputMode(modeID: String, useCJKVFix: Bool = true) {
+    static func switchToInputMode(
+        modeID: String,
+        cJKVFixStrategy: CJKVFixStrategy? = CJKVFixStrategy.defaultStrategy
+    ) {
         guard let tisTarget = resolveInputSourceByModeID(modeID) else {
             logger.debug { "No input source found for modeID=\(modeID)" }
             return
@@ -112,11 +136,11 @@ enum InputSourceSwitcher {
         switchToTarget(
             target,
             tisTarget: tisTarget,
-            allowShortcutFallback: useCJKVFix
+            cJKVFixStrategy: cJKVFixStrategy
         )
     }
 
-    static func switchToInputSource(_ inputSource: InputSource, useCJKVFix: Bool) {
+    static func switchToInputSource(_ inputSource: InputSource, cJKVFixStrategy: CJKVFixStrategy?) {
         cancelPendingWorkItems()
         let target = SwitchTarget(
             localizedName: inputSource.name,
@@ -126,45 +150,79 @@ enum InputSourceSwitcher {
         )
 
         if inputSource.isCJKVR, let modeID = inputSource.inputModeID {
-            return switchToInputMode(modeID: modeID, useCJKVFix: useCJKVFix)
+            return switchToInputMode(modeID: modeID, cJKVFixStrategy: cJKVFixStrategy)
         }
 
         switchToTarget(
             target,
             tisTarget: inputSource.tisInputSource,
-            allowShortcutFallback: useCJKVFix
+            cJKVFixStrategy: cJKVFixStrategy
         )
     }
 
     private static func switchToTarget(
         _ target: SwitchTarget,
         tisTarget: TISInputSource,
-        allowShortcutFallback: Bool
+        cJKVFixStrategy: CJKVFixStrategy?
     ) {
-        if target.isCJKV,
-           allowShortcutFallback,
-           let previousShortcut = getPreviousInputSourceShortcut(),
-           let nonCJKVSource = resolveNonCJKVSource(),
-           canPostShortcuts()
-        {
-            // Suppress modifier event processing in ShortcutTriggerManager for the duration
-            // of the CJKV fix sequence (~300ms) to prevent synthetic keyboard events from
-            // corrupting modifier tracking state and blocking subsequent shortcut triggers.
-            syntheticEventEndTime = ProcessInfo.processInfo.systemUptime + 0.35
-            logger.debug { "Applying CJKV fix using previous input source shortcut" }
-            selectInputSource(tisTarget, reason: "CJKV target")
-            selectInputSource(nonCJKVSource, reason: "CJKV bounce")
-            
-            scheduleWorkItem(after: 0.1, execute: {
-                triggerShortcut(previousShortcut, onFinish: { currentInputSouce in
-                    if !target.matches(currentInputSouce) {
-                        selectInputSource(tisTarget, reason: "CJKV target mismatch fallback")
-                    }
-                })
-            })
-        } else {
+        guard target.isCJKV,
+              let cJKVFixStrategy
+        else {
             selectInputSource(tisTarget, reason: "target")
+            return
         }
+
+        switch cJKVFixStrategy {
+        case .temporaryInputWindow:
+            switchToCJKVTargetWithTemporaryInputWindow(target, tisTarget: tisTarget)
+        case .previousInputSourceShortcut:
+            switchToCJKVTargetWithPreviousInputSourceShortcut(target, tisTarget: tisTarget)
+        }
+    }
+
+    private static func switchToCJKVTargetWithTemporaryInputWindow(
+        _ target: SwitchTarget,
+        tisTarget: TISInputSource
+    ) {
+        logger.debug { "Applying CJKV fix using temporary input window" }
+        selectInputSource(tisTarget, reason: "CJKV target")
+        showTemporaryInputWindow()
+
+        scheduleWorkItem(after: temporaryInputWindowDuration + 0.05) {
+            let currentInputSource = InputSource.getCurrentInputSource()
+            if !target.matches(currentInputSource) {
+                selectInputSource(tisTarget, reason: "CJKV target mismatch fallback")
+            }
+        }
+    }
+
+    private static func switchToCJKVTargetWithPreviousInputSourceShortcut(
+        _ target: SwitchTarget,
+        tisTarget: TISInputSource
+    ) {
+        guard let previousShortcut = getPreviousInputSourceShortcut(),
+              let nonCJKVSource = resolveNonCJKVSource(),
+              canPostShortcuts()
+        else {
+            selectInputSource(tisTarget, reason: "CJKV target shortcut fallback")
+            return
+        }
+
+        // Suppress modifier event processing in ShortcutTriggerManager for the duration
+        // of the CJKV fix sequence (~300ms) to prevent synthetic keyboard events from
+        // corrupting modifier tracking state and blocking subsequent shortcut triggers.
+        syntheticEventEndTime = ProcessInfo.processInfo.systemUptime + 0.35
+        logger.debug { "Applying CJKV fix using previous input source shortcut" }
+        selectInputSource(tisTarget, reason: "CJKV target")
+        selectInputSource(nonCJKVSource, reason: "CJKV bounce")
+
+        scheduleWorkItem(after: 0.1, execute: {
+            triggerShortcut(previousShortcut, onFinish: { currentInputSouce in
+                if !target.matches(currentInputSouce) {
+                    selectInputSource(tisTarget, reason: "CJKV target mismatch fallback")
+                }
+            })
+        })
     }
 
     @discardableResult
@@ -222,6 +280,7 @@ enum InputSourceSwitcher {
 
     private static func cancelPendingWorkItems() {
         syntheticEventEndTime = 0
+        closeTemporaryInputWindow(restorePreviousApplication: true)
         guard !pendingWorkItems.isEmpty else { return }
         pendingWorkItems.forEach { $0.cancel() }
         pendingWorkItems.removeAll()
@@ -246,6 +305,91 @@ enum InputSourceSwitcher {
             pendingWorkItems.remove(at: index)
         }
     }
+
+    /// Adapted from macism's showTemporaryInputWindow approach.
+    /// macism is MIT licensed, copyright (c) 2023 https://github.com/laishulu.
+    private static func showTemporaryInputWindow() {
+        closeTemporaryInputWindow(restorePreviousApplication: false)
+
+        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+
+        temporaryInputWindowPreviousApplication = NSWorkspace.shared.frontmostApplication
+
+        let screenRect = screen.visibleFrame
+        let windowSize = NSSize(width: 3, height: 3)
+        let contentRect = NSRect(
+            x: screenRect.maxX - windowSize.width - 8,
+            y: screenRect.minY + 8,
+            width: windowSize.width,
+            height: windowSize.height
+        )
+
+        let window = TemporaryInputWindow(
+            contentRect: contentRect,
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        let textView = NSTextView(frame: NSRect(origin: .zero, size: windowSize))
+
+        window.contentView = textView
+        window.isReleasedWhenClosed = false
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.alphaValue = 0.01
+        window.hasShadow = false
+        window.ignoresMouseEvents = true
+        window.level = .screenSaver
+        window.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
+
+        temporaryInputWindow = window
+        suppressTemporaryInputWindowActivation()
+        isShowingTemporaryInputWindow = true
+
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeFirstResponder(textView)
+
+        scheduleWorkItem(after: temporaryInputWindowDuration) {
+            closeTemporaryInputWindow(restorePreviousApplication: true)
+        }
+    }
+
+    private static func closeTemporaryInputWindow(restorePreviousApplication: Bool) {
+        guard let window = temporaryInputWindow else {
+            isShowingTemporaryInputWindow = false
+            temporaryInputWindowPreviousApplication = nil
+            return
+        }
+
+        temporaryInputWindow = nil
+        window.orderOut(nil)
+        window.close()
+        suppressTemporaryInputWindowActivation()
+        isShowingTemporaryInputWindow = false
+
+        defer {
+            temporaryInputWindowPreviousApplication = nil
+        }
+
+        guard restorePreviousApplication,
+              let previousApplication = temporaryInputWindowPreviousApplication,
+              previousApplication.bundleIdentifier != Bundle.main.bundleIdentifier,
+              NSWorkspace.shared.frontmostApplication?.bundleIdentifier == Bundle.main.bundleIdentifier
+        else { return }
+
+        previousApplication.activate(options: [])
+    }
+
+    private static func suppressTemporaryInputWindowActivation() {
+        temporaryInputWindowActivationSuppressionEndTime = ProcessInfo.processInfo.systemUptime +
+            temporaryInputWindowActivationSuppressionDuration
+    }
+}
+
+private final class TemporaryInputWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
 }
 
 extension InputSourceSwitcher {

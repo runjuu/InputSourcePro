@@ -70,8 +70,8 @@ class InputSource {
         }()
     }
 
-    func select(useCJKVFix: Bool) {
-        InputSourceSwitcher.switchToInputSource(self, useCJKVFix: useCJKVFix)
+    func select(cJKVFixStrategy: CJKVFixStrategy?) {
+        InputSourceSwitcher.switchToInputSource(self, cJKVFixStrategy: cJKVFixStrategy)
     }
 
     private var normalizedInputModeID: String? {

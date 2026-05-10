@@ -52,7 +52,12 @@
 "Enabled CJKV Fix" = "修复输入法切换问题";
 "Enabled CJKV Fix Description" = "启用此功能可以解决输入法图标已更改，但在打字时系统仍使用前一个输入法的问题。";
 "Enabled CJKV Fix Shortcut Img" = "CJKVFixEnableShortcut-CN";
-"Enabled CJKV Fix Failed Desc" = "为了启动该功能，需要启用系统的「选择上一个输入法」快捷键。";
+"CJKV Fix Method" = "修复方式";
+"CJKV Fix Method Switching Focus" = "切换焦点";
+"CJKV Fix Method Switching Focus Description" = "短暂切换焦点，以促使 macOS 确认所选输入法。不适合悬浮类 App，因为失去焦点可能会让它们自动隐藏。";
+"CJKV Fix Method Shortcut Simulation" = "模拟快捷键";
+"CJKV Fix Method Shortcut Simulation Description" = "模拟系统的「选择上一个输入法」快捷键。它在 macOS 26 之前表现稳定，但在 macOS 26 可能引发其他意外的系统行为。";
+"CJKV Fix Shortcut Method Failed Desc" = "「模拟快捷键」方式需要启用系统的「选择上一个输入法」快捷键。";
 "Open Keyboard Settings" = "打开「键盘」设置";
 
 "Customize Keyboard" = "自定义样式";
