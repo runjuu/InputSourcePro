@@ -58,7 +58,7 @@
 
 ### ✍️ App-Aware Punctuation Modes
 Keep punctuation consistent across different languages by enabling **Force English Punctuation** for specific apps.
-- Automatically types standard symbols (`, . ; ' " [ ]`) even when your current input source would normally produce localized or full-width characters.
+- Automatically types standard symbols (`` ` ~ - _ $ ^ , . ; ' " [ ] ``) even when your current input source would normally produce localized or full-width characters.
 - Enable it only for the apps where you need it, such as code editors or terminal windows.
 
 ### 🎛️ App-Based Function Key Switching

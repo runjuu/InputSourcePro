@@ -18,13 +18,17 @@ class PunctuationService: ObservableObject {
     private let inputSourceCacheTimeout: TimeInterval = 0.5 // Cache for 500ms
     
     private let cjkvToEnglishPunctuationMap: [UInt16: (normal: String, shifted: String)] = [
-        43: (",", "<"),    // 0x2B - Comma key
-        47: (".", ">"),    // 0x2F - Period key
-        41: (";", ":"),    // 0x29 - Semicolon key
-        39: ("'", "\""),   // 0x27 - Quote key
-        42: ("\\", "|"),   // 0x2A - Backslash key
-        33: ("[", "{"),    // 0x21 - Left Bracket key
-        30: ("]", "}")     // 0x1E - Right Bracket key
+        UInt16(kVK_ANSI_Grave): ("`", "~"),
+        UInt16(kVK_ANSI_4): ("4", "$"),
+        UInt16(kVK_ANSI_6): ("6", "^"),
+        UInt16(kVK_ANSI_Minus): ("-", "_"),
+        UInt16(kVK_ANSI_Comma): (",", "<"),
+        UInt16(kVK_ANSI_Period): (".", ">"),
+        UInt16(kVK_ANSI_Semicolon): (";", ":"),
+        UInt16(kVK_ANSI_Quote): ("'", "\""),
+        UInt16(kVK_ANSI_Backslash): ("\\", "|"),
+        UInt16(kVK_ANSI_LeftBracket): ("[", "{"),
+        UInt16(kVK_ANSI_RightBracket): ("]", "}")
     ]
     
     init(preferencesVM: PreferencesVM) {
@@ -84,12 +88,11 @@ class PunctuationService: ObservableObject {
         let eventMask = (1 << CGEventType.keyDown.rawValue)
         
         let callback: CGEventTapCallBack = { proxy, type, event, refcon in
-            guard let refcon = refcon,
-                  let service = Unmanaged<PunctuationService>.fromOpaque(refcon).takeUnretainedValue() as? PunctuationService
-            else { 
-                return Unmanaged.passUnretained(event) 
+            guard let refcon = refcon else {
+                return Unmanaged.passUnretained(event)
             }
             
+            let service = Unmanaged<PunctuationService>.fromOpaque(refcon).takeUnretainedValue()
             return service.handleKeyEvent(proxy: proxy, type: type, event: event)
         }
         
@@ -102,7 +105,7 @@ class PunctuationService: ObservableObject {
             (.defaultTap, .tailAppendEventTap, "Default + Tail insertion")
         ]
         
-        for (index, config) in configurations.enumerated() {
+        for config in configurations {
             logger.debug { "Attempting event tap creation - \(config.description)" }
             
             eventTap = CGEvent.tapCreate(
@@ -166,6 +169,11 @@ class PunctuationService: ObservableObject {
             return Unmanaged.passUnretained(event)
         }
         
+        guard shouldReplacePunctuation(for: event.flags) else {
+            // Preserve shortcuts and system key combinations that use punctuation keys.
+            return Unmanaged.passUnretained(event)
+        }
+
         let englishReplacement = event.flags.contains(.maskShift) ? mapping.shifted : mapping.normal
         
         // Check if we're in a Chinese/CJKV input method (with caching for performance)
@@ -214,6 +222,11 @@ class PunctuationService: ObservableObject {
         return newEvent
     }
     
+    private func shouldReplacePunctuation(for flags: CGEventFlags) -> Bool {
+        let shortcutModifiers: CGEventFlags = [.maskCommand, .maskControl, .maskAlternate, .maskSecondaryFn]
+        return flags.intersection(shortcutModifiers).isEmpty
+    }
+
     func shouldEnableForApp(_ app: NSRunningApplication) -> Bool {
         guard let preferencesVM = preferencesVM else { return false }
         
