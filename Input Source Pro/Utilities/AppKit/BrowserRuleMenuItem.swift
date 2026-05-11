@@ -2,8 +2,10 @@ import AppKit
 
 @MainActor
 class BrowserRuleMenuItem: NSMenuItem {
+    let app: NSRunningApplication
     let url: URL
     let preferencesVM: PreferencesVM
+    let inputSourceVM: InputSourceVM
     let inputSource: InputSource?
 
     var cancelBag = CancelBag()
@@ -12,9 +14,17 @@ class BrowserRuleMenuItem: NSMenuItem {
         preferencesVM.getBrowserRule(url: url)
     }
 
-    init(url: URL, preferencesVM: PreferencesVM, inputSource: InputSource?) {
+    init(
+        app: NSRunningApplication,
+        url: URL,
+        preferencesVM: PreferencesVM,
+        inputSourceVM: InputSourceVM,
+        inputSource: InputSource?
+    ) {
+        self.app = app
         self.url = url
         self.preferencesVM = preferencesVM
+        self.inputSourceVM = inputSourceVM
         self.inputSource = inputSource
 
         super.init(title: inputSource?.name ?? "", action: #selector(forceKeyboard(_:)), keyEquivalent: "")
@@ -55,7 +65,9 @@ class BrowserRuleMenuItem: NSMenuItem {
             )
         }
 
-        inputSource?.select(cJKVFixStrategy: preferencesVM.activeCJKVFixStrategy())
+        if let inputSource {
+            inputSourceVM.select(inputSource: inputSource, app: app)
+        }
 
         watchChanges()
     }

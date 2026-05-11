@@ -20,14 +20,14 @@ class StatusItemController {
         guard let app = applicationVM.appKind?.getApp() else { return nil }
 
         var items: [NSMenuItem] = [
-            AppRuleMenuItem(app: app, preferencesVM: preferencesVM, inputSource: nil),
+            AppRuleMenuItem(app: app, preferencesVM: preferencesVM, inputSourceVM: inputSourceVM, inputSource: nil),
             NSMenuItem.separator(),
         ]
 
         items[0].toolTip = "Default Keyboard Tooltip".i18n()
 
         items += InputSource.sources.map {
-            AppRuleMenuItem(app: app, preferencesVM: preferencesVM, inputSource: $0)
+            AppRuleMenuItem(app: app, preferencesVM: preferencesVM, inputSourceVM: inputSourceVM, inputSource: $0)
         }
 
         items
@@ -51,19 +51,34 @@ class StatusItemController {
     }
 
     var addBrowserRuleMenu: NSMenuItem? {
-        guard let browserInfo = applicationVM.appKind?.getBrowserInfo(),
+        guard let appKind = applicationVM.appKind,
+              let browserInfo = appKind.getBrowserInfo(),
               let host = browserInfo.url.host
         else { return nil }
 
+        let app = appKind.getApp()
+
         var items: [NSMenuItem] = [
-            BrowserRuleMenuItem(url: browserInfo.url, preferencesVM: preferencesVM, inputSource: nil),
+            BrowserRuleMenuItem(
+                app: app,
+                url: browserInfo.url,
+                preferencesVM: preferencesVM,
+                inputSourceVM: inputSourceVM,
+                inputSource: nil
+            ),
             NSMenuItem.separator(),
         ]
 
         items[0].toolTip = "Default Keyboard Tooltip".i18n()
 
         items += InputSource.sources.map {
-            BrowserRuleMenuItem(url: browserInfo.url, preferencesVM: preferencesVM, inputSource: $0)
+            BrowserRuleMenuItem(
+                app: app,
+                url: browserInfo.url,
+                preferencesVM: preferencesVM,
+                inputSourceVM: inputSourceVM,
+                inputSource: $0
+            )
         }
 
         items

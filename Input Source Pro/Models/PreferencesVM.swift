@@ -625,12 +625,21 @@ extension PreferencesVM {
 }
 
 extension PreferencesVM {
-    func activeCJKVFixStrategy() -> CJKVFixStrategy? {
+    func activeCJKVFixStrategy(for app: NSRunningApplication? = nil) -> CJKVFixStrategy? {
         guard preferences.isEnhancedModeEnabled,
+              permissionsVM.isInputMonitoringEnabled,
               preferences.isCJKVFixEnabled
         else { return nil }
 
-        return preferences.cJKVFixStrategy
+        let strategy = preferences.cJKVFixStrategy
+
+        if strategy == .temporaryInputWindow,
+           NSApplication.isFloatingApp(app?.bundleIdentifier)
+        {
+            return nil
+        }
+
+        return strategy
     }
 
     func isAbleToQueryLocation(_ app: NSRunningApplication) -> Bool {

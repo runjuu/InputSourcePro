@@ -234,7 +234,7 @@ extension IndicatorVM {
                     return state
                 case let .appChanged(appKind):
                     if let status = preferencesVM.getAppAutoSwitchKeyboard(appKind) {
-                        inputSourceVM.select(inputSource: status.inputSource)
+                        inputSourceVM.select(inputSource: status.inputSource, app: appKind.getApp())
 
                         return updateState(
                             appKind: appKind,
@@ -253,7 +253,7 @@ extension IndicatorVM {
 
                     return updateState(appKind: state.appKind, inputSource: inputSource, inputSourceChangeReason: .system)
                 case let .switchInputSourceByShortcut(inputSource):
-                    inputSourceVM.select(inputSource: inputSource)
+                    inputSourceVM.select(inputSource: inputSource, app: state.appKind?.getApp())
 
                     return updateState(appKind: state.appKind, inputSource: inputSource, inputSourceChangeReason: .shortcut)
                 }

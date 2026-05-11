@@ -4,6 +4,7 @@ import AppKit
 class AppRuleMenuItem: NSMenuItem {
     let app: NSRunningApplication
     let preferencesVM: PreferencesVM
+    let inputSourceVM: InputSourceVM
     let inputSource: InputSource?
 
     var cancelBag = CancelBag()
@@ -12,9 +13,15 @@ class AppRuleMenuItem: NSMenuItem {
         preferencesVM.getAppCustomization(app: app)
     }
 
-    init(app: NSRunningApplication, preferencesVM: PreferencesVM, inputSource: InputSource?) {
+    init(
+        app: NSRunningApplication,
+        preferencesVM: PreferencesVM,
+        inputSourceVM: InputSourceVM,
+        inputSource: InputSource?
+    ) {
         self.app = app
         self.preferencesVM = preferencesVM
+        self.inputSourceVM = inputSourceVM
         self.inputSource = inputSource
 
         super.init(title: inputSource?.name ?? "", action: #selector(forceKeyboard(_:)), keyEquivalent: "")
@@ -42,7 +49,9 @@ class AppRuleMenuItem: NSMenuItem {
             )
         }
 
-        inputSource?.select(cJKVFixStrategy: preferencesVM.activeCJKVFixStrategy())
+        if let inputSource {
+            inputSourceVM.select(inputSource: inputSource, app: app)
+        }
 
         watchChanges()
     }

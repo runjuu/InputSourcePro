@@ -53,7 +53,7 @@
 "Enabled CJKV Fix Shortcut Img" = "CJKVFixEnableShortcut-EN";
 "CJKV Fix Method" = "Fix Method";
 "CJKV Fix Method Switching Focus" = "Switching Focus";
-"CJKV Fix Method Switching Focus Description" = "Briefly switches focus to force macOS to settle the selected input source. Avoid this for floating apps, because losing focus can make them hide automatically.";
+"CJKV Fix Method Switching Focus Description" = "Briefly switches focus to force macOS to settle the selected input source. This method works better on macOS 26, but does not work for floating apps.";
 "CJKV Fix Method Shortcut Simulation" = "Shortcut Simulation";
 "CJKV Fix Method Shortcut Simulation Description" = "Simulates the system's “Select the previous input source” shortcut. This works well before macOS 26, but on macOS 26 it may cause unexpected system behavior.";
 "CJKV Fix Shortcut Method Failed Desc" = "Shortcut Simulation requires the system's “Select the previous input source” shortcut to be enabled.";

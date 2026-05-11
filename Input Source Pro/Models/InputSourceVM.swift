@@ -7,11 +7,16 @@ import CombineExt
 
 @MainActor
 class InputSourceVM: ObservableObject {
+    private struct SelectionRequest {
+        let inputSource: InputSource
+        let app: NSRunningApplication?
+    }
+
     let preferencesVM: PreferencesVM
 
     private var cancelBag = CancelBag()
 
-    private let selectInputSourceSubject = PassthroughSubject<InputSource, Never>()
+    private let selectInputSourceSubject = PassthroughSubject<SelectionRequest, Never>()
 
     private let inputSourceChangesSubject = PassthroughSubject<Void, Never>()
 
@@ -30,7 +35,7 @@ class InputSourceVM: ObservableObject {
         selectInputSourceSubject
             .tap { [weak self] in
                 if let self {
-                    $0.select(cJKVFixStrategy: self.preferencesVM.activeCJKVFixStrategy())
+                    $0.inputSource.select(cJKVFixStrategy: self.preferencesVM.activeCJKVFixStrategy(for: $0.app))
                 }
             }
             .flatMapLatest({ _ in
@@ -44,8 +49,8 @@ class InputSourceVM: ObservableObject {
             .store(in: cancelBag)
     }
 
-    func select(inputSource: InputSource) {
-        selectInputSourceSubject.send(inputSource)
+    func select(inputSource: InputSource, app: NSRunningApplication? = nil) {
+        selectInputSourceSubject.send(SelectionRequest(inputSource: inputSource, app: app))
     }
 
     private func watchSystemNotification() {

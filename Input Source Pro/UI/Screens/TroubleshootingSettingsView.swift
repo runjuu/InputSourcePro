@@ -38,17 +38,13 @@ struct TroubleshootingSettingsView: View {
                             .opacity(0.8)
 
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("CJKV Fix Method".i18n())
-                                .font(.subheadline)
-
                             Picker("", selection: cJKVFixStrategyBinding) {
                                 ForEach(CJKVFixStrategy.allCases) { strategy in
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text(strategy.name)
-                                            .font(.subheadline.weight(.semibold))
 
                                         Text(strategy.explanation)
-                                            .font(.system(size: 12))
+                                            .font(.body)
                                             .foregroundColor(.secondary)
                                             .fixedSize(horizontal: false, vertical: true)
                                     }

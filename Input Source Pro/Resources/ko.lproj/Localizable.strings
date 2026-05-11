@@ -53,7 +53,7 @@
 "Enabled CJKV Fix Shortcut Img" = "CJKVFixEnableShortcut-EN";
 "CJKV Fix Method" = "수정 방법";
 "CJKV Fix Method Switching Focus" = "포커스 전환";
-"CJKV Fix Method Switching Focus Description" = "잠시 포커스를 전환해 macOS가 선택한 입력 소스를 확정하도록 합니다. 포커스를 잃으면 자동으로 숨겨질 수 있으므로 플로팅 앱에는 적합하지 않습니다.";
+"CJKV Fix Method Switching Focus Description" = "잠시 포커스를 전환해 macOS가 선택한 입력 소스를 확정하도록 합니다. 이 방법은 macOS 26에서 더 잘 작동하지만 플로팅 앱에서는 작동하지 않습니다.";
 "CJKV Fix Method Shortcut Simulation" = "단축키 시뮬레이션";
 "CJKV Fix Method Shortcut Simulation Description" = "시스템의 \"이전 입력 소스 선택\" 단축키를 시뮬레이션합니다. macOS 26 이전 버전에서는 잘 작동하지만 macOS 26에서는 예상치 못한 시스템 동작이 발생할 수 있습니다.";
 "CJKV Fix Shortcut Method Failed Desc" = "단축키 시뮬레이션 방식을 사용하려면 시스템의 \"이전 입력 소스 선택\" 단축키를 활성화해야 합니다.";

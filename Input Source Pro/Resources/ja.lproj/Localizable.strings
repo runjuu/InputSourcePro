@@ -53,7 +53,7 @@
 "Enabled CJKV Fix Shortcut Img" = "CJKVFixEnableShortcut-EN";
 "CJKV Fix Method" = "修正方法";
 "CJKV Fix Method Switching Focus" = "フォーカス切り替え";
-"CJKV Fix Method Switching Focus Description" = "一時的にフォーカスを切り替えて、macOS に選択した入力ソースを反映させます。フォーカスを失うと自動的に隠れることがあるため、フローティングアプリには向いていません。";
+"CJKV Fix Method Switching Focus Description" = "一時的にフォーカスを切り替えて、macOS に選択した入力ソースを反映させます。この方法は macOS 26 でより効果的ですが、フローティングアプリでは動作しません。";
 "CJKV Fix Method Shortcut Simulation" = "ショートカットのシミュレーション";
 "CJKV Fix Method Shortcut Simulation Description" = "システムの「前の入力ソースを選択」ショートカットをシミュレートします。macOS 26 より前ではうまく動作しますが、macOS 26 では予期しないシステム動作を引き起こす場合があります。";
 "CJKV Fix Shortcut Method Failed Desc" = "ショートカットのシミュレーション方式を使用するには、システムの「前の入力ソースを選択」ショートカットを有効にする必要があります。";
