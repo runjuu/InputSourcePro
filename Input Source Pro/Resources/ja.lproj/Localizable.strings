@@ -220,3 +220,17 @@
 "Open Input Monitoring Settings" = "入力監視設定を開く";
 "Open Input Monitoring Settings, click the \"+\" button and add \"Input Source Pro\" to the list." = "入力監視設定を開き、「+」ボタンをクリックして一覧に「Input Source Pro」を追加してください。";
 "Disabled until permissions are granted" = "権限が付与されるまで無効";
+
+"Settings Backup" = "設定バックアップ";
+"Export Settings" = "設定を書き出す";
+"Import Settings" = "設定を読み込む";
+"Settings Exported" = "設定を書き出しました";
+"Settings Exported Message" = "設定バックアップを正常に書き出しました。";
+"Settings Imported" = "設定を読み込みました";
+"Settings Imported Message" = "設定を正常に読み込みました。";
+"Export Settings Failed" = "設定の書き出しに失敗しました";
+"Import Settings Failed" = "設定の読み込みに失敗しました";
+"Replace Current Settings?" = "現在の設定を置き換えますか？";
+"Import Settings Confirmation Message" = "このファイルを読み込むと、現在サポートされている設定、ルール、カラー設定、ホットキーグループ、記録済みショートカットが置き換えられます。";
+"Unsupported settings backup version %@" = "サポートされていない設定バックアップバージョン %@ です。";
+"Unable to save imported settings." = "読み込んだ設定を保存できません。";

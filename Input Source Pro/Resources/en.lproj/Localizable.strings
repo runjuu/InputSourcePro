@@ -220,3 +220,17 @@
 "Open Input Monitoring Settings" = "Open Input Monitoring Settings";
 "Open Input Monitoring Settings, click the \"+\" button and add \"Input Source Pro\" to the list." = "Open Input Monitoring Settings, click the \"+\" button and add \"Input Source Pro\" to the list.";
 "Disabled until permissions are granted" = "Disabled until permissions are granted";
+
+"Settings Backup" = "Settings Backup";
+"Export Settings" = "Export Settings";
+"Import Settings" = "Import Settings";
+"Settings Exported" = "Settings Exported";
+"Settings Exported Message" = "Your settings backup was exported successfully.";
+"Settings Imported" = "Settings Imported";
+"Settings Imported Message" = "Your settings were imported successfully.";
+"Export Settings Failed" = "Export Settings Failed";
+"Import Settings Failed" = "Import Settings Failed";
+"Replace Current Settings?" = "Replace Current Settings?";
+"Import Settings Confirmation Message" = "Importing this file will replace your current supported settings, rules, color configs, hot key groups, and recorded shortcuts.";
+"Unsupported settings backup version %@" = "Unsupported settings backup version %@.";
+"Unable to save imported settings." = "Unable to save imported settings.";

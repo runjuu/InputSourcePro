@@ -90,6 +90,7 @@
 		4A881A91288BC50B00B76498 /* KeyboardConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A881A90288BC50B00B76498 /* KeyboardConfig.swift */; };
 		4A881A93288BC55E00B76498 /* PreferencesVM+KeyboardConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A881A92288BC55E00B76498 /* PreferencesVM+KeyboardConfig.swift */; };
 		4A881A98288CDDD500B76498 /* MainStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A881A97288CDDD500B76498 /* MainStorage.swift */; };
+		4A881A9A2F14C62000B76498 /* SettingsBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A881A992F14C62000B76498 /* SettingsBackup.swift */; };
 		4A8E47692F08814500424D11 /* SwiftUI+FlexibleButtonSizing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A8E47682F08814500424D11 /* SwiftUI+FlexibleButtonSizing.swift */; };
 		4A8E49912F0AF69300424D11 /* FKeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A8E49902F0AF69200424D11 /* FKeyManager.swift */; };
 		4A9B8A1D2881AE94007D23BB /* ButtonStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9B8A1C2881AE94007D23BB /* ButtonStyle.swift */; };
@@ -264,6 +265,7 @@
 		4A881A90288BC50B00B76498 /* KeyboardConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardConfig.swift; sourceTree = "<group>"; };
 		4A881A92288BC55E00B76498 /* PreferencesVM+KeyboardConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesVM+KeyboardConfig.swift"; sourceTree = "<group>"; };
 		4A881A97288CDDD500B76498 /* MainStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainStorage.swift; sourceTree = "<group>"; };
+		4A881A992F14C62000B76498 /* SettingsBackup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsBackup.swift; sourceTree = "<group>"; };
 		4A8E47682F08814500424D11 /* SwiftUI+FlexibleButtonSizing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwiftUI+FlexibleButtonSizing.swift"; sourceTree = "<group>"; };
 		4A8E49902F0AF69200424D11 /* FKeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FKeyManager.swift; sourceTree = "<group>"; };
 		4A9B8A1C2881AE94007D23BB /* ButtonStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ButtonStyle.swift; sourceTree = "<group>"; };
@@ -422,6 +424,7 @@
 				4A2A174D280BA7FA00E13249 /* Main.xcdatamodeld */,
 				4ACC9B822D2641C30002B8CE /* HotKeyGroup.swift */,
 				4A881A97288CDDD500B76498 /* MainStorage.swift */,
+				4A881A992F14C62000B76498 /* SettingsBackup.swift */,
 			);
 			path = Persistence;
 			sourceTree = "<group>";
@@ -839,6 +842,7 @@
 				25C5A6B52E678D86005AB80E /* PunctuationService.swift in Sources */,
 				4ACC9B812D2640F70002B8CE /* AddSwitchingGroupButton.swift in Sources */,
 				4A2A178C280BA7FA00E13249 /* CancelBag.swift in Sources */,
+				4A881A9A2F14C62000B76498 /* SettingsBackup.swift in Sources */,
 				4A4167302813CAE600CCC28C /* PreferencesVM+BrowserRule.swift in Sources */,
 				4A09308B28680A3200232089 /* NSViewHoverable.swift in Sources */,
 				D5115A1C2A33D0F700D94E51 /* IndicatorInfo.swift in Sources */,

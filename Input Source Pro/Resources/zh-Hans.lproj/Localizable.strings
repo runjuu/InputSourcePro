@@ -222,3 +222,17 @@
 "Open Input Monitoring Settings" = "打开「输入监控」设置";
 "Open Input Monitoring Settings, click the \"+\" button and add \"Input Source Pro\" to the list." = "打开「输入监控」设置，点击“+”按钮并将“Input Source Pro”添加到列表中。";
 "Disabled until permissions are granted" = "权限授予前将被禁用";
+
+"Settings Backup" = "设置备份";
+"Export Settings" = "导出设置";
+"Import Settings" = "导入设置";
+"Settings Exported" = "设置已导出";
+"Settings Exported Message" = "设置备份已成功导出。";
+"Settings Imported" = "设置已导入";
+"Settings Imported Message" = "设置已成功导入。";
+"Export Settings Failed" = "导出设置失败";
+"Import Settings Failed" = "导入设置失败";
+"Replace Current Settings?" = "替换当前设置？";
+"Import Settings Confirmation Message" = "导入此文件将替换当前支持的设置、规则、颜色配置、热键组和已记录的快捷键。";
+"Unsupported settings backup version %@" = "不支持的设置备份版本 %@。";
+"Unable to save imported settings." = "无法保存导入的设置。";

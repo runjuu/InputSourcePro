@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum KeyboardRestoreStrategy: String, CaseIterable, Identifiable {
+enum KeyboardRestoreStrategy: String, CaseIterable, Codable, Identifiable {
     case UseDefaultKeyboardInstead
     case RestorePreviouslyUsedOne
 

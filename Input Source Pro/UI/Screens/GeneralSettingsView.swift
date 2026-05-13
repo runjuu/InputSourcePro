@@ -1,8 +1,10 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct GeneralSettingsView: View {
     @EnvironmentObject var preferencesVM: PreferencesVM
     @EnvironmentObject var permissionsVM: PermissionsVM
+    @EnvironmentObject var indicatorVM: IndicatorVM
 
     @State var isDetectSpotlightLikeApp = false
 
@@ -184,6 +186,27 @@ struct GeneralSettingsView: View {
                     }
                 }
 
+                SettingsSection(title: "Settings Backup") {
+                    Button(action: exportSettings) {
+                        HStack {
+                            Text("Export Settings".i18n() + "...")
+
+                            Spacer()
+                        }
+                    }
+                    .buttonStyle(SectionButtonStyle())
+                    .border(width: 1, edges: [.bottom], color: NSColor.border2.color)
+
+                    Button(action: importSettings) {
+                        HStack {
+                            Text("Import Settings".i18n() + "...")
+
+                            Spacer()
+                        }
+                    }
+                    .buttonStyle(SectionButtonStyle())
+                }
+
                 Group {
                     SettingsSection(title: "Find Us", tips: Text("Right click each section to copy link").font(.subheadline).opacity(0.5)) {
                         Button(action: { URL.website.open() }, label: {
@@ -293,6 +316,90 @@ struct GeneralSettingsView: View {
         preferencesVM.update {
             $0.systemWideDefaultKeyboardId = defaultKeyboard.id
         }
+    }
+
+    func exportSettings() {
+        let panel = NSSavePanel()
+        panel.title = "Export Settings".i18n()
+        panel.canCreateDirectories = true
+        panel.isExtensionHidden = false
+        panel.nameFieldStringValue = "Input Source Pro Settings"
+        panel.allowedContentTypes = [.json]
+
+        guard panel.runModal() == .OK,
+              var url = panel.url
+        else { return }
+
+        if url.pathExtension.isEmpty {
+            url.appendPathExtension("json")
+        }
+
+        do {
+            let data = try preferencesVM.exportSettingsBackupData()
+            try data.write(to: url, options: .atomic)
+            showSettingsBackupAlert(
+                title: "Settings Exported".i18n(),
+                message: "Settings Exported Message".i18n(),
+                style: .informational
+            )
+        } catch {
+            showSettingsBackupAlert(
+                title: "Export Settings Failed".i18n(),
+                message: error.localizedDescription,
+                style: .critical
+            )
+        }
+    }
+
+    func importSettings() {
+        let panel = NSOpenPanel()
+        panel.title = "Import Settings".i18n()
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.json]
+
+        guard panel.runModal() == .OK,
+              let url = panel.url
+        else { return }
+
+        do {
+            let backup = try preferencesVM.readSettingsBackup(from: url)
+
+            guard confirmSettingsImport() else { return }
+
+            try preferencesVM.importSettingsBackup(backup)
+            indicatorVM.refreshShortcut()
+            showSettingsBackupAlert(
+                title: "Settings Imported".i18n(),
+                message: "Settings Imported Message".i18n(),
+                style: .informational
+            )
+        } catch {
+            showSettingsBackupAlert(
+                title: "Import Settings Failed".i18n(),
+                message: error.localizedDescription,
+                style: .critical
+            )
+        }
+    }
+
+    func confirmSettingsImport() -> Bool {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Replace Current Settings?".i18n()
+        alert.informativeText = "Import Settings Confirmation Message".i18n()
+        alert.addButton(withTitle: "Import Settings".i18n())
+        alert.addButton(withTitle: "Cancel".i18n())
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    func showSettingsBackupAlert(title: String, message: String, style: NSAlert.Style) {
+        let alert = NSAlert()
+        alert.alertStyle = style
+        alert.messageText = title
+        alert.informativeText = message
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 }
 
