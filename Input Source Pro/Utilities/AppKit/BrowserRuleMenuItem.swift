@@ -55,7 +55,10 @@ class BrowserRuleMenuItem: NSMenuItem {
             )
         }
 
-        inputSource?.select(useCJKVFix: preferencesVM.isUseCJKVFix())
+        inputSource?.select(
+            useCJKVFix: preferencesVM.isUseCJKVFix(),
+            allowShortcutFallback: false
+        )
 
         watchChanges()
     }
