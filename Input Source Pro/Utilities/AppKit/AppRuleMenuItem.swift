@@ -42,7 +42,10 @@ class AppRuleMenuItem: NSMenuItem {
             )
         }
 
-        inputSource?.select(useCJKVFix: preferencesVM.isUseCJKVFix())
+        inputSource?.select(
+            useCJKVFix: preferencesVM.isUseCJKVFix(),
+            allowShortcutFallback: false
+        )
 
         watchChanges()
     }

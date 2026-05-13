@@ -7,11 +7,16 @@ import CombineExt
 
 @MainActor
 class InputSourceVM: ObservableObject {
+    private struct SelectionRequest {
+        let inputSource: InputSource
+        let allowShortcutFallback: Bool
+    }
+
     let preferencesVM: PreferencesVM
 
     private var cancelBag = CancelBag()
 
-    private let selectInputSourceSubject = PassthroughSubject<InputSource, Never>()
+    private let selectInputSourceSubject = PassthroughSubject<SelectionRequest, Never>()
 
     private let inputSourceChangesSubject = PassthroughSubject<Void, Never>()
 
@@ -19,7 +24,7 @@ class InputSourceVM: ObservableObject {
 
     init(preferencesVM: PreferencesVM) {
         self.preferencesVM = preferencesVM
-        
+
         inputSourceChangesPublisher = inputSourceChangesSubject
             .map { _ in InputSource.getCurrentInputSource() }
             .removeDuplicates()
@@ -30,13 +35,30 @@ class InputSourceVM: ObservableObject {
         selectInputSourceSubject
             .tap { [weak self] in
                 if let self {
-                    $0.select(useCJKVFix: self.preferencesVM.isUseCJKVFix())
+                    $0.inputSource.select(
+                        useCJKVFix: self.preferencesVM.isUseCJKVFix(),
+                        allowShortcutFallback: $0.allowShortcutFallback
+                    )
                 }
             }
             .flatMapLatest({ _ in
-                Timer
-                    .interval(seconds: 1)
-                    .eraseToAnyPublisher()
+                Publishers.MergeMany([
+                    Just(())
+                        .eraseToAnyPublisher(),
+                    Timer
+                        .delay(seconds: 0.05)
+                        .mapToVoid()
+                        .eraseToAnyPublisher(),
+                    Timer
+                        .delay(seconds: 0.15)
+                        .mapToVoid()
+                        .eraseToAnyPublisher(),
+                    Timer
+                        .delay(seconds: 0.3)
+                        .mapToVoid()
+                        .eraseToAnyPublisher()
+                ])
+                .eraseToAnyPublisher()
             })
             .sink { [weak self] _ in
                 self?.inputSourceChangesSubject.send(())
@@ -44,8 +66,13 @@ class InputSourceVM: ObservableObject {
             .store(in: cancelBag)
     }
 
-    func select(inputSource: InputSource) {
-        selectInputSourceSubject.send(inputSource)
+    func select(inputSource: InputSource, allowShortcutFallback: Bool = true) {
+        selectInputSourceSubject.send(
+            SelectionRequest(
+                inputSource: inputSource,
+                allowShortcutFallback: allowShortcutFallback
+            )
+        )
     }
 
     private func watchSystemNotification() {

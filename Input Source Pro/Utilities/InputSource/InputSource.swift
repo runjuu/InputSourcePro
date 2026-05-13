@@ -70,8 +70,12 @@ class InputSource {
         }()
     }
 
-    func select(useCJKVFix: Bool) {
-        InputSourceSwitcher.switchToInputSource(self, useCJKVFix: useCJKVFix)
+    func select(useCJKVFix: Bool, allowShortcutFallback: Bool = true) {
+        InputSourceSwitcher.switchToInputSource(
+            self,
+            useCJKVFix: useCJKVFix,
+            allowShortcutFallback: allowShortcutFallback
+        )
     }
 
     private var normalizedInputModeID: String? {

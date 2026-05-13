@@ -103,7 +103,7 @@ final class IndicatorVM: ObservableObject {
             .compactMap { $0 }
             .sink { [weak self] appKind in
                 guard let self = self else { return }
-                
+
                 let app = appKind.getApp()
                 if self.punctuationService.shouldEnableForApp(app) {
                     self.logger.debug { "Enabling English punctuation for app: \(app.localizedName ?? app.bundleIdentifier ?? "Unknown")" }
@@ -253,7 +253,7 @@ extension IndicatorVM {
 
                     return updateState(appKind: state.appKind, inputSource: inputSource, inputSourceChangeReason: .system)
                 case let .switchInputSourceByShortcut(inputSource):
-                    inputSourceVM.select(inputSource: inputSource)
+                    inputSourceVM.select(inputSource: inputSource, allowShortcutFallback: false)
 
                     return updateState(appKind: state.appKind, inputSource: inputSource, inputSourceChangeReason: .shortcut)
                 }

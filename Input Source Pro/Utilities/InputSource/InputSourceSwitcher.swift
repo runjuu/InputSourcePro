@@ -22,6 +22,19 @@ enum InputSourceSwitcher {
         let sourceID: String
         let inputModeID: String?
         let isCJKV: Bool
+
+        var persistentIdentifier: String {
+            if let inputModeID, !inputModeID.isEmpty {
+                return "\(sourceID)::\(inputModeID)"
+            }
+
+            return sourceID
+        }
+    }
+
+    private struct ShortcutFallback {
+        let previousShortcut: HotKeyInfo
+        let nonCJKVSource: TISInputSource
     }
 
     private static let logger = ISPLogger(category: String(describing: InputSourceSwitcher.self))
@@ -91,7 +104,11 @@ enum InputSourceSwitcher {
         )
     }
 
-    static func switchToInputSource(_ inputSource: InputSource, useCJKVFix: Bool) {
+    static func switchToInputSource(
+        _ inputSource: InputSource,
+        useCJKVFix: Bool,
+        allowShortcutFallback: Bool = true
+    ) {
         cancelPendingWorkItems()
         let target = SwitchTarget(
             localizedName: inputSource.name,
@@ -101,13 +118,16 @@ enum InputSourceSwitcher {
         )
 
         if inputSource.isCJKVR, let modeID = inputSource.inputModeID {
-            return switchToInputMode(modeID: modeID, useCJKVFix: useCJKVFix)
+            return switchToInputMode(
+                modeID: modeID,
+                useCJKVFix: useCJKVFix && allowShortcutFallback
+            )
         }
 
         switchToTarget(
             target,
             tisTarget: inputSource.tisInputSource,
-            allowShortcutFallback: useCJKVFix
+            allowShortcutFallback: useCJKVFix && allowShortcutFallback
         )
     }
 
@@ -116,6 +136,7 @@ enum InputSourceSwitcher {
         tisTarget: TISInputSource,
         allowShortcutFallback: Bool
     ) {
+        let shortcutFallback: ShortcutFallback?
         if target.isCJKV,
            allowShortcutFallback,
            let previousShortcut = getPreviousInputSourceShortcut(),
@@ -126,20 +147,20 @@ enum InputSourceSwitcher {
             // of the CJKV fix sequence (~300ms) to prevent synthetic keyboard events from
             // corrupting modifier tracking state and blocking subsequent shortcut triggers.
             syntheticEventEndTime = ProcessInfo.processInfo.systemUptime + 0.35
-            logger.debug { "Applying CJKV fix using previous input source shortcut" }
-            selectInputSource(tisTarget, reason: "CJKV target")
-            selectInputSource(nonCJKVSource, reason: "CJKV bounce")
-            
-            scheduleWorkItem(after: 0.1, execute: {
-                triggerShortcut(previousShortcut, onFinish: { currentInputSouce in
-                    if currentInputSouce.tisInputSource.id != tisTarget.id {
-                        selectInputSource(tisTarget, reason: "CJKV target mismatch fallback")
-                    }
-                })
-            })
+            shortcutFallback = ShortcutFallback(
+                previousShortcut: previousShortcut,
+                nonCJKVSource: nonCJKVSource
+            )
         } else {
-            selectInputSource(tisTarget, reason: "target")
+            shortcutFallback = nil
         }
+
+        selectInputSource(tisTarget, reason: "target")
+        scheduleSelectionVerification(
+            for: target,
+            tisTarget: tisTarget,
+            shortcutFallback: shortcutFallback
+        )
     }
 
     @discardableResult
@@ -221,6 +242,84 @@ enum InputSourceSwitcher {
             pendingWorkItems.remove(at: index)
         }
     }
+
+    private static func scheduleSelectionVerification(
+        for target: SwitchTarget,
+        tisTarget: TISInputSource,
+        shortcutFallback: ShortcutFallback? = nil,
+        didApplyShortcutFallback: Bool = false,
+        remainingAttempts: Int = 3
+    ) {
+        guard remainingAttempts > 0 else { return }
+
+        scheduleWorkItem(after: 0.05, execute: {
+            let currentInputSource = InputSource.getCurrentInputSource()
+
+            guard !isCurrentInputSourceMatched(currentInputSource, with: target) else { return }
+
+            if let shortcutFallback, !didApplyShortcutFallback {
+                logger.debug {
+                    "Direct input source selection did not stick for \(target.localizedName) (\(target.persistentIdentifier)); applying CJKV shortcut fallback."
+                }
+
+                applyShortcutFallback(
+                    shortcutFallback,
+                    for: target,
+                    tisTarget: tisTarget,
+                    remainingAttempts: remainingAttempts - 1
+                )
+                return
+            }
+
+            logger.debug {
+                "Retrying input source selection for \(target.localizedName) (\(target.persistentIdentifier)); current=\(currentInputSource.persistentIdentifier)"
+            }
+
+            selectInputSource(tisTarget, reason: "verification retry")
+            scheduleSelectionVerification(
+                for: target,
+                tisTarget: tisTarget,
+                shortcutFallback: nil,
+                didApplyShortcutFallback: didApplyShortcutFallback,
+                remainingAttempts: remainingAttempts - 1
+            )
+        })
+    }
+
+    private static func applyShortcutFallback(
+        _ shortcutFallback: ShortcutFallback,
+        for target: SwitchTarget,
+        tisTarget: TISInputSource,
+        remainingAttempts: Int
+    ) {
+        logger.debug { "Applying CJKV shortcut fallback for \(target.localizedName)" }
+        selectInputSource(shortcutFallback.nonCJKVSource, reason: "CJKV bounce")
+
+        scheduleWorkItem(after: 0.1, execute: {
+            triggerShortcut(shortcutFallback.previousShortcut, onFinish: { currentInputSource in
+                if !isCurrentInputSourceMatched(currentInputSource, with: target) {
+                    selectInputSource(tisTarget, reason: "CJKV fallback target retry")
+                }
+
+                scheduleSelectionVerification(
+                    for: target,
+                    tisTarget: tisTarget,
+                    shortcutFallback: nil,
+                    didApplyShortcutFallback: true,
+                    remainingAttempts: remainingAttempts
+                )
+            })
+        })
+    }
+
+    private static func isCurrentInputSourceMatched(_ currentInputSource: InputSource, with target: SwitchTarget) -> Bool {
+        if let inputModeID = target.inputModeID, !inputModeID.isEmpty {
+            return currentInputSource.inputModeID == inputModeID ||
+                currentInputSource.persistentIdentifier == target.persistentIdentifier
+        }
+
+        return currentInputSource.id == target.sourceID
+    }
 }
 
 extension InputSourceSwitcher {
@@ -235,59 +334,59 @@ extension InputSourceSwitcher {
         guard let dict = UserDefaults.standard.persistentDomain(forName: "com.apple.symbolichotkeys"),
               let hotKeys = dict["AppleSymbolicHotKeys"] as? [String: Any],
               let inputSourceDict = hotKeys["60"] as? [String: Any] else {
-            
+
             logger.debug { "Could not find Input Source shortcut in global preferences." }
             return nil
         }
-        
+
         if let enabled = inputSourceDict["enabled"] as? Bool, !enabled {
             logger.debug { "The 'Select Previous Input Source' shortcut is currently disabled in System Settings." }
             return nil
         }
-        
+
         guard let value = inputSourceDict["value"] as? [String: Any],
               let parameters = value["parameters"] as? [Int],
               parameters.count >= 3 else {
             logger.debug { "Invalid parameter format found in plist." }
             return nil
         }
-        
+
         let rawKeyCode = parameters[1]
         let rawModifiers = parameters[2]
         let cgModifiers = convertCarbonModifiersToCGFlags(carbonFlags: rawModifiers)
-        
+
         return HotKeyInfo(keyCode: CGKeyCode(rawKeyCode), modifiers: cgModifiers)
     }
 
     /// Helper to convert legacy Carbon modifier integers to modern CGEventFlags
     static func convertCarbonModifiersToCGFlags(carbonFlags: Int) -> CGEventFlags {
         var flags = CGEventFlags()
-        
+
         // Carbon modifier bitmasks
         if (carbonFlags & 131072) != 0 { flags.insert(.maskShift) }
         if (carbonFlags & 262144) != 0 { flags.insert(.maskControl) }
         if (carbonFlags & 524288) != 0 { flags.insert(.maskAlternate) } // Option key
         if (carbonFlags & 1048576) != 0 { flags.insert(.maskCommand) }
-        
+
         return flags
     }
 
     /// Triggers the specified keyboard shortcut programmatically.
     static func triggerShortcut(_ hotKey: HotKeyInfo, onFinish: @escaping ((InputSource) -> Void)) {
         let source = CGEventSource(stateID: .hidSystemState)
-        
+
         guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: hotKey.keyCode, keyDown: true),
               let keyUp = CGEvent(keyboardEventSource: source, virtualKey: hotKey.keyCode, keyDown: false)
         else {
             logger.debug { "Failed to create key press event." }
             return
         }
-        
+
         keyDown.flags = hotKey.modifiers
         keyUp.flags = hotKey.modifiers
         keyDown.post(tap: .cghidEventTap)
         keyUp.post(tap: .cghidEventTap)
-        
+
         scheduleWorkItem(after: 0.1, execute: {
             let kVK_Command: CGKeyCode = 55
             if let cmdDown = CGEvent(keyboardEventSource: source, virtualKey: kVK_Command, keyDown: true),
@@ -301,7 +400,7 @@ extension InputSourceSwitcher {
                     "Failed to create Command event."
                 }
             }
-            
+
             scheduleWorkItem(after: 0.1, execute: {
                 onFinish(InputSource.getCurrentInputSource())
             })
