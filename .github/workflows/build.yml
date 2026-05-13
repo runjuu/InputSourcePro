@@ -10,7 +10,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Restore ExportOptions.plist
         run: |
           echo "$EXPORT_OPTIONS_PLIST_B64" | base64 --decode > ExportOptions.plist
@@ -70,7 +70,7 @@ jobs:
         run: |
           mv dist/Input\ Source\ Pro.dmg dist/Input\ Source\ Pro\ ${{ github.ref_name }}.dmg
       - name: Upload DMG
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Input Source Pro ${{ github.ref_name }}.dmg
           path: dist/Input Source Pro ${{ github.ref_name }}.dmg
