@@ -17,10 +17,10 @@ class PunctuationService: ObservableObject {
     private var inputSourceCacheTime: TimeInterval = 0
     private let inputSourceCacheTimeout: TimeInterval = 0.5 // Cache for 500ms
     
-    private let cjkvToEnglishPunctuationMap: [UInt16: (normal: String, shifted: String)] = [
+    private let cjkvToEnglishPunctuationMap: [UInt16: (normal: String?, shifted: String?)] = [
         UInt16(kVK_ANSI_Grave): ("`", "~"),
-        UInt16(kVK_ANSI_4): ("4", "$"),
-        UInt16(kVK_ANSI_6): ("6", "^"),
+        UInt16(kVK_ANSI_4): (nil, "$"),
+        UInt16(kVK_ANSI_6): (nil, "^"),
         UInt16(kVK_ANSI_Minus): ("-", "_"),
         UInt16(kVK_ANSI_Comma): (",", "<"),
         UInt16(kVK_ANSI_Period): (".", ">"),
@@ -174,7 +174,9 @@ class PunctuationService: ObservableObject {
             return Unmanaged.passUnretained(event)
         }
 
-        let englishReplacement = event.flags.contains(.maskShift) ? mapping.shifted : mapping.normal
+        guard let englishReplacement = event.flags.contains(.maskShift) ? mapping.shifted : mapping.normal else {
+            return Unmanaged.passUnretained(event)
+        }
         
         // Check if we're in a Chinese/CJKV input method (with caching for performance)
         let currentInputSource = getCachedCurrentInputSource()
@@ -267,7 +269,7 @@ class PunctuationService: ObservableObject {
             - CGEvent Permission Check: \(permissionViaCGEvent ? "✅ Passed" : "❌ Failed")  
             - Accessibility Permission: \(accessibilityEnabled ? "✅ Granted" : "❌ Denied")
             - Current Input Source: \(currentInputSource.name) (CJKV: \(currentInputSource.isCJKVR))
-            - Monitored Keys: \(cjkvToEnglishPunctuationMap.map { "\($0.key)→'\($0.value.normal)'/'\($0.value.shifted)'" }.joined(separator: ", "))
+            - Monitored Keys: \(cjkvToEnglishPunctuationMap.map { "\($0.key)→'\($0.value.normal ?? "pass")'/'\($0.value.shifted ?? "pass")'" }.joined(separator: ", "))
             """ }
     }
 }

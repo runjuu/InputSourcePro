@@ -1,16 +1,16 @@
 import Cocoa
 
 extension HotKeyGroup {
-    private static let separator = "∆"
+    static let persistedIdentifierSeparator = "∆"
 
     var persistedInputSourceIdentifiers: [String] {
         return inputSourceIds?
-            .components(separatedBy: Self.separator)
+            .components(separatedBy: Self.persistedIdentifierSeparator)
             .filter { !$0.isEmpty } ?? []
     }
 
     func updatePersistedInputSourceIdentifiers(_ identifiers: [String]) {
-        inputSourceIds = identifiers.joined(separator: Self.separator)
+        inputSourceIds = identifiers.joined(separator: Self.persistedIdentifierSeparator)
     }
 
     @MainActor

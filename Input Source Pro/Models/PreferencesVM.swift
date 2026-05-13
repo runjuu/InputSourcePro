@@ -627,7 +627,6 @@ extension PreferencesVM {
 extension PreferencesVM {
     func activeCJKVFixStrategy(for app: NSRunningApplication? = nil) -> CJKVFixStrategy? {
         guard preferences.isEnhancedModeEnabled,
-              permissionsVM.isInputMonitoringEnabled,
               preferences.isCJKVFixEnabled
         else { return nil }
 

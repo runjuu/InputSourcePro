@@ -55,15 +55,15 @@ struct SettingsBackup: Codable {
         schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
         app = try container.decodeIfPresent(SettingsBackupApp.self, forKey: .app) ?? .unknown
         exportedAt = try container.decodeIfPresent(Date.self, forKey: .exportedAt) ?? Date(timeIntervalSince1970: 0)
-        preferences = try container.decodeIfPresent(SettingsBackupPreferences.self, forKey: .preferences) ?? SettingsBackupPreferences()
-        appRules = try container.decodeIfPresent([SettingsBackupAppRule].self, forKey: .appRules) ?? []
-        browserRules = try container.decodeIfPresent([SettingsBackupBrowserRule].self, forKey: .browserRules) ?? []
-        keyboardConfigs = try container.decodeIfPresent([SettingsBackupKeyboardConfig].self, forKey: .keyboardConfigs) ?? []
-        hotKeyGroups = try container.decodeIfPresent([SettingsBackupHotKeyGroup].self, forKey: .hotKeyGroups) ?? []
-        keyboardShortcuts = try container.decodeIfPresent(
+        preferences = try container.decode(SettingsBackupPreferences.self, forKey: .preferences)
+        appRules = try container.decode([SettingsBackupAppRule].self, forKey: .appRules)
+        browserRules = try container.decode([SettingsBackupBrowserRule].self, forKey: .browserRules)
+        keyboardConfigs = try container.decode([SettingsBackupKeyboardConfig].self, forKey: .keyboardConfigs)
+        hotKeyGroups = try container.decode([SettingsBackupHotKeyGroup].self, forKey: .hotKeyGroups)
+        keyboardShortcuts = try container.decode(
             [String: KeyboardShortcuts.Shortcut].self,
             forKey: .keyboardShortcuts
-        ) ?? [:]
+        )
     }
 
     func validate() throws {
@@ -284,25 +284,71 @@ struct SettingsBackupAppRule: Codable {
     let bundleId: String?
     let bundleName: String?
     let createdAt: Date?
+    let doNotRestoreKeyboard: Bool?
+    let doRestoreKeyboard: Bool?
     let forceEnglishPunctuation: Bool?
     let functionKeyModeRaw: String?
     let hideIndicator: Bool?
     let inputSourceId: String?
-    let keyboardRestoreStrategy: KeyboardRestoreStrategy?
     let removed: Bool?
     let url: URL?
 
-    init(_ rule: AppRule, preferences: Preferences) {
+    init(_ rule: AppRule) {
         bundleId = rule.bundleId
         bundleName = rule.bundleName
         createdAt = rule.createdAt
+        doNotRestoreKeyboard = rule.doNotRestoreKeyboard
+        doRestoreKeyboard = rule.doRestoreKeyboard
         forceEnglishPunctuation = rule.forceEnglishPunctuation
         functionKeyModeRaw = rule.functionKeyModeRaw
         hideIndicator = rule.hideIndicator
         inputSourceId = rule.inputSourceId
-        keyboardRestoreStrategy = Self.keyboardRestoreStrategy(for: rule, preferences: preferences)
         removed = rule.removed
         url = rule.url
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        bundleId = try container.decodeIfPresent(String.self, forKey: .bundleId)
+        bundleName = try container.decodeIfPresent(String.self, forKey: .bundleName)
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt)
+        forceEnglishPunctuation = try container.decodeIfPresent(Bool.self, forKey: .forceEnglishPunctuation)
+        functionKeyModeRaw = try container.decodeIfPresent(String.self, forKey: .functionKeyModeRaw)
+        hideIndicator = try container.decodeIfPresent(Bool.self, forKey: .hideIndicator)
+        inputSourceId = try container.decodeIfPresent(String.self, forKey: .inputSourceId)
+        removed = try container.decodeIfPresent(Bool.self, forKey: .removed)
+        url = try container.decodeIfPresent(URL.self, forKey: .url)
+
+        let decodedDoNotRestoreKeyboard = try container.decodeIfPresent(Bool.self, forKey: .doNotRestoreKeyboard)
+        let decodedDoRestoreKeyboard = try container.decodeIfPresent(Bool.self, forKey: .doRestoreKeyboard)
+
+        if decodedDoNotRestoreKeyboard == nil,
+           decodedDoRestoreKeyboard == nil,
+           let strategy = try container.decodeIfPresent(KeyboardRestoreStrategy.self, forKey: .keyboardRestoreStrategy)
+        {
+            doNotRestoreKeyboard = strategy == .UseDefaultKeyboardInstead
+            doRestoreKeyboard = strategy == .RestorePreviouslyUsedOne
+        } else {
+            doNotRestoreKeyboard = decodedDoNotRestoreKeyboard
+            doRestoreKeyboard = decodedDoRestoreKeyboard
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        try container.encodeIfPresent(bundleId, forKey: .bundleId)
+        try container.encodeIfPresent(bundleName, forKey: .bundleName)
+        try container.encodeIfPresent(createdAt, forKey: .createdAt)
+        try container.encodeIfPresent(doNotRestoreKeyboard, forKey: .doNotRestoreKeyboard)
+        try container.encodeIfPresent(doRestoreKeyboard, forKey: .doRestoreKeyboard)
+        try container.encodeIfPresent(forceEnglishPunctuation, forKey: .forceEnglishPunctuation)
+        try container.encodeIfPresent(functionKeyModeRaw, forKey: .functionKeyModeRaw)
+        try container.encodeIfPresent(hideIndicator, forKey: .hideIndicator)
+        try container.encodeIfPresent(inputSourceId, forKey: .inputSourceId)
+        try container.encodeIfPresent(removed, forKey: .removed)
+        try container.encodeIfPresent(url, forKey: .url)
     }
 
     func insert(in context: NSManagedObjectContext) {
@@ -314,28 +360,25 @@ struct SettingsBackupAppRule: Codable {
         rule.functionKeyModeRaw = functionKeyModeRaw
         rule.hideIndicator = hideIndicator ?? false
         rule.inputSourceId = inputSourceId
-        rule.doNotRestoreKeyboard = keyboardRestoreStrategy == .UseDefaultKeyboardInstead
-        rule.doRestoreKeyboard = keyboardRestoreStrategy == .RestorePreviouslyUsedOne
+        rule.doNotRestoreKeyboard = doNotRestoreKeyboard ?? false
+        rule.doRestoreKeyboard = doRestoreKeyboard ?? false
         rule.removed = removed ?? false
         rule.url = url
     }
 
-    private static func keyboardRestoreStrategy(for rule: AppRule, preferences: Preferences) -> KeyboardRestoreStrategy? {
-        if rule.doNotRestoreKeyboard, rule.doRestoreKeyboard {
-            return preferences.isRestorePreviouslyUsedInputSource
-                ? .UseDefaultKeyboardInstead
-                : .RestorePreviouslyUsedOne
-        }
-
-        if rule.doNotRestoreKeyboard {
-            return .UseDefaultKeyboardInstead
-        }
-
-        if rule.doRestoreKeyboard {
-            return .RestorePreviouslyUsedOne
-        }
-
-        return nil
+    private enum CodingKeys: String, CodingKey {
+        case bundleId
+        case bundleName
+        case createdAt
+        case doNotRestoreKeyboard
+        case doRestoreKeyboard
+        case forceEnglishPunctuation
+        case functionKeyModeRaw
+        case hideIndicator
+        case inputSourceId
+        case keyboardRestoreStrategy
+        case removed
+        case url
     }
 }
 
@@ -406,10 +449,26 @@ struct SettingsBackupHotKeyGroup: Codable {
     }
 
     func insert(in context: NSManagedObjectContext) {
+        guard let inputSourceIds = normalizedInputSourceIds else { return }
+
         let group = HotKeyGroup(context: context)
         group.createdAt = createdAt
-        group.id = id
+        group.id = normalizedID ?? UUID().uuidString
         group.inputSourceIds = inputSourceIds
+    }
+
+    private var normalizedID: String? {
+        guard let id, !id.isEmpty else { return nil }
+        return id
+    }
+
+    private var normalizedInputSourceIds: String? {
+        let identifiers = inputSourceIds?
+            .components(separatedBy: HotKeyGroup.persistedIdentifierSeparator)
+            .filter { !$0.isEmpty } ?? []
+
+        guard !identifiers.isEmpty else { return nil }
+        return identifiers.joined(separator: HotKeyGroup.persistedIdentifierSeparator)
     }
 }
 
@@ -467,7 +526,7 @@ private extension PreferencesVM {
         return SettingsBackup(
             app: .current,
             preferences: SettingsBackupPreferences(preferences),
-            appRules: appRules.map { SettingsBackupAppRule($0, preferences: preferences) },
+            appRules: appRules.map(SettingsBackupAppRule.init),
             browserRules: browserRules.map(SettingsBackupBrowserRule.init),
             keyboardConfigs: keyboardConfigs.map(SettingsBackupKeyboardConfig.init),
             hotKeyGroups: hotKeyGroups.map(SettingsBackupHotKeyGroup.init),

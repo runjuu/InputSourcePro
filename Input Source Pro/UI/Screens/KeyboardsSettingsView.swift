@@ -309,7 +309,9 @@ struct KeyboardsSettingsView: View {
     }
 
     func deleteGroup(group: HotKeyGroup) {
-        KeyboardShortcuts.reset([.init(group.id!)])
+        if let id = group.id, !id.isEmpty {
+            KeyboardShortcuts.reset([.init(id)])
+        }
         preferencesVM.deleteHotKeyGroup(group)
         indicatorVM.refreshShortcut()
     }
