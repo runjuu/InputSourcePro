@@ -54,21 +54,33 @@ extension BrowserRule {
     static func validate(type: BrowserRuleType, url: URL, value: String?) -> Bool {
         switch type {
         case .domainSuffix:
-            if let suffix = value,
-               let host = url.host,
-               let regex = try? NSRegularExpression(pattern: "\(suffix)$", options: .caseInsensitive)
-            {
-                return regex.matches(host)
-            }
-            return false
+            guard let suffix = normalizedDomain(value),
+                  let host = normalizedDomain(url.host)
+            else { return false }
+
+            return host == suffix || host.hasSuffix(".\(suffix)")
         case .domain:
-            return url.host == value
+            guard let domain = normalizedDomain(value),
+                  let host = normalizedDomain(url.host)
+            else { return false }
+
+            return host == domain
         case .urlRegex:
             if let regex = try? NSRegularExpression(pattern: value ?? "", options: .caseInsensitive) {
                 return regex.matches(url.absoluteString)
             }
             return false
         }
+    }
+
+    private static func normalizedDomain(_ value: String?) -> String? {
+        let domain = value?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "."))
+            .lowercased()
+
+        guard let domain, !domain.isEmpty else { return nil }
+        return domain
     }
 }
 
