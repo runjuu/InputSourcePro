@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D60000032F20000000000003 /* TestHarnessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000022F20000000000002 /* TestHarnessTests.swift */; };
 		25C5A6B52E678D86005AB80E /* PunctuationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25C5A6B42E678D86005AB80E /* PunctuationService.swift */; };
 		3D25B151766744F888171177 /* ShortcutTrigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18B53A0848947E3A2D4EFA8 /* ShortcutTrigger.swift */; };
 		4A093071285DACAA00232089 /* NSToggleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A093070285DACAA00232089 /* NSToggleView.swift */; };
@@ -214,6 +215,8 @@
 		4A2A1732280BA6A800E13249 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		4A2A1735280BA6A800E13249 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		4A2A1737280BA6A800E13249 /* Signing.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Signing.entitlements; sourceTree = "<group>"; };
+		D60000012F20000000000001 /* Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D60000022F20000000000002 /* TestHarnessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHarnessTests.swift; sourceTree = "<group>"; };
 		4A2A174C280BA7FA00E13249 /* AppRule.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppRule.swift; sourceTree = "<group>"; };
 		4A2A174E280BA7FA00E13249 /* Main.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = Main.xcdatamodel; sourceTree = "<group>"; };
 		4A2A1750280BA7FA00E13249 /* PreferencesWindowController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PreferencesWindowController.swift; sourceTree = "<group>"; };
@@ -360,6 +363,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D60000062F20000000000006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -378,6 +388,7 @@
 			isa = PBXGroup;
 			children = (
 				4A2A172D280BA6A600E13249 /* Input Source Pro */,
+				D60000042F20000000000004 /* Tests */,
 				4A2A172C280BA6A600E13249 /* Products */,
 				D525609129B3D391009EB7BA /* Frameworks */,
 			);
@@ -387,8 +398,17 @@
 			isa = PBXGroup;
 			children = (
 				4A2A172B280BA6A600E13249 /* Input Source Pro.app */,
+				D60000012F20000000000001 /* Tests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		D60000042F20000000000004 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				D60000022F20000000000002 /* TestHarnessTests.swift */,
+			);
+			path = Tests;
 			sourceTree = "<group>";
 		};
 		4A2A172D280BA6A600E13249 /* Input Source Pro */ = {
@@ -732,7 +752,35 @@
 			productReference = 4A2A172B280BA6A600E13249 /* Input Source Pro.app */;
 			productType = "com.apple.product-type.application";
 		};
+		4A881A842888588E00B76498 /* Tests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D60000082F20000000000008 /* Build configuration list for PBXNativeTarget "Tests" */;
+			buildPhases = (
+				D60000052F20000000000005 /* Sources */,
+				D60000062F20000000000006 /* Frameworks */,
+				D60000072F20000000000007 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D600000B2F2000000000000B /* PBXTargetDependency */,
+			);
+			name = Tests;
+			productName = Tests;
+			productReference = D60000012F20000000000001 /* Tests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXContainerItemProxy section */
+		D600000C2F2000000000000C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4A2A1723280BA6A500E13249 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4A2A172A280BA6A600E13249;
+			remoteInfo = "Input Source Pro";
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXProject section */
 		4A2A1723280BA6A500E13249 /* Project object */ = {
@@ -744,6 +792,10 @@
 				TargetAttributes = {
 					4A2A172A280BA6A600E13249 = {
 						CreatedOnToolsVersion = 13.3.1;
+					};
+					4A881A842888588E00B76498 = {
+						CreatedOnToolsVersion = 16.3;
+						TestTargetID = 4A2A172A280BA6A600E13249;
 					};
 				};
 			};
@@ -777,6 +829,7 @@
 			projectRoot = "";
 			targets = (
 				4A2A172A280BA6A600E13249 /* Input Source Pro */,
+				4A881A842888588E00B76498 /* Tests */,
 			);
 		};
 /* End PBXProject section */
@@ -793,6 +846,13 @@
 				D58168CA28943A5400E84058 /* Indicator-Near-Cursor-Demo-Dark.mp4 in Resources */,
 				D58168CB28943A5400E84058 /* Indicator-Near-Cursor-Demo-Light.mp4 in Resources */,
 				4A2A1733280BA6A800E13249 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D60000072F20000000000007 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -969,7 +1029,23 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D60000052F20000000000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D60000032F20000000000003 /* TestHarnessTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D600000B2F2000000000000B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4A2A172A280BA6A600E13249 /* Input Source Pro */;
+			targetProxy = D600000C2F2000000000000C /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		4A5BABE92830A720009F42D7 /* Localizable.strings */ = {
@@ -1182,6 +1258,44 @@
 			};
 			name = Release;
 		};
+		D60000092F20000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.runjuu.Input-Source-Pro.Tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Input Source Pro.app/Contents/MacOS/Input Source Pro";
+			};
+			name = Debug;
+		};
+		D600000A2F2000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.runjuu.Input-Source-Pro.Tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Input Source Pro.app/Contents/MacOS/Input Source Pro";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1199,6 +1313,15 @@
 			buildConfigurations = (
 				4A2A173B280BA6A800E13249 /* Debug */,
 				4A2A173C280BA6A800E13249 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D60000082F20000000000008 /* Build configuration list for PBXNativeTarget "Tests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D60000092F20000000000009 /* Debug */,
+				D600000A2F2000000000000A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
