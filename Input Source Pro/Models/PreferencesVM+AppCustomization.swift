@@ -23,61 +23,77 @@ extension PreferencesVM {
         appCustomization.bundleId = url.bundleId()
         appCustomization.bundleName = FileManager.default.displayName(atPath: url.path)
 
-        saveContext()
+        if saveContext() {
+            notifyRuntimeRulesChanged()
+        }
 
         return appCustomization
     }
 
     func removeAppCustomization(_ appCustomization: AppRule) {
         container.viewContext.delete(appCustomization)
-        saveContext()
+        if saveContext() {
+            notifyRuntimeRulesChanged()
+        }
     }
 
     func setForceKeyboard(_ appCustomization: AppRule?, _ inputSourceId: String?) {
         guard let appCustomization = appCustomization else { return }
 
-        saveContext {
+        if saveContext({
             appCustomization.inputSourceId = inputSourceId
+        }) {
+            notifyRuntimeRulesChanged()
         }
     }
 
     func setDoRestoreKeyboard(_ appCustomization: AppRule?, _ doRestoreKeyboard: Bool) {
         guard let appCustomization = appCustomization else { return }
 
-        saveContext {
+        if saveContext({
             appCustomization.doRestoreKeyboard = doRestoreKeyboard
+        }) {
+            notifyRuntimeRulesChanged()
         }
     }
 
     func setDoNotRestoreKeyboard(_ appCustomization: AppRule?, _ doNotRestoreKeyboard: Bool) {
         guard let appCustomization = appCustomization else { return }
 
-        saveContext {
+        if saveContext({
             appCustomization.doNotRestoreKeyboard = doNotRestoreKeyboard
+        }) {
+            notifyRuntimeRulesChanged()
         }
     }
 
     func setHideIndicator(_ appCustomization: AppRule?, _ hideIndicator: Bool) {
         guard let appCustomization = appCustomization else { return }
 
-        saveContext {
+        if saveContext({
             appCustomization.hideIndicator = hideIndicator
+        }) {
+            notifyRuntimeRulesChanged()
         }
     }
 
     func setForceEnglishPunctuation(_ appCustomization: AppRule?, _ forceEnglishPunctuation: Bool) {
         guard let appCustomization = appCustomization else { return }
 
-        saveContext {
+        if saveContext({
             appCustomization.forceEnglishPunctuation = forceEnglishPunctuation
+        }) {
+            notifyRuntimeRulesChanged()
         }
     }
 
     func setFunctionKeyMode(_ appCustomization: AppRule?, _ mode: FKeyMode?) {
         guard let appCustomization = appCustomization else { return }
 
-        saveContext {
+        if saveContext({
             appCustomization.functionKeyMode = mode
+        }) {
+            notifyRuntimeRulesChanged()
         }
     }
 

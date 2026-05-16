@@ -7,6 +7,22 @@ import Sparkle
 import SwiftUI
 
 @MainActor
+final class RuntimeRuleChangeNotifier: ObservableObject {
+    @Published private(set) var version = 0
+
+    var changes: AnyPublisher<Void, Never> {
+        $version
+            .dropFirst()
+            .map { _ in () }
+            .eraseToAnyPublisher()
+    }
+
+    func notify() {
+        version += 1
+    }
+}
+
+@MainActor
 final class PreferencesVM: ObservableObject {
     @Published
     var preferences = Preferences()
@@ -21,6 +37,12 @@ final class PreferencesVM: ObservableObject {
     var cancelBag = CancelBag()
 
     var appKeyboardCache = AppKeyboardCache()
+
+    let runtimeRuleChangeNotifier = RuntimeRuleChangeNotifier()
+
+    var runtimeRuleChanges: AnyPublisher<Void, Never> {
+        runtimeRuleChangeNotifier.changes
+    }
 
     let container: NSPersistentContainer
     let mainStorage: MainStorage
@@ -80,20 +102,17 @@ final class PreferencesVM: ObservableObject {
         preferences = draft
     }
 
+    func notifyRuntimeRulesChanged() {
+        runtimeRuleChangeNotifier.notify()
+    }
+
     @discardableResult
     func saveContext(_ callback: (() -> Void)? = nil) -> Bool {
-        var didSave = false
-
         if let callback = callback {
-            container.viewContext.performAndWait {
-                callback()
-                didSave = save()
-            }
-        } else {
-            didSave = save()
+            callback()
         }
 
-        return didSave
+        return save()
 
         func save() -> Bool {
             do {

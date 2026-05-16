@@ -23,6 +23,7 @@ final class ApplicationVM: ObservableObject {
 
         activateAccessibilitiesForCurrentApp()
         watchApplicationChange()
+        watchRuntimeRuleChange()
         watchAppsDiffChange()
     }
 }
@@ -89,6 +90,20 @@ extension ApplicationVM {
 }
 
 extension ApplicationVM {
+    private func watchRuntimeRuleChange() {
+        preferencesVM.runtimeRuleChanges
+            .compactMap { [weak self] _ -> AppKind? in
+                guard let self = self else { return nil }
+                let app = self.appKind?.getApp() ?? NSWorkspace.shared.frontmostApplication
+                return AppKind.from(app, preferencesVM: self.preferencesVM)
+            }
+            .filter { appKind in
+                !InputSourceSwitcher.isTemporaryInputWindowApplicationActivation(appKind.getApp())
+            }
+            .sink { [weak self] in self?.appKind = $0 }
+            .store(in: cancelBag)
+    }
+
     private func watchAppsDiffChange() {
         AppsDiff
             .publisher(preferencesVM: preferencesVM)

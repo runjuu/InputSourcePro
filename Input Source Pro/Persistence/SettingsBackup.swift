@@ -513,6 +513,7 @@ extension PreferencesVM {
 
         mainStorage.refresh()
         clearKeyboardCache()
+        notifyRuntimeRulesChanged()
     }
 }
 
