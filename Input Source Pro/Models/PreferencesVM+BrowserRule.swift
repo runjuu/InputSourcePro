@@ -67,7 +67,7 @@ extension PreferencesVM {
     }
 
     func getBrowserRule(url: URL) -> BrowserRule? {
-        return getBrowserRules().first { $0.validate(url: url) }
+        return BrowserRule.firstEnabledRule(matching: url, in: getBrowserRules())
     }
 }
 

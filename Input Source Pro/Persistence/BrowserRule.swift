@@ -47,6 +47,10 @@ extension BrowserRule {
 }
 
 extension BrowserRule {
+    static func firstEnabledRule(matching url: URL, in rules: [BrowserRule]) -> BrowserRule? {
+        return rules.first { !$0.disabled && $0.validate(url: url) }
+    }
+
     static func validate(type: BrowserRuleType, url: URL, value: String?) -> Bool {
         switch type {
         case .domainSuffix:
