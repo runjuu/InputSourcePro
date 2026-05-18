@@ -17,7 +17,7 @@ enum AppKind {
     typealias NormalInfo = (
         focusedElement: UIElement?,
         isFocusOnInputContainer: Bool,
-        isCodexTerminal: Bool
+        isFocusedOnCodexTerminal: Bool
     )
 
     case normal(app: NSRunningApplication, info: NormalInfo)
@@ -27,7 +27,7 @@ enum AppKind {
         switch self {
         case let .normal(app, info):
             guard let bundleId = app.bundleId() else { return nil }
-            return info.isCodexTerminal ? "\(bundleId)_codex_terminal" : bundleId
+            return info.isFocusedOnCodexTerminal ? "\(bundleId)_codex_terminal" : bundleId
         case let .browser(app, info):
             if !info.isFocusedOnAddressBar,
                info.url != .newtab,
@@ -83,7 +83,7 @@ enum AppKind {
 
         let isSameAddress = getBrowserInfo()?.url == otherKind.getBrowserInfo()?.url
         let isSameAddressBar = getBrowserInfo()?.isFocusedOnAddressBar == otherKind.getBrowserInfo()?.isFocusedOnAddressBar
-        let isSameCodexTerminalState = isCodexTerminal == otherKind.isCodexTerminal
+        let isSameCodexTerminalState = isFocusedOnCodexTerminal == otherKind.isFocusedOnCodexTerminal
 
         return detectAddressBar
             ? (isSameAddressBar && isSameAddress && isSameCodexTerminalState)
@@ -92,10 +92,10 @@ enum AppKind {
 }
 
 extension AppKind {
-    var isCodexTerminal: Bool {
+    var isFocusedOnCodexTerminal: Bool {
         switch self {
         case let .normal(_, info):
-            return info.isCodexTerminal
+            return info.isFocusedOnCodexTerminal
         case .browser:
             return false
         }
@@ -117,7 +117,7 @@ extension AppKind {
         let application = app.getApplication(preferencesVM: preferencesVM)
         let focusedElement = app.focuedUIElement(application: application)
         let isFocusOnInputContainer = UIElement.isInputContainer(focusedElement)
-        let isCodexTerminal = app.bundleIdentifier == CodexTerminalDetector.bundleIdentifier
+        let isFocusedOnCodexTerminal = app.bundleIdentifier == CodexTerminalDetector.bundleIdentifier
             && preferencesVM.codexTerminalInputSource != nil
             && CodexTerminalDetector.isTerminalFocused(
                 app: app,
@@ -144,7 +144,7 @@ extension AppKind {
                 info: (
                     focusedElement,
                     isFocusOnInputContainer,
-                    isCodexTerminal
+                    isFocusedOnCodexTerminal
                 )
             )
         }

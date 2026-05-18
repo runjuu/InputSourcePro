@@ -12,7 +12,6 @@ struct ApplicationDetail: View {
     @State var hideIndicator = NSToggleViewState.off
     @State var forceEnglishPunctuation = NSToggleViewState.off
     @State var functionKeyModeItem: PickerItem?
-    @State var codexTerminalKeyboard: PickerItem?
 
     var mixed: Bool {
         Set(selectedApp.map { $0.forcedKeyboard?.persistentIdentifier }).count > 1
@@ -87,7 +86,7 @@ struct ApplicationDetail: View {
                     PopUpButtonPicker<PickerItem?>(
                         items: keyboardItems,
                         isItemEnabled: { $0?.id != "mixed" },
-                        isItemSelected: { $0 == codexTerminalKeyboard },
+                        isItemSelected: { $0 == selectedCodexTerminalKeyboard },
                         getTitle: { $0?.title ?? "" },
                         getToolTip: { $0?.toolTip },
                         onSelect: { handleCodexTerminalKeyboardSelect($0, items: keyboardItems) }
@@ -221,7 +220,6 @@ struct ApplicationDetail: View {
             updateHideIndicatorState()
             updateForceEnglishPunctuationState()
             updateFunctionKeyModeItem()
-            updateCodexTerminalKeyboard()
         }
     }
 
@@ -289,19 +287,6 @@ struct ApplicationDetail: View {
         }
 
         functionKeyModeItem = functionKeyItem(for: mode)
-    }
-
-    func updateCodexTerminalKeyboard() {
-        guard shouldShowCodexTerminalKeyboard else {
-            codexTerminalKeyboard = PickerItem.empty
-            return
-        }
-
-        if let inputSource = preferencesVM.codexTerminalInputSource {
-            codexTerminalKeyboard = pickerItem(for: inputSource)
-        } else {
-            codexTerminalKeyboard = PickerItem.empty
-        }
     }
 
     func handleSelect(_ index: Int, items: [PickerItem]) {
@@ -389,10 +374,10 @@ struct ApplicationDetail: View {
     }
 
     func handleCodexTerminalKeyboardSelect(_ index: Int, items: [PickerItem]) {
-        codexTerminalKeyboard = items[index]
+        let selection = items[index]
 
         preferencesVM.update {
-            $0.codexTerminalInputSourceId = codexTerminalKeyboard?.id ?? ""
+            $0.codexTerminalInputSourceId = selection.id
         }
     }
 
@@ -406,6 +391,13 @@ struct ApplicationDetail: View {
             title: inputSource.name,
             toolTip: inputSource.persistentIdentifier
         )
+    }
+
+    var selectedCodexTerminalKeyboard: PickerItem {
+        guard let inputSource = preferencesVM.codexTerminalInputSource
+        else { return .empty }
+
+        return pickerItem(for: inputSource)
     }
 
     func restoreStrategyName(strategy: KeyboardRestoreStrategy) -> String {
