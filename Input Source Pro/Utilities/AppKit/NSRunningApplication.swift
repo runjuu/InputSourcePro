@@ -118,18 +118,22 @@ extension NSRunningApplication {
     }
 
     func activateAccessibility(attribute: String) {
-        if let application = Application(self),
-           let isSettable = try? application.attributeIsSettable(attribute),
-           isSettable
-        {
-            if let rawValue: AnyObject = try? application.attribute(attribute),
-               CFBooleanGetTypeID() == CFGetTypeID(rawValue),
-               let enabled = rawValue as? Bool, enabled
-            {
-                return
-            }
+        guard let application = Application(self) else { return }
 
-            try? application.setAttribute(attribute, value: true)
+        // Skip if already enabled to avoid redundant writes.
+        if let rawValue: AnyObject = try? application.attribute(attribute),
+           CFBooleanGetTypeID() == CFGetTypeID(rawValue),
+           let enabled = rawValue as? Bool, enabled
+        {
+            return
         }
+
+        // Always attempt the set. Chromium/Electron apps (e.g. Codex) report
+        // `attributeIsSettable == false` for `AXManualAccessibility` until the
+        // attribute has been written at least once, so the previous settability
+        // gate made this a permanent no-op and prevented the web AX tree from
+        // ever being exposed. The attribute is documented as a write-only opt-in
+        // for AT clients, so unconditionally writing matches the platform contract.
+        try? application.setAttribute(attribute, value: true)
     }
 }

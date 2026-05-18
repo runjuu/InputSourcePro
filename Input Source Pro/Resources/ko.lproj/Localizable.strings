@@ -115,6 +115,7 @@
 "%@ App(s) Selected" = "%@개 앱 선택됨";
 "System-Wide" = "시스템 전체";
 "Default Keyboard" = "기본 입력 소스";
+"Codex Terminal Input Source" = "Codex 터미널 입력 소스";
 "Default Function Keys" = "기본 기능 키";
 "Function Keys" = "기능 키";
 "Keyboard Restore Strategy" = "입력 소스 복원 전략";

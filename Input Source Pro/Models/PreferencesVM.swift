@@ -255,6 +255,7 @@ struct Preferences {
         static let cJKVFixStrategy = "cJKVFixStrategy"
 
         static let systemWideDefaultKeyboardId = "systemWideDefaultKeyboardId"
+        static let codexTerminalInputSourceId = "codexTerminalInputSourceId"
         static let isFunctionKeysEnabled = "isFunctionKeysEnabled"
 
         static let browserAddressDefaultKeyboardId = "browserAddressDefaultKeyboardId"
@@ -402,6 +403,9 @@ struct Preferences {
 
     @UserDefault(Preferences.Key.systemWideDefaultKeyboardId)
     var systemWideDefaultKeyboardId = ""
+
+    @UserDefault(Preferences.Key.codexTerminalInputSourceId)
+    var codexTerminalInputSourceId = ""
 
     // MARK: - Browser Rules
 
@@ -611,6 +615,10 @@ extension PreferencesVM {
 
     var browserAddressDefaultKeyboard: InputSource? {
         return InputSource.resolvePersistedIdentifier(preferences.browserAddressDefaultKeyboardId)
+    }
+
+    var codexTerminalInputSource: InputSource? {
+        return InputSource.resolvePersistedIdentifier(preferences.codexTerminalInputSourceId)
     }
 }
 

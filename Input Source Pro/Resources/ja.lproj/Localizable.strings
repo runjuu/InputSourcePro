@@ -115,6 +115,7 @@
 "%@ App(s) Selected" = "%@個のアプリが選択されました";
 "System-Wide" = "システム全体";
 "Default Keyboard" = "デフォルトキーボード";
+"Codex Terminal Input Source" = "Codex ターミナル入力ソース";
 "Default Function Keys" = "デフォルトのファンクションキー";
 "Function Keys" = "ファンクションキー";
 "Keyboard Restore Strategy" = "キーボード復元戦略";

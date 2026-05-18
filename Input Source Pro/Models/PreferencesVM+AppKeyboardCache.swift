@@ -31,6 +31,11 @@ extension PreferencesVM {
     }
 
     func cacheKeyboardFor(_ appKind: AppKind, keyboard: InputSource) {
+        if appKind.isCodexTerminal {
+            appKeyboardCache.remove(appKind)
+            return
+        }
+
         let defaultKeyboard = getAppDefaultKeyboard(appKind)
 
         if appNeedCacheKeyboard(appKind),
@@ -64,6 +69,12 @@ extension PreferencesVM {
     func getAppAutoSwitchKeyboard(
         _ appKind: AppKind
     ) -> AppAutoSwitchKeyboardStatus? {
+        if appKind.isCodexTerminal,
+           let defaultKeyboard = getAppDefaultKeyboard(appKind)
+        {
+            return .specified(defaultKeyboard)
+        }
+
         if let cachedKeyboard = getAppCachedKeyboard(appKind) {
             return .cached(cachedKeyboard)
         }
@@ -88,6 +99,12 @@ extension PreferencesVM {
     }
 
     func getAppDefaultKeyboard(_ appKind: AppKind) -> InputSource? {
+        if appKind.isCodexTerminal,
+           let codexTerminalKeyboard = codexTerminalInputSource
+        {
+            return codexTerminalKeyboard
+        }
+
         if appKind.getBrowserInfo()?.isFocusedOnAddressBar == true,
            let browserAddressKeyboard = browserAddressDefaultKeyboard
         {

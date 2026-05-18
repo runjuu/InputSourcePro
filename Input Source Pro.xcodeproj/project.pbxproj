@@ -141,6 +141,7 @@
 		D52E2C57293D31E00017CB7E /* FocusAwareTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = D52E2C56293D31E00017CB7E /* FocusAwareTextField.swift */; };
 		D56A7CFC28A4D5C0002F356A /* AXSwift+Browser.swift in Sources */ = {isa = PBXBuildFile; fileRef = D56A7CFB28A4D5C0002F356A /* AXSwift+Browser.swift */; };
 		D57334262A84B40B00C8438F /* IconMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57334252A84B40B00C8438F /* IconMap.swift */; };
+		D57400012F69D8A600000001 /* CodexTerminalDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57400002F69D8A600000001 /* CodexTerminalDetector.swift */; };
 		D579258C2A1AB0A4003B83EA /* NSRunningApplication+WindowInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = D579258B2A1AB0A4003B83EA /* NSRunningApplication+WindowInfo.swift */; };
 		D57925902A1AB1DA003B83EA /* NSRunningApplication+FloatingApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D579258F2A1AB1DA003B83EA /* NSRunningApplication+FloatingApp.swift */; };
 		D57925922A1ACA0B003B83EA /* AppKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57925912A1ACA0B003B83EA /* AppKind.swift */; };
@@ -311,6 +312,7 @@
 		D52E2C56293D31E00017CB7E /* FocusAwareTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusAwareTextField.swift; sourceTree = "<group>"; };
 		D56A7CFB28A4D5C0002F356A /* AXSwift+Browser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AXSwift+Browser.swift"; sourceTree = "<group>"; };
 		D57334252A84B40B00C8438F /* IconMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconMap.swift; sourceTree = "<group>"; };
+		D57400002F69D8A600000001 /* CodexTerminalDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexTerminalDetector.swift; sourceTree = "<group>"; };
 		D579258B2A1AB0A4003B83EA /* NSRunningApplication+WindowInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSRunningApplication+WindowInfo.swift"; sourceTree = "<group>"; };
 		D579258F2A1AB1DA003B83EA /* NSRunningApplication+FloatingApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSRunningApplication+FloatingApp.swift"; sourceTree = "<group>"; };
 		D57925912A1ACA0B003B83EA /* AppKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKind.swift; sourceTree = "<group>"; };
@@ -455,6 +457,7 @@
 				D598C7E728B79E22004747D1 /* Log */,
 				4AC5738428411B33000BF10B /* AppKeyboardCache.swift */,
 				D57925912A1ACA0B003B83EA /* AppKind.swift */,
+				D57400002F69D8A600000001 /* CodexTerminalDetector.swift */,
 				4A0930882867E91100232089 /* AppsDiff.swift */,
 				4A2A1761280BA7FA00E13249 /* UserDefault.swift */,
 				4A2A1763280BA7FA00E13249 /* CancelBag.swift */,
@@ -936,6 +939,7 @@
 				4A881A98288CDDD500B76498 /* MainStorage.swift in Sources */,
 				4A09307D285F32B100232089 /* PreferencesWindowController+NSToolbar.swift in Sources */,
 				D57925922A1ACA0B003B83EA /* AppKind.swift in Sources */,
+				D57400012F69D8A600000001 /* CodexTerminalDetector.swift in Sources */,
 				4A4E035C2DB97534008E5C2F /* PromotionBadge.swift in Sources */,
 				4A09307B285F31E800232089 /* NSToolbarItem+Identifier.swift in Sources */,
 				4A2A1788280BA7FA00E13249 /* NSImage+Extension.swift in Sources */,

@@ -115,6 +115,7 @@
 "%@ App(s) Selected" = "%@ App(s) Selected";
 "System-Wide" = "System-Wide";
 "Default Keyboard" = "Default Input Source";
+"Codex Terminal Input Source" = "Codex Terminal Input Source";
 "Default Function Keys" = "Default Function Keys";
 "Function Keys" = "Function Keys";
 "Keyboard Restore Strategy" = "Input Source Restore Strategy";

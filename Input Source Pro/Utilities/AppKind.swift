@@ -16,7 +16,8 @@ enum AppKind {
 
     typealias NormalInfo = (
         focusedElement: UIElement?,
-        isFocusOnInputContainer: Bool
+        isFocusOnInputContainer: Bool,
+        isCodexTerminal: Bool
     )
 
     case normal(app: NSRunningApplication, info: NormalInfo)
@@ -24,8 +25,9 @@ enum AppKind {
 
     func getId() -> String? {
         switch self {
-        case let .normal(app, _):
-            return app.bundleId()
+        case let .normal(app, info):
+            guard let bundleId = app.bundleId() else { return nil }
+            return info.isCodexTerminal ? "\(bundleId)_codex_terminal" : bundleId
         case let .browser(app, info):
             if !info.isFocusedOnAddressBar,
                info.url != .newtab,
@@ -81,8 +83,22 @@ enum AppKind {
 
         let isSameAddress = getBrowserInfo()?.url == otherKind.getBrowserInfo()?.url
         let isSameAddressBar = getBrowserInfo()?.isFocusedOnAddressBar == otherKind.getBrowserInfo()?.isFocusedOnAddressBar
+        let isSameCodexTerminalState = isCodexTerminal == otherKind.isCodexTerminal
 
-        return detectAddressBar ? (isSameAddressBar && isSameAddress) : isSameAddress
+        return detectAddressBar
+            ? (isSameAddressBar && isSameAddress && isSameCodexTerminalState)
+            : (isSameAddress && isSameCodexTerminalState)
+    }
+}
+
+extension AppKind {
+    var isCodexTerminal: Bool {
+        switch self {
+        case let .normal(_, info):
+            return info.isCodexTerminal
+        case .browser:
+            return false
+        }
     }
 }
 
@@ -101,6 +117,12 @@ extension AppKind {
         let application = app.getApplication(preferencesVM: preferencesVM)
         let focusedElement = app.focuedUIElement(application: application)
         let isFocusOnInputContainer = UIElement.isInputContainer(focusedElement)
+        let isCodexTerminal = app.bundleIdentifier == CodexTerminalDetector.bundleIdentifier
+            && preferencesVM.codexTerminalInputSource != nil
+            && CodexTerminalDetector.isTerminalFocused(
+                app: app,
+                focusedElement: focusedElement
+            )
 
         if let url = preferencesVM.getBrowserURL(app.bundleIdentifier, application: application)?.removeFragment() {
             let rule = preferencesVM.getBrowserRule(url: url)
@@ -121,7 +143,8 @@ extension AppKind {
                 app: app,
                 info: (
                     focusedElement,
-                    isFocusOnInputContainer
+                    isFocusOnInputContainer,
+                    isCodexTerminal
                 )
             )
         }

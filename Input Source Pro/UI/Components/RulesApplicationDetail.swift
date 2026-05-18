@@ -1,18 +1,5 @@
 import SwiftUI
 
-// 新增 ToggleLabel 组件
-
-struct ToggleLabel: View {
-    let systemImageName: String
-    let text: String
-    var body: some View {
-        HStack(spacing: 6) {
-            RuleSettingIcon(systemName: systemImageName)
-            Text(text)
-        }
-    }
-}
-
 struct ApplicationDetail: View {
     @Binding var selectedApp: Set<AppRule>
 
@@ -25,6 +12,7 @@ struct ApplicationDetail: View {
     @State var hideIndicator = NSToggleViewState.off
     @State var forceEnglishPunctuation = NSToggleViewState.off
     @State var functionKeyModeItem: PickerItem?
+    @State var codexTerminalKeyboard: PickerItem?
 
     var mixed: Bool {
         Set(selectedApp.map { $0.forcedKeyboard?.persistentIdentifier }).count > 1
@@ -37,13 +25,17 @@ struct ApplicationDetail: View {
     var items: [PickerItem] {
         [mixed ? PickerItem.mixed : nil, PickerItem.empty].compactMap { $0 }
             + InputSource.sources.map {
-                PickerItem(id: $0.persistentIdentifier, title: $0.name, toolTip: $0.persistentIdentifier)
+                pickerItem(for: $0)
             }
     }
 
     var functionKeyItems: [PickerItem] {
         [isFunctionKeyModeMixed ? PickerItem.mixed : nil, functionKeyDefaultItem].compactMap { $0 }
             + functionKeyOptionItems
+    }
+
+    var shouldShowCodexTerminalKeyboard: Bool {
+        selectedApp.count == 1 && selectedApp.first?.bundleId == CodexTerminalDetector.bundleIdentifier
     }
 
     var functionKeyDefaultItem: PickerItem {
@@ -58,6 +50,8 @@ struct ApplicationDetail: View {
     }
 
     var body: some View {
+        let keyboardItems = items
+
         VStack(alignment: .leading) {
             Text(String(format: "%@ App(s) Selected".i18n(), "\(selectedApp.count)"))
                 .font(.subheadline.monospacedDigit())
@@ -69,17 +63,41 @@ struct ApplicationDetail: View {
                     .fontWeight(.medium)
 
                 PopUpButtonPicker<PickerItem?>(
-                    items: items,
+                    items: keyboardItems,
                     isItemEnabled: { $0?.id != "mixed" },
                     isItemSelected: { $0 == forceKeyboard },
                     getTitle: { $0?.title ?? "" },
                     getToolTip: { $0?.toolTip },
-                    onSelect: handleSelect
+                    onSelect: { handleSelect($0, items: keyboardItems) }
                 )
             }
 
             Divider()
                 .padding(.vertical, 4)
+
+            if shouldShowCodexTerminalKeyboard {
+                VStack(alignment: .leading) {
+                    HStack {
+                        Text("Codex Terminal Input Source".i18n())
+                            .fontWeight(.medium)
+                        Spacer()
+                        EnhancedModeRequiredBadge()
+                    }
+
+                    PopUpButtonPicker<PickerItem?>(
+                        items: keyboardItems,
+                        isItemEnabled: { $0?.id != "mixed" },
+                        isItemSelected: { $0 == codexTerminalKeyboard },
+                        getTitle: { $0?.title ?? "" },
+                        getToolTip: { $0?.toolTip },
+                        onSelect: { handleCodexTerminalKeyboardSelect($0, items: keyboardItems) }
+                    )
+                    .disabled(!preferencesVM.preferences.isEnhancedModeEnabled)
+                }
+
+                Divider()
+                    .padding(.vertical, 4)
+            }
 
             VStack(alignment: .leading) {
                 Text("Function Keys".i18n())
@@ -203,6 +221,7 @@ struct ApplicationDetail: View {
             updateHideIndicatorState()
             updateForceEnglishPunctuationState()
             updateFunctionKeyModeItem()
+            updateCodexTerminalKeyboard()
         }
     }
 
@@ -210,11 +229,7 @@ struct ApplicationDetail: View {
         if mixed {
             forceKeyboard = PickerItem.mixed
         } else if let keyboard = selectedApp.first?.forcedKeyboard {
-            forceKeyboard = PickerItem(
-                id: keyboard.persistentIdentifier,
-                title: keyboard.name,
-                toolTip: keyboard.persistentIdentifier
-            )
+            forceKeyboard = pickerItem(for: keyboard)
         } else {
             forceKeyboard = PickerItem.empty
         }
@@ -276,7 +291,20 @@ struct ApplicationDetail: View {
         functionKeyModeItem = functionKeyItem(for: mode)
     }
 
-    func handleSelect(_ index: Int) {
+    func updateCodexTerminalKeyboard() {
+        guard shouldShowCodexTerminalKeyboard else {
+            codexTerminalKeyboard = PickerItem.empty
+            return
+        }
+
+        if let inputSource = preferencesVM.codexTerminalInputSource {
+            codexTerminalKeyboard = pickerItem(for: inputSource)
+        } else {
+            codexTerminalKeyboard = PickerItem.empty
+        }
+    }
+
+    func handleSelect(_ index: Int, items: [PickerItem]) {
         forceKeyboard = items[index]
 
         for app in selectedApp {
@@ -360,8 +388,24 @@ struct ApplicationDetail: View {
         selectedApp.forEach { preferencesVM.setFunctionKeyMode($0, mode) }
     }
 
+    func handleCodexTerminalKeyboardSelect(_ index: Int, items: [PickerItem]) {
+        codexTerminalKeyboard = items[index]
+
+        preferencesVM.update {
+            $0.codexTerminalInputSourceId = codexTerminalKeyboard?.id ?? ""
+        }
+    }
+
     func functionKeyItem(for mode: FKeyMode) -> PickerItem {
         functionKeyOptionItems.first(where: { $0.id == mode.rawValue }) ?? functionKeyDefaultItem
+    }
+
+    func pickerItem(for inputSource: InputSource) -> PickerItem {
+        PickerItem(
+            id: inputSource.persistentIdentifier,
+            title: inputSource.name,
+            toolTip: inputSource.persistentIdentifier
+        )
     }
 
     func restoreStrategyName(strategy: KeyboardRestoreStrategy) -> String {

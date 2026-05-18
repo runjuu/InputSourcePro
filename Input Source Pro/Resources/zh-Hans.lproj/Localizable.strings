@@ -117,6 +117,7 @@
 "%@ App(s) Selected" = "已选中 %@ 个应用";
 "System-Wide" = "全局";
 "Default Keyboard" = "默认输入法";
+"Codex Terminal Input Source" = "Codex 终端输入法";
 "Default Function Keys" = "默认功能键";
 "Function Keys" = "功能键";
 "Keyboard Restore Strategy" = "输入法恢复策略";

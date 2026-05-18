@@ -46,6 +46,7 @@ extension ApplicationVM {
                 didActivateAppNotification.eraseToAnyPublisher(),
                 activeSpaceDidChangeNotification.eraseToAnyPublisher()
             ])
+            .prepend(())
             .compactMap { [weak self] _ -> NSRunningApplication? in
                 guard self?.preferencesVM.preferences.isEnhancedModeEnabled == true,
                       let elm: UIElement = try? systemWideElement.attribute(.focusedApplication),
@@ -61,8 +62,27 @@ extension ApplicationVM {
                 guard let preferencesVM = self?.preferencesVM
                 else { return Empty().eraseToAnyPublisher() }
 
-                guard NSApplication.isBrowser(app)
+                let shouldWatchCodexTerminal = app.bundleIdentifier == CodexTerminalDetector.bundleIdentifier
+                    && preferencesVM.preferences.isEnhancedModeEnabled
+                    && preferencesVM.codexTerminalInputSource != nil
+
+                guard NSApplication.isBrowser(app) || shouldWatchCodexTerminal
                 else { return Just(.from(app, preferencesVM: preferencesVM)).eraseToAnyPublisher() }
+
+                if shouldWatchCodexTerminal {
+                    // Chromium/Electron only exposes the web content accessibility tree (where the
+                    // xterm-helper-textarea lives) after `AXManualAccessibility` is set to true on
+                    // the app's AX element. Without this, `focusedUIElement` returns kAXNoValue and
+                    // `CodexTerminalDetector` can never see the terminal markers, so we'd fall back
+                    // to the app's default input source instead of `codexTerminalInputSource`.
+                    app.activateAccessibilities()
+
+                    return Timer
+                        .interval(seconds: 0.25)
+                        .prepend(Date())
+                        .map { _ in AppKind.from(app, preferencesVM: preferencesVM) }
+                        .eraseToAnyPublisher()
+                }
 
                 return Timer
                     .interval(seconds: 1)
