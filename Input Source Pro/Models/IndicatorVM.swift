@@ -253,7 +253,11 @@ extension IndicatorVM {
 
                     return updateState(appKind: state.appKind, inputSource: inputSource, inputSourceChangeReason: .system)
                 case let .switchInputSourceByShortcut(inputSource):
-                    inputSourceVM.select(inputSource: inputSource, app: state.appKind?.getApp())
+                    inputSourceVM.select(
+                        inputSource: inputSource,
+                        app: state.appKind?.getApp(),
+                        allowShortcutFallback: false
+                    )
 
                     return updateState(appKind: state.appKind, inputSource: inputSource, inputSourceChangeReason: .shortcut)
                 }
