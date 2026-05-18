@@ -5,7 +5,16 @@ enum CodexTerminalDetector {
     static let bundleIdentifier = "com.openai.codex"
 
     private static let maxAncestorDepth = 16
-    private static let terminalKeywords = ["terminal", "xterm", "pty", "console", "shell"]
+
+    // xterm.js prefixes every class on the helper textarea, its container, and
+    // its render layers with `xterm` (e.g. `xterm-helper-textarea`,
+    // `xterm-screen`, `xterm-viewport`, `xterm-rows`, `xterm-cursor-layer`).
+    // Matching this prefix on AXDOMClassList is both specific to xterm.js and
+    // resilient to version changes. We deliberately avoid broad keywords like
+    // `terminal` / `console` / `shell`, because Codex labels other panes with
+    // those words, which caused the terminal input source to be applied to the
+    // chat composer as well.
+    private static let xtermClassPrefix = "xterm"
 
     static func isTerminalFocused(
         app: NSRunningApplication,
@@ -15,16 +24,16 @@ enum CodexTerminalDetector {
               let focusedElement
         else { return false }
 
-        return hasTerminalAccessibilityMarker(focusedElement)
+        return hasXtermAncestor(focusedElement)
     }
 
-    private static func hasTerminalAccessibilityMarker(_ focusedElement: UIElement) -> Bool {
+    private static func hasXtermAncestor(_ focusedElement: UIElement) -> Bool {
         var element: UIElement? = focusedElement
 
         for _ in 0 ..< maxAncestorDepth {
             guard let current = element else { return false }
 
-            if elementLooksLikeTerminal(current) {
+            if elementHasXtermClass(current) {
                 return true
             }
 
@@ -34,26 +43,7 @@ enum CodexTerminalDetector {
         return false
     }
 
-    private static func elementLooksLikeTerminal(_ element: UIElement) -> Bool {
-        let textValues = [
-            element.safeString(attribute: .identifier),
-            element.safeString(attribute: "AXDOMIdentifier"),
-            element.safeString(attribute: .title),
-            element.safeString(attribute: .description),
-            element.safeString(attribute: "AXHelp"),
-            element.safeString(attribute: "AXRoleDescription"),
-        ]
-        .compactMap { $0 }
-
-        if textValues.contains(where: containsTerminalKeyword) {
-            return true
-        }
-
-        return element.domClassList().contains(where: containsTerminalKeyword)
-    }
-
-    private static func containsTerminalKeyword(_ value: String) -> Bool {
-        let value = value.lowercased()
-        return terminalKeywords.contains { value.contains($0) }
+    private static func elementHasXtermClass(_ element: UIElement) -> Bool {
+        return element.domClassList().contains { $0.hasPrefix(xtermClassPrefix) }
     }
 }
