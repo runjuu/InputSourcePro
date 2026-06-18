@@ -362,3 +362,48 @@ extension PreferencesVM {
         }
     }
 }
+
+// MARK: - Function Keys Toggle Shortcut
+
+extension PreferencesVM {
+    /// Stable identifier used both for the `KeyboardShortcuts.Recorder`/`KeyboardShortcuts.Name`
+    /// and for the `ShortcutBinding` that triggers the function-keys toggle. Deliberately not a
+    /// UUID so it never collides with a `HotKeyGroup` id.
+    nonisolated static let functionKeysToggleShortcutId = "com.runjuu.isp.toggle-function-keys"
+
+    func functionKeysToggleMode() -> ShortcutTriggerMode {
+        preferences.functionKeysToggleShortcutMode ?? .keyboardShortcut
+    }
+
+    func functionKeysToggleTrigger() -> SingleModifierTrigger {
+        preferences.functionKeysToggleSingleModifierTrigger ?? .singlePress
+    }
+
+    func functionKeysToggleCombo() -> ModifierCombo? {
+        guard let combo = preferences.functionKeysToggleModifierCombo, !combo.keys.isEmpty
+        else { return nil }
+        return combo
+    }
+
+    func updateFunctionKeysToggleMode(_ mode: ShortcutTriggerMode) {
+        update { preferences in
+            preferences.functionKeysToggleShortcutMode = mode
+
+            if mode != .singleModifier {
+                preferences.functionKeysToggleModifierCombo = ModifierCombo(keys: [])
+            }
+        }
+    }
+
+    func updateFunctionKeysToggleTrigger(_ trigger: SingleModifierTrigger) {
+        update { preferences in
+            preferences.functionKeysToggleSingleModifierTrigger = trigger
+        }
+    }
+
+    func updateFunctionKeysToggleCombo(_ combo: ModifierCombo?) {
+        update { preferences in
+            preferences.functionKeysToggleModifierCombo = combo ?? ModifierCombo(keys: [])
+        }
+    }
+}

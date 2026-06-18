@@ -323,7 +323,41 @@ extension IndicatorVM {
             )
         }
 
+        bindings.append(
+            ShortcutBinding(
+                id: PreferencesVM.functionKeysToggleShortcutId,
+                mode: preferencesVM.functionKeysToggleMode(),
+                modifierCombo: preferencesVM.functionKeysToggleCombo(),
+                singleModifierTrigger: preferencesVM.functionKeysToggleTrigger(),
+                onTrigger: { [weak self] in
+                    self?.toggleFunctionKeyMode()
+                }
+            )
+        )
+
         return bindings
+    }
+
+    private func toggleFunctionKeyMode() {
+        let current = currentFKeyMode
+            ?? (try? FKeyManager.getCurrentFKeyMode().get())
+            ?? preferencesVM.preferences.functionKeyMode
+        let toggled: FKeyMode = current == .functionKeys ? .mediaKeys : .functionKeys
+
+        // Persist as the new global default. This keeps the change for apps without a
+        // per-app rule and keeps the General → "Default Function Keys" toggle in sync.
+        // The synchronous `watchFunctionKeyMode` sink may re-apply a per-app rule here.
+        preferencesVM.update { $0.functionKeyMode = toggled }
+
+        // Force the live system mode afterwards so the toggle takes effect immediately,
+        // even when the frontmost app has a per-app Function Keys rule. The rule
+        // re-asserts on the next app switch.
+        do {
+            try FKeyManager.setCurrentFKeyMode(toggled)
+            currentFKeyMode = toggled
+        } catch {
+            logger.debug { "Failed to toggle function key mode: \(error.localizedDescription)" }
+        }
     }
 
     private func triggerHotKeyGroup(_ group: HotKeyGroup) {

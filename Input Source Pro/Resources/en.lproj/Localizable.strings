@@ -130,6 +130,9 @@
 "Use Media Keys" = "Use Media Keys (brightness, volume, etc.)";
 "Use Global Setting" = "Use Global Setting";
 "Function Keys Description" = "Use F1, F2, etc. as standard function keys instead of media keys";
+"Toggle Function Keys" = "Toggle Function Keys";
+"Toggle Function Keys Description" = "Switch between standard function keys (F1, F2…) and media keys (brightness, volume…) with a shortcut.";
+"Input Sources" = "Input Sources";
 "Input Monitoring Required" = "Input Monitoring Required";
 "This feature requires input monitoring permission to work" = "This feature requires input monitoring permission to work";
 "Open Permission Settings" = "Open Permission Settings";

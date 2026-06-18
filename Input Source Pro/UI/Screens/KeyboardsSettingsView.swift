@@ -31,6 +31,11 @@ struct KeyboardsSettingsView: View {
                 return true
             }
         }
+        // Check function keys toggle
+        if preferencesVM.functionKeysToggleMode() == .singleModifier,
+           preferencesVM.functionKeysToggleCombo() != nil {
+            return true
+        }
         return false
     }
     
@@ -51,7 +56,8 @@ struct KeyboardsSettingsView: View {
                 if hasSingleModifierShortcuts && (needsAccessibilityPermission || needsInputMonitoringPermission) {
                     permissionWarningSection
                 }
-                
+
+                functionKeysToggleSection
                 normalSection
                 groupSection
                 AddSwitchingGroupButton(onSelect: preferencesVM.addHotKeyGroup)
@@ -113,9 +119,38 @@ struct KeyboardsSettingsView: View {
         .padding(.bottom)
     }
 
+    var functionKeysToggleSection: some View {
+        SettingsSection(title: "Function Keys") {
+            HStack(alignment: .top) {
+                Text("Toggle Function Keys Description".i18n())
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Spacer()
+
+                shortcutControls(
+                    mode: preferencesVM.functionKeysToggleMode(),
+                    modeBinding: functionKeysToggleModeBinding(),
+                    triggerBinding: functionKeysToggleTriggerBinding(),
+                    modifierSelection: preferencesVM.functionKeysToggleCombo(),
+                    onModifierSelect: { selection in
+                        preferencesVM.updateFunctionKeysToggleCombo(selection)
+                        if let selection, selection.keys.count > 1 {
+                            preferencesVM.updateFunctionKeysToggleTrigger(.singlePress)
+                        }
+                        indicatorVM.refreshShortcut()
+                    },
+                    recorderId: PreferencesVM.functionKeysToggleShortcutId
+                )
+            }
+            .padding()
+        }
+        .padding(.bottom)
+    }
+
     var normalSection: some View {
-        ForEach(InputSource.sources, id: \.persistentIdentifier) { inputSource in
-            SettingsSection(title: "") {
+        ForEach(Array(InputSource.sources.enumerated()), id: \.element.persistentIdentifier) { index, inputSource in
+            SettingsSection(title: index == 0 ? "Input Sources" : "") {
                 HStack(alignment: .top) {
                     CustomizedIndicatorView(inputSource: inputSource)
                         .help(inputSource.persistentIdentifier)
@@ -220,6 +255,26 @@ struct KeyboardsSettingsView: View {
             get: { preferencesVM.shortcutMode(for: group) },
             set: { newValue in
                 preferencesVM.updateShortcutMode(newValue, for: group)
+                indicatorVM.refreshShortcut()
+            }
+        )
+    }
+
+    func functionKeysToggleModeBinding() -> Binding<ShortcutTriggerMode> {
+        Binding(
+            get: { preferencesVM.functionKeysToggleMode() },
+            set: { newValue in
+                preferencesVM.updateFunctionKeysToggleMode(newValue)
+                indicatorVM.refreshShortcut()
+            }
+        )
+    }
+
+    func functionKeysToggleTriggerBinding() -> Binding<SingleModifierTrigger> {
+        Binding(
+            get: { preferencesVM.functionKeysToggleTrigger() },
+            set: { newValue in
+                preferencesVM.updateFunctionKeysToggleTrigger(newValue)
                 indicatorVM.refreshShortcut()
             }
         )

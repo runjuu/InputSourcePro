@@ -114,6 +114,9 @@ struct SettingsBackupPreferences: Codable {
     var singleModifierTriggerGroupMapping: [String: SingleModifierTrigger]?
     var singleModifierInputSourceMapping: [String: ModifierCombo]?
     var singleModifierGroupMapping: [String: ModifierCombo]?
+    var functionKeysToggleShortcutMode: ShortcutTriggerMode?
+    var functionKeysToggleSingleModifierTrigger: SingleModifierTrigger?
+    var functionKeysToggleModifierCombo: ModifierCombo?
     var systemWideDefaultKeyboardId: String?
     var browserAddressDefaultKeyboardId: String?
     var isEnableURLSwitchForSafari: Bool?
@@ -168,6 +171,9 @@ struct SettingsBackupPreferences: Codable {
         singleModifierTriggerGroupMapping = preferences.singleModifierTriggerGroupMapping
         singleModifierInputSourceMapping = preferences.singleModifierInputSourceMapping
         singleModifierGroupMapping = preferences.singleModifierGroupMapping
+        functionKeysToggleShortcutMode = preferences.functionKeysToggleShortcutMode
+        functionKeysToggleSingleModifierTrigger = preferences.functionKeysToggleSingleModifierTrigger
+        functionKeysToggleModifierCombo = preferences.functionKeysToggleModifierCombo
         systemWideDefaultKeyboardId = preferences.systemWideDefaultKeyboardId
         browserAddressDefaultKeyboardId = preferences.browserAddressDefaultKeyboardId
         isEnableURLSwitchForSafari = preferences.isEnableURLSwitchForSafari
@@ -235,6 +241,15 @@ struct SettingsBackupPreferences: Codable {
             preferences.singleModifierInputSourceMapping = singleModifierInputSourceMapping
         }
         if let singleModifierGroupMapping { preferences.singleModifierGroupMapping = singleModifierGroupMapping }
+        if let functionKeysToggleShortcutMode {
+            preferences.functionKeysToggleShortcutMode = functionKeysToggleShortcutMode
+        }
+        if let functionKeysToggleSingleModifierTrigger {
+            preferences.functionKeysToggleSingleModifierTrigger = functionKeysToggleSingleModifierTrigger
+        }
+        if let functionKeysToggleModifierCombo {
+            preferences.functionKeysToggleModifierCombo = functionKeysToggleModifierCombo
+        }
         if let systemWideDefaultKeyboardId { preferences.systemWideDefaultKeyboardId = systemWideDefaultKeyboardId }
         if let browserAddressDefaultKeyboardId {
             preferences.browserAddressDefaultKeyboardId = browserAddressDefaultKeyboardId
@@ -597,6 +612,7 @@ private extension PreferencesVM {
     func keyboardShortcuts(for hotKeyGroups: [HotKeyGroup]) -> [String: KeyboardShortcuts.Shortcut] {
         currentInputSourceShortcutNames()
             .union(hotKeyGroups.compactMap(\.id))
+            .union([PreferencesVM.functionKeysToggleShortcutId])
             .reduce(into: [:]) { result, name in
                 guard let shortcut = KeyboardShortcuts.getShortcut(for: KeyboardShortcuts.Name(name)) else { return }
                 result[name] = shortcut
@@ -604,7 +620,9 @@ private extension PreferencesVM {
     }
 
     func currentSettingsBackupShortcutNames() -> Set<String> {
-        currentInputSourceShortcutNames().union(getHotKeyGroups().compactMap(\.id))
+        currentInputSourceShortcutNames()
+            .union(getHotKeyGroups().compactMap(\.id))
+            .union([PreferencesVM.functionKeysToggleShortcutId])
     }
 
     func currentInputSourceShortcutNames() -> Set<String> {
@@ -624,7 +642,9 @@ private extension PreferencesVM {
 
 private extension SettingsBackup {
     var settingsBackupShortcutNames: Set<String> {
-        Set(keyboardShortcuts.keys).union(hotKeyGroups.compactMap(\.id))
+        Set(keyboardShortcuts.keys)
+            .union(hotKeyGroups.compactMap(\.id))
+            .union([PreferencesVM.functionKeysToggleShortcutId])
     }
 }
 

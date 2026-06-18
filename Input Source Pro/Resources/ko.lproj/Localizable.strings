@@ -130,6 +130,9 @@
 "Use Media Keys" = "미디어 키 사용 (밝기, 음량 등)";
 "Use Global Setting" = "전역 설정 사용";
 "Function Keys Description" = "F1, F2 등을 미디어 키 대신 표준 기능 키로 사용합니다";
+"Toggle Function Keys" = "기능 키 전환";
+"Toggle Function Keys Description" = "단축키로 표준 기능 키 (F1, F2…)와 미디어 키 (밝기, 음량…)를 전환합니다.";
+"Input Sources" = "입력 소스";
 "Input Monitoring Required" = "입력 모니터링 권한 필요";
 "This feature requires input monitoring permission to work" = "이 기능을 사용하려면 입력 모니터링 권한이 필요합니다";
 "Open Permission Settings" = "권한 설정 열기";

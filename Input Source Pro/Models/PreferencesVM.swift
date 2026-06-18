@@ -312,6 +312,10 @@ struct Preferences {
         static let singleModifierInputSourceMapping = "singleModifierInputSourceMapping"
         static let singleModifierGroupMapping = "singleModifierGroupMapping"
 
+        static let functionKeysToggleShortcutMode = "functionKeysToggleShortcutMode"
+        static let functionKeysToggleSingleModifierTrigger = "functionKeysToggleSingleModifierTrigger"
+        static let functionKeysToggleModifierCombo = "functionKeysToggleModifierCombo"
+
         static let isAutoAppearanceMode = "isAutoAppearanceMode"
         static let appearanceMode = "appearanceMode"
         static let isShowInputSourcesLabel = "isShowInputSourcesLabel"
@@ -416,6 +420,17 @@ struct Preferences {
 
     @CodableUserDefault(Preferences.Key.singleModifierGroupMapping)
     var singleModifierGroupMapping = [String: ModifierCombo]()
+
+    // MARK: - Function Keys Toggle Shortcut
+
+    @CodableUserDefault(Preferences.Key.functionKeysToggleShortcutMode)
+    var functionKeysToggleShortcutMode = ShortcutTriggerMode.keyboardShortcut
+
+    @CodableUserDefault(Preferences.Key.functionKeysToggleSingleModifierTrigger)
+    var functionKeysToggleSingleModifierTrigger = SingleModifierTrigger.singlePress
+
+    @CodableUserDefault(Preferences.Key.functionKeysToggleModifierCombo)
+    var functionKeysToggleModifierCombo = ModifierCombo(keys: [])
 
     // MARK: - App Rules
 

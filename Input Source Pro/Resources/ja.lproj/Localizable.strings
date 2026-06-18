@@ -130,6 +130,9 @@
 "Use Media Keys" = "メディアキーを使用 (明るさ、音量など)";
 "Use Global Setting" = "グローバル設定を使用";
 "Function Keys Description" = "F1、F2 などをメディアキーではなく標準のファンクションキーとして使用します";
+"Toggle Function Keys" = "ファンクションキーを切り替え";
+"Toggle Function Keys Description" = "ショートカットで標準のファンクションキー (F1、F2…) とメディアキー (明るさ、音量…) を切り替えます。";
+"Input Sources" = "入力ソース";
 "Input Monitoring Required" = "入力監視権限が必要";
 "This feature requires input monitoring permission to work" = "この機能を使うには入力監視権限が必要です";
 "Open Permission Settings" = "権限設定を開く";
