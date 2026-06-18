@@ -169,9 +169,20 @@ extension InputSource {
         let inputSourceNSArray = TISCreateInputSourceList(nil, false).takeRetainedValue() as NSArray
         let inputSourceList = inputSourceNSArray as! [TISInputSource]
 
-        return inputSourceList
+        let selectableSources = inputSourceList
             .filter { $0.category == TISInputSource.Category.keyboardInputSource && $0.isSelectable }
             .map { InputSource(tisInputSource: $0) }
+
+        return deduplicatedByPersistentIdentifier(selectableSources)
+    }
+
+    /// Removes input sources that share the same `persistentIdentifier`, keeping the first
+    /// occurrence and preserving order. macOS TIS can return multiple distinct objects with
+    /// identical logical identity (same source ID + input mode ID), which would otherwise
+    /// surface as duplicate entries in the candidate list. See issue #116.
+    static func deduplicatedByPersistentIdentifier(_ sources: [InputSource]) -> [InputSource] {
+        var seen = Set<String>()
+        return sources.filter { seen.insert($0.persistentIdentifier).inserted }
     }
 
     static func nonCJKVSource() -> InputSource? {
