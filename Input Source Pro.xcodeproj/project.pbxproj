@@ -12,6 +12,9 @@
 		D60000322F20000000000032 /* BrowserRuleValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000312F20000000000031 /* BrowserRuleValidationTests.swift */; };
 		D60000222F20000000000022 /* RuntimeRuleChangeNotifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000212F20000000000021 /* RuntimeRuleChangeNotifierTests.swift */; };
 		D60000032F20000000000003 /* TestHarnessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000022F20000000000002 /* TestHarnessTests.swift */; };
+		D60000722F20000000000072 /* AppURLActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000712F20000000000071 /* AppURLActionTests.swift */; };
+		D60000822F20000000000082 /* URLActivationSuppressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000812F20000000000081 /* URLActivationSuppressionTests.swift */; };
+		D60000622F20000000000062 /* AppURLAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000612F20000000000061 /* AppURLAction.swift */; };
 		25C5A6B52E678D86005AB80E /* PunctuationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25C5A6B42E678D86005AB80E /* PunctuationService.swift */; };
 		3D25B151766744F888171177 /* ShortcutTrigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18B53A0848947E3A2D4EFA8 /* ShortcutTrigger.swift */; };
 		4A093071285DACAA00232089 /* NSToggleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A093070285DACAA00232089 /* NSToggleView.swift */; };
@@ -225,6 +228,9 @@
 		D60000312F20000000000031 /* BrowserRuleValidationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserRuleValidationTests.swift; sourceTree = "<group>"; };
 		D60000212F20000000000021 /* RuntimeRuleChangeNotifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeRuleChangeNotifierTests.swift; sourceTree = "<group>"; };
 		D60000022F20000000000002 /* TestHarnessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHarnessTests.swift; sourceTree = "<group>"; };
+		D60000712F20000000000071 /* AppURLActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppURLActionTests.swift; sourceTree = "<group>"; };
+		D60000812F20000000000081 /* URLActivationSuppressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLActivationSuppressionTests.swift; sourceTree = "<group>"; };
+		D60000612F20000000000061 /* AppURLAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppURLAction.swift; sourceTree = "<group>"; };
 		4A2A174C280BA7FA00E13249 /* AppRule.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppRule.swift; sourceTree = "<group>"; };
 		4A2A174E280BA7FA00E13249 /* Main.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = Main.xcdatamodel; sourceTree = "<group>"; };
 		4A2A1750280BA7FA00E13249 /* PreferencesWindowController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PreferencesWindowController.swift; sourceTree = "<group>"; };
@@ -419,6 +425,8 @@
 				D60000312F20000000000031 /* BrowserRuleValidationTests.swift */,
 				D60000212F20000000000021 /* RuntimeRuleChangeNotifierTests.swift */,
 				D60000022F20000000000002 /* TestHarnessTests.swift */,
+				D60000712F20000000000071 /* AppURLActionTests.swift */,
+				D60000812F20000000000081 /* URLActivationSuppressionTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -513,6 +521,7 @@
 			isa = PBXGroup;
 			children = (
 				4A2A176D280BA7FA00E13249 /* AppDelegate.swift */,
+				D60000612F20000000000061 /* AppURLAction.swift */,
 				4A2A176E280BA7FA00E13249 /* main.swift */,
 				4A2A176F280BA7FA00E13249 /* AppMenu.swift */,
 			);
@@ -965,6 +974,7 @@
 				4A2A177D280BA7FA00E13249 /* Main.xcdatamodeld in Sources */,
 				4A2A1795280BA7FA00E13249 /* main.swift in Sources */,
 				4A2A1794280BA7FA00E13249 /* AppDelegate.swift in Sources */,
+				D60000622F20000000000062 /* AppURLAction.swift in Sources */,
 				D5CC44942A33F143007FF839 /* TroubleshootingSettingsView.swift in Sources */,
 				D51625FE2A2077AE00BB8735 /* QueryWebAreaService.swift in Sources */,
 				4A843BDB280E570700549B6C /* AppRuleMenuItem.swift in Sources */,
@@ -1050,6 +1060,8 @@
 				D60000322F20000000000032 /* BrowserRuleValidationTests.swift in Sources */,
 				D60000222F20000000000022 /* RuntimeRuleChangeNotifierTests.swift in Sources */,
 				D60000032F20000000000003 /* TestHarnessTests.swift in Sources */,
+				D60000722F20000000000072 /* AppURLActionTests.swift in Sources */,
+				D60000822F20000000000082 /* URLActivationSuppressionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

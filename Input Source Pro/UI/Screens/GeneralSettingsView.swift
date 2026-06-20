@@ -7,6 +7,7 @@ struct GeneralSettingsView: View {
     @EnvironmentObject var indicatorVM: IndicatorVM
 
     @State var isDetectSpotlightLikeApp = false
+    @State private var isShowScriptableImportGuide = false
 
     var items: [PickerItem] {
         [PickerItem.empty]
@@ -205,6 +206,19 @@ struct GeneralSettingsView: View {
                         }
                     }
                     .buttonStyle(SectionButtonStyle())
+                    .border(width: 1, edges: [.bottom], color: NSColor.border2.color)
+
+                    Button(action: { isShowScriptableImportGuide = true }) {
+                        HStack {
+                            Text("Scriptable Import Entry".i18n())
+
+                            Spacer()
+                        }
+                    }
+                    .buttonStyle(SectionButtonStyle())
+                    .sheet(isPresented: $isShowScriptableImportGuide) {
+                        ScriptableSettingsImportGuideView(isPresented: $isShowScriptableImportGuide)
+                    }
                 }
 
                 Group {
@@ -473,5 +487,105 @@ private struct RefinePromotionCard: View {
             }
         }
         .resume()
+    }
+}
+
+private struct ScriptableSettingsImportGuideView: View {
+    @Binding var isPresented: Bool
+
+    @State private var didCopy = false
+    @State private var silent = false
+
+    private var command: String {
+        let url = "inputsourcepro://import?path=/absolute/path/settings.json"
+        let query = silent ? "&silent=1" : ""
+        return "open \"\(url)\(query)\""
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            header
+
+            commandBox
+
+            HStack {
+                HStack(spacing: 6) {
+                    Toggle("", isOn: $silent)
+                        .toggleStyle(.checkbox)
+                        .labelsHidden()
+                        .allowsHitTesting(false)
+
+                    Text("Scriptable Import Silent".i18n())
+                }
+                .contentShape(Rectangle())
+                .onTapGesture { silent.toggle() }
+
+                Spacer()
+
+                Button(action: copyCommand) {
+                    HStack(spacing: 5) {
+                        SwiftUI.Image(systemName: didCopy ? "checkmark" : "doc.on.doc")
+                        Text("Copy".i18n())
+                    }
+                }
+                .help("Copy".i18n())
+
+                Button("Done".i18n(), action: { isPresented = false })
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .lineLimit(nil)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(24)
+        .frame(width: 520)
+    }
+
+    private var header: some View {
+        HStack(alignment: .top, spacing: 12) {
+            SwiftUI.Image(systemName: "terminal")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundColor(.accentColor)
+                .frame(width: 40, height: 40)
+                .background(
+                    Circle()
+                        .fill(Color.accentColor.opacity(0.12))
+                )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Scriptable Import Title".i18n())
+                    .font(.title2)
+                    .fontWeight(.semibold)
+
+                Text("Scriptable Import Summary".i18n())
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+
+    private var commandBox: some View {
+        Text(command)
+            .font(.system(size: 13, design: .monospaced))
+            .foregroundColor(.primary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.primary.opacity(0.055))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    private func copyCommand() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(command, forType: .string)
+        didCopy = true
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            didCopy = false
+        }
     }
 }

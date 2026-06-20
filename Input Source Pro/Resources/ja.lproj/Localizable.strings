@@ -228,12 +228,18 @@
 "Settings Backup" = "設定バックアップ";
 "Export Settings" = "設定を書き出す";
 "Import Settings" = "設定を読み込む";
+"Scriptable Import Entry" = "コマンドラインから復元";
+"Scriptable Import Title" = "1 つのコマンドで設定を読み込む";
+"Scriptable Import Summary" = "新しい Mac で Input Source Pro を復元します。";
+"Scriptable Import Silent" = "成功メッセージを表示しない";
+"Done" = "完了";
 "Settings Exported" = "設定を書き出しました";
 "Settings Exported Message" = "設定バックアップを正常に書き出しました。";
 "Settings Imported" = "設定を読み込みました";
 "Settings Imported Message" = "設定を正常に読み込みました。";
 "Export Settings Failed" = "設定の書き出しに失敗しました";
 "Import Settings Failed" = "設定の読み込みに失敗しました";
+"No valid file path was provided. Use an absolute path, e.g. inputsourcepro://import?path=/path/to/settings.json" = "有効なファイルパスが指定されていません。絶対パスを使用してください。例: inputsourcepro://import?path=/path/to/settings.json";
 "Replace Current Settings?" = "現在の設定を置き換えますか？";
 "Import Settings Confirmation Message" = "このファイルを読み込むと、現在サポートされている設定、ルール、カラー設定、ホットキーグループ、記録済みショートカットが置き換えられます。";
 "Unsupported settings backup version %@" = "サポートされていない設定バックアップバージョン %@ です。";
