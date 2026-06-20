@@ -81,15 +81,28 @@ extension PreferencesVM {
 }
 
 extension PreferencesVM {
-    func getTextNSColor(_ inputSource: InputSource) -> NSColor? {
-        let isAutoAppearanceMode = preferences.isAutoAppearanceMode
+    /// The indicator's default foreground color, honoring auto-appearance mode and
+    /// ignoring any per-input-source override. Used by badges that aren't backed by
+    /// an `InputSource` (e.g. the Function Keys / Media Keys mode indicator).
+    var defaultIndicatorTextNSColor: NSColor? {
+        preferences.isAutoAppearanceMode
+            ? preferences.indicatorForgeground?.dynamicColor
+            : NSColor(preferences.indicatorForgegroundColor)
+    }
 
+    /// The indicator's default background color, honoring auto-appearance mode and
+    /// ignoring any per-input-source override. Counterpart to `defaultIndicatorTextNSColor`.
+    var defaultIndicatorBgNSColor: NSColor? {
+        preferences.isAutoAppearanceMode
+            ? preferences.indicatorBackground?.dynamicColor
+            : NSColor(preferences.indicatorBackgroundColor)
+    }
+
+    func getTextNSColor(_ inputSource: InputSource) -> NSColor? {
         if let keyboardColor = getKeyboardConfig(inputSource)?.textColor {
             return NSColor(keyboardColor)
         } else {
-            return isAutoAppearanceMode
-                ? preferences.indicatorForgeground?.dynamicColor
-                : NSColor(preferences.indicatorForgegroundColor)
+            return defaultIndicatorTextNSColor
         }
     }
 
@@ -102,14 +115,10 @@ extension PreferencesVM {
     }
 
     func getBgNSColor(_ inputSource: InputSource) -> NSColor? {
-        let isAutoAppearanceMode = preferences.isAutoAppearanceMode
-
         if let bgColor = getKeyboardConfig(inputSource)?.bgColor {
             return NSColor(bgColor)
         } else {
-            return isAutoAppearanceMode
-                ? preferences.indicatorBackground?.dynamicColor
-                : NSColor(preferences.indicatorBackgroundColor)
+            return defaultIndicatorBgNSColor
         }
     }
 

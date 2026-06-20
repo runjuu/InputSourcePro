@@ -117,6 +117,7 @@
 "Default Keyboard" = "기본 입력 소스";
 "Default Function Keys" = "기본 기능 키";
 "Function Keys" = "기능 키";
+"Media Keys" = "미디어 키";
 "Keyboard Restore Strategy" = "입력 소스 복원 전략";
 "Restore Previously Used Keyboard" = "이전에 사용한 입력 소스 복원";
 "Use Default Keyboard Instead" = "기본 입력 소스 사용";

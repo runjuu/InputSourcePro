@@ -119,12 +119,41 @@ struct KeyboardsSettingsView: View {
         .padding(.bottom)
     }
 
+    /// The function-key mode the indicator is currently enforcing (per-app rule,
+    /// default, or shortcut override), falling back to the stored default before the
+    /// VM has applied a mode. Mirrors what the indicator badge shows.
+    private var currentFunctionKeyMode: FKeyMode {
+        indicatorVM.currentFKeyMode ?? preferencesVM.preferences.functionKeyMode
+    }
+
     var functionKeysToggleSection: some View {
         SettingsSection(title: "Function Keys") {
             HStack(alignment: .top) {
-                Text("Toggle Function Keys Description".i18n())
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 8) {
+                    // Render the real indicator badge — the exact AppKit view the live
+                    // indicator shows when toggling the mode (same config as
+                    // IndicatorWindowController+Indicator) — so this chip can't drift from it.
+                    DumpIndicatorView(config: IndicatorViewConfig(
+                        inputSource: indicatorVM.state.inputSource,
+                        kind: preferencesVM.preferences.indicatorKind,
+                        size: preferencesVM.preferences.indicatorSize ?? .medium,
+                        bgColor: preferencesVM.defaultIndicatorBgNSColor,
+                        textColor: preferencesVM.defaultIndicatorTextNSColor,
+                        badge: .init(
+                            glyph: currentFunctionKeyMode.badgeGlyph,
+                            title: currentFunctionKeyMode.displayName
+                        )
+                    ))
+
+                    QuestionMark {
+                        Text("Toggle Function Keys Description".i18n())
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(width: 220, alignment: .leading)
+                            .padding(12)
+                    }
+                }
 
                 Spacer()
 

@@ -62,6 +62,13 @@ class IndicatorWindowController: FloatWindowController {
 
                 let app = appKind.getApp()
 
+                // Function-key toggles are one-shot status changes: always use the
+                // transient auto-hide path, never the persistent always-on / auto-show
+                // flows that are tied to the focused input field.
+                if case .functionKeyModeChanges = event {
+                    return self.autoHidePublisher(event: event, inputSource: inputSource, appKind: appKind)
+                }
+
                 if preferencesVM.isShowAlwaysOnIndicator(app: app) {
                     return self.alwaysOnPublisher(event: event, inputSource: inputSource, appKind: appKind)
                 } else if preferencesVM.needDetectFocusedFieldChanges(app: app) {

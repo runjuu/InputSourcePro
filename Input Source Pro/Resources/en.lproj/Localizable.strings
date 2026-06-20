@@ -117,6 +117,7 @@
 "Default Keyboard" = "Default Input Source";
 "Default Function Keys" = "Default Function Keys";
 "Function Keys" = "Function Keys";
+"Media Keys" = "Media Keys";
 "Keyboard Restore Strategy" = "Input Source Restore Strategy";
 "Restore Previously Used Keyboard" = "Restore Previously Used Keyboard";
 "Use Default Keyboard Instead" = "Use Default Input Source";

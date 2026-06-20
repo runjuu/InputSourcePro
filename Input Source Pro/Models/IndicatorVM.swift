@@ -17,7 +17,14 @@ final class IndicatorVM: ObservableObject {
 
     let logger = ISPLogger(category: String(describing: IndicatorVM.self))
 
-    private var currentFKeyMode: FKeyMode?
+    /// The function-key mode currently enforced by the app (per-app rule, default,
+    /// or shortcut override). Published so the Function Keys settings chip can mirror
+    /// the live mode the indicator shows, instead of the stored global default.
+    @Published private(set) var currentFKeyMode: FKeyMode?
+
+    /// Fires when the user toggles the function-key mode via the shortcut, so the
+    /// indicator can show the new mode the same way it shows input-source changes.
+    let functionKeyModeChangeSubject = PassthroughSubject<FKeyMode, Never>()
 
     @Published
     private(set) var state: State
@@ -29,6 +36,7 @@ final class IndicatorVM: ObservableObject {
     private(set) lazy var activateEventPublisher = Publishers.MergeMany([
         longMouseDownPublisher(),
         stateChangesPublisher(),
+        functionKeyModeChangesPublisher(),
     ])
     .share()
 
@@ -355,6 +363,7 @@ extension IndicatorVM {
         do {
             try FKeyManager.setCurrentFKeyMode(toggled)
             currentFKeyMode = toggled
+            functionKeyModeChangeSubject.send(toggled)
         } catch {
             logger.debug { "Failed to toggle function key mode: \(error.localizedDescription)" }
         }

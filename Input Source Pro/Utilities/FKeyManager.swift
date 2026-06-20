@@ -2,6 +2,13 @@ import IOKit
 import IOKit.hid
 import Foundation
 
+/// How to draw the glyph inside an indicator badge: either an SF Symbol or a
+/// literal piece of text (e.g. the "fn" key label).
+enum BadgeGlyph: Equatable {
+    case symbol(String)
+    case text(String)
+}
+
 enum FKeyMode: String, CaseIterable, Identifiable {
     case mediaKeys
     case functionKeys
@@ -19,6 +26,26 @@ enum FKeyMode: String, CaseIterable, Identifiable {
 
     var isFunctionKeysEnabled: Bool {
         self == .functionKeys
+    }
+
+    /// Glyph shown in the indicator badge for this mode.
+    var badgeGlyph: BadgeGlyph {
+        switch self {
+        case .functionKeys:
+            return .text("fn")
+        case .mediaKeys:
+            return .symbol("sun.max.fill")
+        }
+    }
+
+    /// Short localized label for this mode (e.g. "Function Keys" / "Media Keys").
+    var displayName: String {
+        switch self {
+        case .functionKeys:
+            return "Function Keys".i18n()
+        case .mediaKeys:
+            return "Media Keys".i18n()
+        }
     }
 
     init(isFunctionKeysEnabled: Bool) {

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 extension IndicatorWindowController {
@@ -5,8 +6,28 @@ extension IndicatorWindowController {
         return indicatorVC.fittingSize
     }
 
-    func updateIndicator(event _: IndicatorVM.ActivateEvent, inputSource: InputSource) {
+    func updateIndicator(event: IndicatorVM.ActivateEvent, inputSource: InputSource) {
         let preferences = preferencesVM.preferences
+
+        // Function-key mode badge: not backed by an input source, so render a glyph
+        // (SF Symbol or text) + title using the default indicator theme colors
+        // (ignoring any per-input-source color override).
+        if case let .functionKeyModeChanges(mode) = event {
+            indicatorVC.prepare(config: IndicatorViewConfig(
+                inputSource: inputSource,
+                kind: preferences.indicatorKind,
+                size: preferences.indicatorSize ?? .medium,
+                bgColor: preferencesVM.defaultIndicatorBgNSColor,
+                textColor: preferencesVM.defaultIndicatorTextNSColor,
+                badge: .init(glyph: mode.badgeGlyph, title: mode.displayName)
+            ))
+
+            if isActive {
+                indicatorVC.refresh()
+            }
+
+            return
+        }
 
         indicatorVC.prepare(config: IndicatorViewConfig(
             inputSource: inputSource,

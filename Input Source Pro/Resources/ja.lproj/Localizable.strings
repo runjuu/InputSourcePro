@@ -117,6 +117,7 @@
 "Default Keyboard" = "デフォルトキーボード";
 "Default Function Keys" = "デフォルトのファンクションキー";
 "Function Keys" = "ファンクションキー";
+"Media Keys" = "メディアキー";
 "Keyboard Restore Strategy" = "キーボード復元戦略";
 "Restore Previously Used Keyboard" = "以前使用していたキーボードを復元";
 "Use Default Keyboard Instead" = "代わりにデフォルトキーボードを使用";

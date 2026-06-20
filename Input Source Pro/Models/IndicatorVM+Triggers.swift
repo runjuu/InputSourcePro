@@ -10,12 +10,15 @@ extension IndicatorVM {
         case longMouseDown
         case appChanges(current: AppKind?, prev: AppKind?)
         case inputSourceChanges(InputSource, InputSourceChangeReason)
+        case functionKeyModeChanges(FKeyMode)
 
         func isAppChangesWithSameAppOrWebsite() -> Bool {
             switch self {
             case let .appChanges(current, prev):
                 return current?.isSameAppOrWebsite(with: prev) == true
             case .inputSourceChanges:
+                return false
+            case .functionKeyModeChanges:
                 return false
             case .longMouseDown:
                 return false
@@ -56,6 +59,12 @@ extension IndicatorVM {
                 self?.preferencesVM.preferences.isActiveWhenLongpressLeftMouse ?? false
             }
             .mapTo(.longMouseDown)
+    }
+
+    func functionKeyModeChangesPublisher() -> AnyPublisher<ActivateEvent, Never> {
+        functionKeyModeChangeSubject
+            .map { ActivateEvent.functionKeyModeChanges($0) }
+            .eraseToAnyPublisher()
     }
 
     func stateChangesPublisher() -> AnyPublisher<ActivateEvent, Never> {
@@ -111,6 +120,8 @@ extension IndicatorVM.ActivateEvent: @preconcurrency CustomStringConvertible {
             return "appChanges(\(String(describing: current)), \(String(describing: prev))"
         case .inputSourceChanges:
             return "inputSourceChanges"
+        case let .functionKeyModeChanges(mode):
+            return "functionKeyModeChanges(\(mode.rawValue))"
         case .longMouseDown:
             return "longMouseDown"
         case .justHide:

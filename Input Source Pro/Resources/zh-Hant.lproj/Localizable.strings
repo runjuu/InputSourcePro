@@ -119,6 +119,7 @@
 "Default Keyboard" = "預設輸入法";
 "Default Function Keys" = "預設功能鍵";
 "Function Keys" = "功能鍵";
+"Media Keys" = "媒體鍵";
 "Keyboard Restore Strategy" = "輸入法復原模式";
 "Restore Previously Used Keyboard" = "自動復原應用程式上次使用的輸入法";
 "Use Default Keyboard Instead" = "總是切換至預設輸入法";
