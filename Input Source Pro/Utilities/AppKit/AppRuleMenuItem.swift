@@ -50,7 +50,7 @@ class AppRuleMenuItem: NSMenuItem {
         }
 
         if let inputSource {
-            inputSourceVM.select(inputSource: inputSource, app: app)
+            inputSourceVM.select(inputSource: inputSource, app: app, allowShortcutFallback: false)
         }
 
         watchChanges()
