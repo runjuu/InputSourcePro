@@ -7,14 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		D60000522F20000000000052 /* InputSourceDeduplicationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000512F20000000000051 /* InputSourceDeduplicationTests.swift */; };
-		D60000122F20000000000012 /* BrowserRuleSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000112F20000000000011 /* BrowserRuleSelectionTests.swift */; };
-		D60000322F20000000000032 /* BrowserRuleValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000312F20000000000031 /* BrowserRuleValidationTests.swift */; };
-		D60000222F20000000000022 /* RuntimeRuleChangeNotifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000212F20000000000021 /* RuntimeRuleChangeNotifierTests.swift */; };
-		D60000032F20000000000003 /* TestHarnessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000022F20000000000002 /* TestHarnessTests.swift */; };
-		D60000722F20000000000072 /* AppURLActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000712F20000000000071 /* AppURLActionTests.swift */; };
-		D60000822F20000000000082 /* URLActivationSuppressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000812F20000000000081 /* URLActivationSuppressionTests.swift */; };
-		D60000622F20000000000062 /* AppURLAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000612F20000000000061 /* AppURLAction.swift */; };
 		25C5A6B52E678D86005AB80E /* PunctuationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25C5A6B42E678D86005AB80E /* PunctuationService.swift */; };
 		3D25B151766744F888171177 /* ShortcutTrigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18B53A0848947E3A2D4EFA8 /* ShortcutTrigger.swift */; };
 		4A093071285DACAA00232089 /* NSToggleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A093070285DACAA00232089 /* NSToggleView.swift */; };
@@ -175,7 +167,25 @@
 		D5F4A1CA2F0B1234001B2C3D /* InputSourceSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5F4A1C92F0B1234001B2C3D /* InputSourceSwitcher.swift */; };
 		D5F73B022A2C1DCD00BBC10A /* InputSourceVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5F73B012A2C1DCD00BBC10A /* InputSourceVM.swift */; };
 		D5FC8F552A4134B5002AE1F2 /* IndicatorSize.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5FC8F542A4134B5002AE1F2 /* IndicatorSize.swift */; };
+		D60000032F20000000000003 /* TestHarnessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000022F20000000000002 /* TestHarnessTests.swift */; };
+		D60000122F20000000000012 /* BrowserRuleSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000112F20000000000011 /* BrowserRuleSelectionTests.swift */; };
+		D60000222F20000000000022 /* RuntimeRuleChangeNotifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000212F20000000000021 /* RuntimeRuleChangeNotifierTests.swift */; };
+		D60000322F20000000000032 /* BrowserRuleValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000312F20000000000031 /* BrowserRuleValidationTests.swift */; };
+		D60000522F20000000000052 /* InputSourceDeduplicationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000512F20000000000051 /* InputSourceDeduplicationTests.swift */; };
+		D60000622F20000000000062 /* AppURLAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000612F20000000000061 /* AppURLAction.swift */; };
+		D60000722F20000000000072 /* AppURLActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000712F20000000000071 /* AppURLActionTests.swift */; };
+		D60000822F20000000000082 /* URLActivationSuppressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000812F20000000000081 /* URLActivationSuppressionTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D600000C2F2000000000000C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4A2A1723280BA6A500E13249 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4A2A172A280BA6A600E13249;
+			remoteInfo = "Input Source Pro";
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
 		D508B69E2A13FE49002E272E /* Embed Browser Ext Helper  */ = {
@@ -222,15 +232,6 @@
 		4A2A1732280BA6A800E13249 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		4A2A1735280BA6A800E13249 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		4A2A1737280BA6A800E13249 /* Signing.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Signing.entitlements; sourceTree = "<group>"; };
-		D60000012F20000000000001 /* Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		D60000512F20000000000051 /* InputSourceDeduplicationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSourceDeduplicationTests.swift; sourceTree = "<group>"; };
-		D60000112F20000000000011 /* BrowserRuleSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserRuleSelectionTests.swift; sourceTree = "<group>"; };
-		D60000312F20000000000031 /* BrowserRuleValidationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserRuleValidationTests.swift; sourceTree = "<group>"; };
-		D60000212F20000000000021 /* RuntimeRuleChangeNotifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeRuleChangeNotifierTests.swift; sourceTree = "<group>"; };
-		D60000022F20000000000002 /* TestHarnessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHarnessTests.swift; sourceTree = "<group>"; };
-		D60000712F20000000000071 /* AppURLActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppURLActionTests.swift; sourceTree = "<group>"; };
-		D60000812F20000000000081 /* URLActivationSuppressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLActivationSuppressionTests.swift; sourceTree = "<group>"; };
-		D60000612F20000000000061 /* AppURLAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppURLAction.swift; sourceTree = "<group>"; };
 		4A2A174C280BA7FA00E13249 /* AppRule.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppRule.swift; sourceTree = "<group>"; };
 		4A2A174E280BA7FA00E13249 /* Main.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = Main.xcdatamodel; sourceTree = "<group>"; };
 		4A2A1750280BA7FA00E13249 /* PreferencesWindowController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PreferencesWindowController.swift; sourceTree = "<group>"; };
@@ -355,6 +356,15 @@
 		D5F6E8D429EC812500DE042B /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/Localizable.strings; sourceTree = "<group>"; };
 		D5F73B012A2C1DCD00BBC10A /* InputSourceVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSourceVM.swift; sourceTree = "<group>"; };
 		D5FC8F542A4134B5002AE1F2 /* IndicatorSize.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndicatorSize.swift; sourceTree = "<group>"; };
+		D60000012F20000000000001 /* Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D60000022F20000000000002 /* TestHarnessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHarnessTests.swift; sourceTree = "<group>"; };
+		D60000112F20000000000011 /* BrowserRuleSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserRuleSelectionTests.swift; sourceTree = "<group>"; };
+		D60000212F20000000000021 /* RuntimeRuleChangeNotifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeRuleChangeNotifierTests.swift; sourceTree = "<group>"; };
+		D60000312F20000000000031 /* BrowserRuleValidationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserRuleValidationTests.swift; sourceTree = "<group>"; };
+		D60000512F20000000000051 /* InputSourceDeduplicationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSourceDeduplicationTests.swift; sourceTree = "<group>"; };
+		D60000612F20000000000061 /* AppURLAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppURLAction.swift; sourceTree = "<group>"; };
+		D60000712F20000000000071 /* AppURLActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppURLActionTests.swift; sourceTree = "<group>"; };
+		D60000812F20000000000081 /* URLActivationSuppressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLActivationSuppressionTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -415,20 +425,6 @@
 				D60000012F20000000000001 /* Tests.xctest */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		D60000042F20000000000004 /* Tests */ = {
-			isa = PBXGroup;
-			children = (
-				D60000512F20000000000051 /* InputSourceDeduplicationTests.swift */,
-				D60000112F20000000000011 /* BrowserRuleSelectionTests.swift */,
-				D60000312F20000000000031 /* BrowserRuleValidationTests.swift */,
-				D60000212F20000000000021 /* RuntimeRuleChangeNotifierTests.swift */,
-				D60000022F20000000000002 /* TestHarnessTests.swift */,
-				D60000712F20000000000071 /* AppURLActionTests.swift */,
-				D60000812F20000000000081 /* URLActivationSuppressionTests.swift */,
-			);
-			path = Tests;
 			sourceTree = "<group>";
 		};
 		4A2A172D280BA6A600E13249 /* Input Source Pro */ = {
@@ -737,6 +733,20 @@
 			path = Log;
 			sourceTree = "<group>";
 		};
+		D60000042F20000000000004 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				D60000512F20000000000051 /* InputSourceDeduplicationTests.swift */,
+				D60000112F20000000000011 /* BrowserRuleSelectionTests.swift */,
+				D60000312F20000000000031 /* BrowserRuleValidationTests.swift */,
+				D60000212F20000000000021 /* RuntimeRuleChangeNotifierTests.swift */,
+				D60000022F20000000000002 /* TestHarnessTests.swift */,
+				D60000712F20000000000071 /* AppURLActionTests.swift */,
+				D60000812F20000000000081 /* URLActivationSuppressionTests.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -792,16 +802,6 @@
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
-
-/* Begin PBXContainerItemProxy section */
-		D600000C2F2000000000000C /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 4A2A1723280BA6A500E13249 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 4A2A172A280BA6A600E13249;
-			remoteInfo = "Input Source Pro";
-		};
-/* End PBXContainerItemProxy section */
 
 /* Begin PBXProject section */
 		4A2A1723280BA6A500E13249 /* Project object */ = {
@@ -1220,7 +1220,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Input Source Pro/Resources/Signing.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 680;
+				CURRENT_PROJECT_VERSION = 706;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"Input Source Pro/Preview Content\"";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1241,7 +1241,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 2.10.0;
+				MARKETING_VERSION = 2.11.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.runjuu.Input-Source-Pro";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1257,7 +1257,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Input Source Pro/Resources/Signing.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 680;
+				CURRENT_PROJECT_VERSION = 706;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"Input Source Pro/Preview Content\"";
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1278,7 +1278,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 2.10.0;
+				MARKETING_VERSION = 2.11.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.runjuu.Input-Source-Pro";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
