@@ -137,8 +137,9 @@ struct KeyboardsSettingsView: View {
                         inputSource: indicatorVM.state.inputSource,
                         kind: preferencesVM.preferences.indicatorKind,
                         size: preferencesVM.preferences.indicatorSize ?? .medium,
-                        bgColor: preferencesVM.defaultIndicatorBgNSColor,
+                        bgColor: nil,
                         textColor: preferencesVM.defaultIndicatorTextNSColor,
+                        prefersTextInputSourceIcons: preferencesVM.preferences.prefersTextInputSourceIcons,
                         badge: .init(
                             glyph: currentFunctionKeyMode.badgeGlyph,
                             title: currentFunctionKeyMode.displayName
