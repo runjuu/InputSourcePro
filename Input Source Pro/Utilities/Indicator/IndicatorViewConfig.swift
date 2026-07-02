@@ -21,6 +21,7 @@ struct IndicatorViewConfig {
     let size: IndicatorSize
     let bgColor: NSColor?
     let textColor: NSColor?
+    let prefersTextInputSourceIcons: Bool
 
     /// When set, the indicator renders this glyph (SF Symbol or text) + title
     /// instead of the input source. Lets the same pill machinery show
@@ -217,7 +218,9 @@ struct IndicatorViewConfig {
     }
 
     private func getImageView(_ inputSource: InputSource) -> NSView? {
-//    if let textImage = getTextImageView(inputSource) { return textImage }
+        if prefersTextInputSourceIcons, let textImage = getTextImageView(inputSource) {
+            return textImage
+        }
 
         guard let image = inputSource.icon
         else { return nil }
@@ -265,26 +268,23 @@ struct IndicatorViewConfig {
         else { return nil }
 
         let labelView = NSTextField(labelWithString: labelName)
-        let view = NSView()
+        labelView.textColor = textColor
+        labelView.alignment = .center
 
-        view.addSubview(labelView)
-        view.wantsLayer = true
-        view.layer?.backgroundColor = textColor?.cgColor
-        view.layer?.cornerRadius = 2
-
-        labelView.snp.makeConstraints {
-            $0.center.equalTo(view)
+        switch size {
+        case .small:
+            labelView.font = .systemFont(ofSize: labelName.count > 1 ? 7 : 10, weight: .regular)
+        case .medium:
+            labelView.font = .systemFont(ofSize: labelName.count > 1 ? 10 : 13, weight: .regular)
+        case .large:
+            labelView.font = .systemFont(ofSize: labelName.count > 1 ? 15 : 20, weight: .regular)
         }
 
-        view.snp.makeConstraints {
-//      $0.width.equalTo(22)
-            $0.width.height.equalTo(16)
+        labelView.snp.makeConstraints { make in
+            make.width.equalTo(max(leadingIconWidth, labelView.intrinsicContentSize.width))
         }
 
-        labelView.textColor = bgColor
-        labelView.font = .systemFont(ofSize: labelName.count > 1 ? 10 : 11, weight: .regular)
-
-        return view
+        return labelView
     }
 
     private func getContainerView() -> NSView {
