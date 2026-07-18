@@ -9,7 +9,7 @@ enum AppKind {
         focusedElement: UIElement?,
         isFocusOnInputContainer: Bool,
 
-        url: URL,
+        url: URL?,
         rule: BrowserRule?,
         isFocusedOnAddressBar: Bool
     )
@@ -28,9 +28,10 @@ enum AppKind {
             return app.bundleId()
         case let .browser(app, info):
             if !info.isFocusedOnAddressBar,
-               info.url != .newtab,
+               let url = info.url,
+               url != .newtab,
                let bundleId = app.bundleId(),
-               let addressId = info.rule?.id() ?? info.url.host
+               let addressId = info.rule?.id() ?? url.host
             {
                 return "\(bundleId)_\(addressId)"
             } else {
@@ -79,16 +80,55 @@ enum AppKind {
         guard let otherKind = otherKind else { return false }
         guard getApp() == otherKind.getApp() else { return false }
 
-        let isSameAddress = getBrowserInfo()?.url == otherKind.getBrowserInfo()?.url
-        let isSameAddressBar = getBrowserInfo()?.isFocusedOnAddressBar == otherKind.getBrowserInfo()?.isFocusedOnAddressBar
+        switch (getBrowserInfo(), otherKind.getBrowserInfo()) {
+        case (nil, nil):
+            return true
+        case let (current?, previous?):
+            if detectAddressBar,
+               current.isFocusedOnAddressBar != previous.isFocusedOnAddressBar
+            {
+                return false
+            }
 
-        return detectAddressBar ? (isSameAddressBar && isSameAddress) : isSameAddress
+            // While the address bar stays focused, URL changes reflect omnibox
+            // edits or suggestions rather than navigation; treating them as
+            // navigation switches input sources mid-composition (issue #99).
+            if current.isFocusedOnAddressBar,
+               previous.isFocusedOnAddressBar
+            {
+                return true
+            }
+
+            return current.url == previous.url
+        default:
+            return false
+        }
     }
 }
 
 // MARK: - From
 
 extension AppKind {
+    static func makeBrowserInfo(
+        focusedElement: UIElement?,
+        isFocusOnInputContainer: Bool,
+        url: URL?,
+        rule: BrowserRule?,
+        isFocusedOnAddressBar: Bool
+    ) -> BrowserInfo? {
+        // An empty omnibox can expose no web-area URL, so address-bar focus
+        // alone constitutes a browser context (issue #99).
+        guard url != nil || isFocusedOnAddressBar else { return nil }
+
+        return (
+            focusedElement: focusedElement,
+            isFocusOnInputContainer: isFocusOnInputContainer,
+            url: url,
+            rule: rule,
+            isFocusedOnAddressBar: isFocusedOnAddressBar
+        )
+    }
+
     static func from(_ app: NSRunningApplication?, preferencesVM: PreferencesVM) -> AppKind? {
         if let app = app {
             return .from(app, preferencesVM: preferencesVM)
@@ -101,29 +141,38 @@ extension AppKind {
         let application = app.getApplication(preferencesVM: preferencesVM)
         let focusedElement = app.focuedUIElement(application: application)
         let isFocusOnInputContainer = UIElement.isInputContainer(focusedElement)
+        let isBrowserEnabled = preferencesVM.isBrowserAndEnabled(app)
 
-        if let url = preferencesVM.getBrowserURL(app.bundleIdentifier, application: application)?.removeFragment() {
-            let rule = preferencesVM.getBrowserRule(url: url)
-            let isFocusOnBrowserAddress = preferencesVM.isFocusOnBrowserAddress(app: app, focusedElement: focusedElement)
+        if isBrowserEnabled {
+            let isFocusOnBrowserAddress = preferencesVM.isFocusOnBrowserAddress(
+                app: app,
+                focusedElement: focusedElement
+            )
+            let browserURL = preferencesVM
+                .getBrowserURL(app.bundleIdentifier, application: application)?
+                .removeFragment()
+            let rule = browserURL.flatMap { preferencesVM.getBrowserRule(url: $0) }
 
-            return .browser(
-                app: app,
-                info: (
-                    focusedElement,
-                    isFocusOnInputContainer,
-                    url,
-                    rule,
-                    isFocusOnBrowserAddress
+            if let browserInfo = makeBrowserInfo(
+                focusedElement: focusedElement,
+                isFocusOnInputContainer: isFocusOnInputContainer,
+                url: browserURL,
+                rule: rule,
+                isFocusedOnAddressBar: isFocusOnBrowserAddress
+            ) {
+                return .browser(
+                    app: app,
+                    info: browserInfo
                 )
-            )
-        } else {
-            return .normal(
-                app: app,
-                info: (
-                    focusedElement,
-                    isFocusOnInputContainer
-                )
-            )
+            }
         }
+
+        return .normal(
+            app: app,
+            info: (
+                focusedElement,
+                isFocusOnInputContainer
+            )
+        )
     }
 }

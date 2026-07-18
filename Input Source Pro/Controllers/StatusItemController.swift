@@ -53,7 +53,8 @@ class StatusItemController {
     var addBrowserRuleMenu: NSMenuItem? {
         guard let appKind = applicationVM.appKind,
               let browserInfo = appKind.getBrowserInfo(),
-              let host = browserInfo.url.host
+              let browserURL = browserInfo.url,
+              let host = browserURL.host
         else { return nil }
 
         let app = appKind.getApp()
@@ -61,7 +62,7 @@ class StatusItemController {
         var items: [NSMenuItem] = [
             BrowserRuleMenuItem(
                 app: app,
-                url: browserInfo.url,
+                url: browserURL,
                 preferencesVM: preferencesVM,
                 inputSourceVM: inputSourceVM,
                 inputSource: nil
@@ -74,7 +75,7 @@ class StatusItemController {
         items += InputSource.sources.map {
             BrowserRuleMenuItem(
                 app: app,
-                url: browserInfo.url,
+                url: browserURL,
                 preferencesVM: preferencesVM,
                 inputSourceVM: inputSourceVM,
                 inputSource: $0
