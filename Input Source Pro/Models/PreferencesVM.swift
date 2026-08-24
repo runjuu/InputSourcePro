@@ -232,6 +232,8 @@ extension PreferencesVM {
             guard preferences.isEnableURLSwitchForZen else { return nil }
         case .Dia:
             guard preferences.isEnableURLSwitchForDia else { return nil }
+        case .Helium:
+            guard preferences.isEnableURLSwitchForHelium else { return nil }
         }
 
         if let application = application,
@@ -302,6 +304,7 @@ struct Preferences {
         static let isEnableURLSwitchForFirefoxNightly = "isEnableURLSwitchForFirefoxNightly"
         static let isEnableURLSwitchForZen = "isEnableURLSwitchForZen"
         static let isEnableURLSwitchForDia = "isEnableURLSwitchForDia"
+        static let isEnableURLSwitchForHelium = "isEnableURLSwitchForHelium"
 
         static let shortcutTriggerMode = "shortcutTriggerMode"
         static let singleModifierTrigger = "singleModifierTrigger"
@@ -492,6 +495,9 @@ struct Preferences {
     
     @UserDefault(Preferences.Key.isEnableURLSwitchForDia)
     var isEnableURLSwitchForDia = false
+
+    @UserDefault(Preferences.Key.isEnableURLSwitchForHelium)
+    var isEnableURLSwitchForHelium = false
 
     // MARK: - Appearance
 

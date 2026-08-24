@@ -129,6 +129,8 @@ extension PreferencesVM {
             return preferences.isEnableURLSwitchForZen
         case .Dia:
             return preferences.isEnableURLSwitchForDia
+        case .Helium:
+            return preferences.isEnableURLSwitchForHelium
         }
     }
 
