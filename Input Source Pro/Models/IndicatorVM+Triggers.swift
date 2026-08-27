@@ -8,13 +8,13 @@ extension IndicatorVM {
     enum ActivateEvent {
         case justHide
         case longMouseDown
-        case appChanges(current: AppKind?, prev: AppKind?)
+        case appChanges(current: AppKind?, prev: AppKind?, inputSourceDidChange: Bool)
         case inputSourceChanges(InputSource, InputSourceChangeReason)
         case functionKeyModeChanges(FKeyMode)
 
         func isAppChangesWithSameAppOrWebsite() -> Bool {
             switch self {
-            case let .appChanges(current, prev):
+            case let .appChanges(current, prev, _):
                 return current?.isSameAppOrWebsite(with: prev) == true
             case .inputSourceChanges:
                 return false
@@ -23,6 +23,15 @@ extension IndicatorVM {
             case .longMouseDown:
                 return false
             case .justHide:
+                return false
+            }
+        }
+
+        var isAppChangesWithUnchangedInputSource: Bool {
+            switch self {
+            case let .appChanges(_, _, inputSourceDidChange):
+                return !inputSourceDidChange
+            default:
                 return false
             }
         }
@@ -73,7 +82,11 @@ extension IndicatorVM {
             .map { [weak self] previous, current -> ActivateEvent in
                 if let preferencesVM = self?.preferencesVM {
                     if previous?.appKind?.getId() != current.appKind?.getId() {
-                        let event = ActivateEvent.appChanges(current: current.appKind, prev: previous?.appKind)
+                        let event = ActivateEvent.appChanges(
+                            current: current.appKind,
+                            prev: previous?.appKind,
+                            inputSourceDidChange: previous?.inputSource.persistentIdentifier != current.inputSource.persistentIdentifier
+                        )
 
                         if preferencesVM.preferences.isActiveWhenSwitchApp || preferencesVM.preferences.isActiveWhenFocusedElementChangesEnabled {
                             if preferencesVM.preferences.isHideWhenSwitchAppWithForceKeyboard {
@@ -116,8 +129,8 @@ extension IndicatorVM {
 extension IndicatorVM.ActivateEvent: @preconcurrency CustomStringConvertible {
     var description: String {
         switch self {
-        case let .appChanges(current, prev):
-            return "appChanges(\(String(describing: current)), \(String(describing: prev))"
+        case let .appChanges(current, prev, inputSourceDidChange):
+            return "appChanges(\(String(describing: current)), \(String(describing: prev)), inputSourceDidChange: \(inputSourceDidChange))"
         case .inputSourceChanges:
             return "inputSourceChanges"
         case let .functionKeyModeChanges(mode):

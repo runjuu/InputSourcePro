@@ -63,6 +63,12 @@ extension IndicatorWindowController {
         let application = app.getApplication(preferencesVM: preferencesVM)
 
         let needActivateAtFirstTime = {
+            // App switch that keeps the same input source: don't announce it,
+            // let focus detection decide whether the indicator should be visible.
+            if event.isAppChangesWithUnchangedInputSource {
+                return false
+            }
+
             if preferencesVM.preferences.isActiveWhenSwitchApp {
                 return true
             }

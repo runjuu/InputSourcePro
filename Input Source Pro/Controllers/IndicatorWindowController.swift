@@ -73,6 +73,10 @@ class IndicatorWindowController: FloatWindowController {
                     return self.alwaysOnPublisher(event: event, inputSource: inputSource, appKind: appKind)
                 } else if preferencesVM.needDetectFocusedFieldChanges(app: app) {
                     return self.autoShowPublisher(event: event, inputSource: inputSource, appKind: appKind)
+                } else if event.isAppChangesWithUnchangedInputSource {
+                    // App switch that keeps the same input source: nothing switched,
+                    // so don't pop the indicator up.
+                    return self.justHidePublisher()
                 } else {
                     return self.autoHidePublisher(event: event, inputSource: inputSource, appKind: appKind)
                 }

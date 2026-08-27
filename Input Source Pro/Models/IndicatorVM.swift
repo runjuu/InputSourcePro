@@ -242,6 +242,17 @@ extension IndicatorVM {
                     return state
                 case let .appChanged(appKind):
                     if let status = preferencesVM.getAppAutoSwitchKeyboard(appKind) {
+                        // The target keyboard is already active: skip the redundant
+                        // TIS select (and CJKV fix) so nothing "switches", and mark
+                        // the reason as .noChanges so the indicator won't announce it.
+                        if status.inputSource.persistentIdentifier == state.inputSource.persistentIdentifier {
+                            return updateState(
+                                appKind: appKind,
+                                inputSource: state.inputSource,
+                                inputSourceChangeReason: .noChanges
+                            )
+                        }
+
                         inputSourceVM.select(inputSource: status.inputSource, app: appKind.getApp())
 
                         return updateState(

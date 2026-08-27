@@ -175,6 +175,7 @@
 		D60000622F20000000000062 /* AppURLAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000612F20000000000061 /* AppURLAction.swift */; };
 		D60000722F20000000000072 /* AppURLActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000712F20000000000071 /* AppURLActionTests.swift */; };
 		D60000822F20000000000082 /* URLActivationSuppressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000812F20000000000081 /* URLActivationSuppressionTests.swift */; };
+		D60001922F20000000000192 /* ActivateEventInputSourceChangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60001912F20000000000191 /* ActivateEventInputSourceChangeTests.swift */; };
 		D60001022F20000000000102 /* AppKindComparisonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60001012F20000000000101 /* AppKindComparisonTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -366,6 +367,7 @@
 		D60000612F20000000000061 /* AppURLAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppURLAction.swift; sourceTree = "<group>"; };
 		D60000712F20000000000071 /* AppURLActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppURLActionTests.swift; sourceTree = "<group>"; };
 		D60000812F20000000000081 /* URLActivationSuppressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLActivationSuppressionTests.swift; sourceTree = "<group>"; };
+		D60001912F20000000000191 /* ActivateEventInputSourceChangeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivateEventInputSourceChangeTests.swift; sourceTree = "<group>"; };
 		D60001012F20000000000101 /* AppKindComparisonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKindComparisonTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -746,6 +748,7 @@
 				D60000022F20000000000002 /* TestHarnessTests.swift */,
 				D60000712F20000000000071 /* AppURLActionTests.swift */,
 				D60000812F20000000000081 /* URLActivationSuppressionTests.swift */,
+				D60001912F20000000000191 /* ActivateEventInputSourceChangeTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -1066,6 +1069,7 @@
 				D60000032F20000000000003 /* TestHarnessTests.swift in Sources */,
 				D60000722F20000000000072 /* AppURLActionTests.swift in Sources */,
 				D60000822F20000000000082 /* URLActivationSuppressionTests.swift in Sources */,
+				D60001922F20000000000192 /* ActivateEventInputSourceChangeTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
