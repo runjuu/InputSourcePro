@@ -242,13 +242,17 @@ extension IndicatorVM {
                     return state
                 case let .appChanged(appKind):
                     if let status = preferencesVM.getAppAutoSwitchKeyboard(appKind) {
-                        // The target keyboard is already active: skip the redundant
-                        // TIS select (and CJKV fix) so nothing "switches", and mark
-                        // the reason as .noChanges so the indicator won't announce it.
-                        if status.inputSource.persistentIdentifier == state.inputSource.persistentIdentifier {
+                        // The target keyboard is already active in macOS: skip the
+                        // redundant TIS select (and CJKV fix) so nothing "switches",
+                        // and mark the reason as .noChanges so the indicator won't
+                        // announce it. Compare against the live system source rather
+                        // than the reducer's optimistic `state.inputSource`, so a
+                        // failed or delayed select is retried instead of skipped.
+                        let liveInputSource = InputSource.getCurrentInputSource()
+                        if status.inputSource.persistentIdentifier == liveInputSource.persistentIdentifier {
                             return updateState(
                                 appKind: appKind,
-                                inputSource: state.inputSource,
+                                inputSource: liveInputSource,
                                 inputSourceChangeReason: .noChanges
                             )
                         }

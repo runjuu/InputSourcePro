@@ -63,16 +63,19 @@ extension IndicatorWindowController {
         let application = app.getApplication(preferencesVM: preferencesVM)
 
         let needActivateAtFirstTime = {
-            // App switch that keeps the same input source: don't announce it,
-            // let focus detection decide whether the indicator should be visible.
-            if event.isAppChangesWithUnchangedInputSource {
-                return false
-            }
-
-            if preferencesVM.preferences.isActiveWhenSwitchApp {
+            // App-switch trigger: suppress only when the same input source stays
+            // active, so unchanged-keyboard app switches don't pop the indicator.
+            if preferencesVM.preferences.isActiveWhenSwitchApp,
+               !event.isAppChangesWithUnchangedInputSource
+            {
                 return true
             }
 
+            // Focused-field trigger is independent: even on unchanged-keyboard
+            // app switches (e.g. browser address-bar transitions), the indicator
+            // should still appear immediately if the focused element is an input
+            // container. The AX watcher installed below does not replay the
+            // current focus, so we must evaluate it here.
             if preferencesVM.preferences.isActiveWhenFocusedElementChangesEnabled,
                let focusedUIElement = app.focuedUIElement(application: application),
                UIElement.isInputContainer(focusedUIElement)
