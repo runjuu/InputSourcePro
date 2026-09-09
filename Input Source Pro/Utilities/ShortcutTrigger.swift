@@ -271,8 +271,8 @@ final class ShortcutTriggerManager {
     }
 
     deinit {
-        // deinit is nonisolated; schedule main-actor cleanup asynchronously
-        Task { @MainActor in
+        // Object is MainActor-isolated; deallocation happens on the main actor.
+        MainActor.assumeIsolated {
             removeAllMonitors()
         }
     }

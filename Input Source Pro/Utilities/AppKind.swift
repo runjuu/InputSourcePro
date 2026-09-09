@@ -16,7 +16,8 @@ enum AppKind {
 
     typealias NormalInfo = (
         focusedElement: UIElement?,
-        isFocusOnInputContainer: Bool
+        isFocusOnInputContainer: Bool,
+        windowId: String?
     )
 
     case normal(app: NSRunningApplication, info: NormalInfo)
@@ -24,8 +25,15 @@ enum AppKind {
 
     func getId() -> String? {
         switch self {
-        case let .normal(app, _):
-            return app.bundleId()
+        case let .normal(app, info):
+            let processId = Self.instanceCacheId(
+                bundleId: app.bundleId(),
+                processIdentifier: app.processIdentifier
+            )
+            if let windowId = info.windowId, !windowId.isEmpty {
+                return "\(processId)#\(windowId)"
+            }
+            return processId
         case let .browser(app, info):
             if !info.isFocusedOnAddressBar,
                let url = info.url,
@@ -38,6 +46,34 @@ enum AppKind {
                 return nil
             }
         }
+    }
+
+    func processInstanceCacheId() -> String? {
+        switch self {
+        case let .normal(app, _):
+            return Self.instanceCacheId(
+                bundleId: app.bundleId(),
+                processIdentifier: app.processIdentifier
+            )
+        case .browser:
+            return nil
+        }
+    }
+
+    func windowCacheId() -> String? {
+        switch self {
+        case let .normal(_, info):
+            return info.windowId
+        case .browser:
+            return nil
+        }
+    }
+
+    static func instanceCacheId(bundleId: String?, processIdentifier: pid_t) -> String {
+        if let bundleId, !bundleId.isEmpty {
+            return "\(bundleId)#\(processIdentifier)"
+        }
+        return "pid:\(processIdentifier)"
     }
 
     func getApp() -> NSRunningApplication {
@@ -82,7 +118,7 @@ enum AppKind {
 
         switch (getBrowserInfo(), otherKind.getBrowserInfo()) {
         case (nil, nil):
-            return true
+            return windowCacheId() == otherKind.windowCacheId()
         case let (current?, previous?):
             if detectAddressBar,
                current.isFocusedOnAddressBar != previous.isFocusedOnAddressBar
@@ -171,8 +207,49 @@ extension AppKind {
             app: app,
             info: (
                 focusedElement,
-                isFocusOnInputContainer
+                isFocusOnInputContainer,
+                resolveWindowCacheToken(app: app, application: application)
             )
         )
+    }
+
+    static func resolveWindowCacheToken(app: NSRunningApplication, application: Application?) -> String? {
+        if let cg = CGWindowIdentity.cacheToken(forPid: app.processIdentifier) {
+            return cg
+        }
+        return focusedWindowCacheToken(application: application)
+    }
+
+    static func focusedWindowCacheToken(application: Application?) -> String? {
+        guard AXIsProcessTrusted(),
+              let application,
+              let window: UIElement = try? application.attribute(.focusedWindow)
+        else { return nil }
+
+        if let number = axWindowNumber(window) {
+            return "w\(number)"
+        }
+
+        if let title: String = try? window.attribute(.title) {
+            let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                let slug = trimmed
+                    .replacingOccurrences(of: "#", with: "_")
+                    .prefix(96)
+                return "t\(slug)"
+            }
+        }
+
+        return nil
+    }
+
+    private static func axWindowNumber(_ window: UIElement) -> Int? {
+        if let number: Int = try? window.attribute("AXWindowNumber") {
+            return number
+        }
+        if let number: NSNumber = try? window.attribute("AXWindowNumber") {
+            return number.intValue
+        }
+        return nil
     }
 }

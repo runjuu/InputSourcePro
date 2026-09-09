@@ -104,9 +104,22 @@ extension PreferencesVM {
     func getAppCustomization(bundleId: String?) -> AppRule? {
         guard let bundleId = bundleId else { return nil }
 
-        let request = AppRule.fetchRequest()
+        if let rule = fetchAppCustomization(exactBundleId: bundleId) {
+            return rule
+        }
 
-        request.predicate = NSPredicate(format: "bundleId == %@", bundleId)
+        for alias in SystemChrome.ruleAliasBundleIDs(for: bundleId) {
+            if let rule = fetchAppCustomization(exactBundleId: alias) {
+                return rule
+            }
+        }
+
+        return nil
+    }
+
+    private func fetchAppCustomization(exactBundleId: String) -> AppRule? {
+        let request = AppRule.fetchRequest()
+        request.predicate = NSPredicate(format: "bundleId == %@", exactBundleId)
 
         do {
             return try container.viewContext.fetch(request).first

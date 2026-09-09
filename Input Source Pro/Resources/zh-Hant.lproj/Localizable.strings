@@ -224,6 +224,9 @@
 "Accessibility" = "輔助功能";
 "Open Accessibility Settings" = "打開「輔助功能」設定";
 "Open Accessibility Settings, find \"Input Source Pro\" in the list and enable the toggle." = "打開「輔助功能」設定，在列表中找到「Input Source Pro」，並開啟開關。";
+"Accessibility Required Title" = "Accessibility Required";
+"Accessibility Required Description" = "Input Source Pro needs **Accessibility** to remember keyboard layouts per window (for example different CLion project windows) and switch them reliably.\n\nWithout this permission the app will not start.";
+"Accessibility Required Steps" = "1. Click **Open Accessibility Settings**\n2. Unlock if needed, find **Input Source Pro** in the list and turn it **on**\n3. If you launched from Xcode, also enable the Debug build (or Xcode) in that list\n4. Return here — the app continues automatically when permission is granted";
 "Input Monitoring" = "輸入監控";
 "Open Input Monitoring Settings" = "打開「輸入監控」設定";
 "Open Input Monitoring Settings, click the \"+\" button and add \"Input Source Pro\" to the list." = "打開「輸入監控」設定，點擊「+」按鈕並將「Input Source Pro」加入列表。";

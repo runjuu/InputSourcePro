@@ -222,6 +222,9 @@
 "Accessibility" = "Accessibility";
 "Open Accessibility Settings" = "Open Accessibility Settings";
 "Open Accessibility Settings, find \"Input Source Pro\" in the list and enable the toggle." = "Open Accessibility Settings, find \"Input Source Pro\" in the list and enable the toggle.";
+"Accessibility Required Title" = "Accessibility Required";
+"Accessibility Required Description" = "Input Source Pro needs **Accessibility** to remember keyboard layouts per window (for example different CLion project windows) and switch them reliably.\n\nWithout this permission the app will not start.";
+"Accessibility Required Steps" = "1. Open Accessibility Settings (button below)\n2. Find **this running build** in the list (path is shown under the steps) and turn it **on**\n3. If you Run from Xcode, each rebuild can appear as a new entry — enable the one that matches the path\n4. Return here — the app continues automatically when permission is granted";
 "Input Monitoring" = "Input Monitoring";
 "Open Input Monitoring Settings" = "Open Input Monitoring Settings";
 "Open Input Monitoring Settings, click the \"+\" button and add \"Input Source Pro\" to the list." = "Open Input Monitoring Settings, click the \"+\" button and add \"Input Source Pro\" to the list.";

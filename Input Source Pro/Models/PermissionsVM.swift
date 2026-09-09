@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import Combine
 import IOKit
 
@@ -23,20 +24,23 @@ final class PermissionsVM: ObservableObject {
     @Published var isAccessibilityEnabled = PermissionsVM.checkAccessibility(prompt: false)
     @Published var isInputMonitoringEnabled = PermissionsVM.checkInputMonitoring(prompt: false)
 
+    private var cancelBag = Set<AnyCancellable>()
+
     init() {
         watchAccessibilityChange()
         watchInputMonitoringChange()
     }
 
     private func watchAccessibilityChange() {
-        guard !isAccessibilityEnabled else { return }
-
         Timer
             .interval(seconds: 1)
             .map { _ in Self.checkAccessibility(prompt: false) }
-            .filter { $0 }
-            .first()
-            .assign(to: &$isAccessibilityEnabled)
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] trusted in
+                self?.isAccessibilityEnabled = trusted
+            }
+            .store(in: &cancelBag)
     }
 
     private func watchInputMonitoringChange() {

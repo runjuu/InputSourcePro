@@ -135,6 +135,12 @@ class StatusItemController {
             changelogMenu,
             checkUpdatesMenu,
             settingsMenu,
+            NSMenuItem(
+                title: "Open Log…",
+                target: self,
+                action: #selector(openLog),
+                keyEquivalent: ""
+            ),
             NSMenuItem.separator(),
             NSMenuItem(
                 title: "Quit".i18n(),
@@ -230,6 +236,10 @@ class StatusItemController {
         if let url = URL(string: "https://inputsource.pro/changelog") {
             NSWorkspace.shared.open(url)
         }
+    }
+
+    @objc func openLog() {
+        ISPFileLog.openInFinder()
     }
 
     @objc func checkForUpdates() {

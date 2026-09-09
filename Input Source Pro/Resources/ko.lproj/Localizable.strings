@@ -222,6 +222,9 @@
 "Accessibility" = "접근성";
 "Open Accessibility Settings" = "접근성 설정 열기";
 "Open Accessibility Settings, find \"Input Source Pro\" in the list and enable the toggle." = "접근성 설정을 열고 목록에서 \"Input Source Pro\"를 찾아 토글을 켜세요.";
+"Accessibility Required Title" = "Accessibility Required";
+"Accessibility Required Description" = "Input Source Pro needs **Accessibility** to remember keyboard layouts per window (for example different CLion project windows) and switch them reliably.\n\nWithout this permission the app will not start.";
+"Accessibility Required Steps" = "1. Click **Open Accessibility Settings**\n2. Unlock if needed, find **Input Source Pro** in the list and turn it **on**\n3. If you launched from Xcode, also enable the Debug build (or Xcode) in that list\n4. Return here — the app continues automatically when permission is granted";
 "Input Monitoring" = "입력 모니터링";
 "Open Input Monitoring Settings" = "입력 모니터링 설정 열기";
 "Open Input Monitoring Settings, click the \"+\" button and add \"Input Source Pro\" to the list." = "입력 모니터링 설정을 열고 \"+\" 버튼을 클릭한 다음 목록에 \"Input Source Pro\"를 추가하세요.";

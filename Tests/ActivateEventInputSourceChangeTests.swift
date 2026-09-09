@@ -7,7 +7,7 @@ final class ActivateEventInputSourceChangeTests: XCTestCase {
     private let app = NSRunningApplication.current
 
     private func appKind() -> AppKind {
-        .normal(app: app, info: (focusedElement: nil, isFocusOnInputContainer: true))
+        .normal(app: app, info: (focusedElement: nil, isFocusOnInputContainer: true, windowId: nil))
     }
 
     func testAppChangesWithUnchangedInputSourceIsFlagged() {

@@ -27,7 +27,11 @@ class BrowserRuleMenuItem: NSMenuItem {
         self.inputSourceVM = inputSourceVM
         self.inputSource = inputSource
 
-        super.init(title: inputSource?.name ?? "", action: #selector(forceKeyboard(_:)), keyEquivalent: "")
+        super.init(
+            title: inputSource?.name ?? "Default".i18n(),
+            action: #selector(forceKeyboard(_:)),
+            keyEquivalent: ""
+        )
 
         target = self
 

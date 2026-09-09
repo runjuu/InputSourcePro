@@ -59,18 +59,28 @@ extension NSApplication {
 // MARK: - isBrowserApp
 
 private var browserAppIdentifier: Set<String> = {
-    let array1 = LSCopyAllRoleHandlersForContentType(
+    let htmlViewers = LSCopyAllRoleHandlersForContentType(
         "public.html" as CFString, .viewer
     )?.takeRetainedValue() as? [String] ?? []
-    let array2 = LSCopyAllHandlersForURLScheme(
-        "https" as CFString
-    )?.takeRetainedValue() as? [String] ?? []
 
-    let set1 = Set(array1)
-    let set2 = Set(array2)
+    let httpsHandlers = httpsURLSchemeHandlers()
 
-    return set1.intersection(set2)
+    return Set(htmlViewers).intersection(httpsHandlers)
 }()
+
+private func httpsURLSchemeHandlers() -> [String] {
+    if #available(macOS 12.0, *) {
+        return NSWorkspace.shared.urlsForApplications(toOpen: URL(string: "https://")!)
+            .compactMap { Bundle(url: $0)?.bundleIdentifier }
+    }
+    return legacyHTTPSURLSchemeHandlers()
+}
+
+@available(macOS, deprecated: 10.15)
+private func legacyHTTPSURLSchemeHandlers() -> [String] {
+    LSCopyAllHandlersForURLScheme("https" as CFString)?
+        .takeRetainedValue() as? [String] ?? []
+}
 
 extension NSApplication {
     static func isBrowserApp(_ bundleIdentifier: String?) -> Bool {

@@ -145,8 +145,11 @@ extension PreferencesVM {
         }
 
         if preferences.prevInstalledBuildVersion <= 462 {
+            // Read legacy key directly to avoid deprecated property warning.
+            let showLabel =
+                (UserDefaults.standard.object(forKey: "isShowInputSourcesLabel") as? Bool) ?? true
             update {
-                $0.indicatorInfo = $0.isShowInputSourcesLabel ? .iconAndTitle : .iconOnly
+                $0.indicatorInfo = showLabel ? .iconAndTitle : .iconOnly
             }
         }
     }

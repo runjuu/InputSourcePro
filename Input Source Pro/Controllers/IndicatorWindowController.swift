@@ -57,7 +57,7 @@ class IndicatorWindowController: FloatWindowController {
                 guard let self = self else { return Empty().eraseToAnyPublisher() }
                 guard let appKind = self.applicationVM.appKind,
                       !event.isJustHide,
-                      !preferencesVM.isHideIndicator(appKind)
+                      !self.preferencesVM.isHideIndicator(appKind)
                 else { return self.justHidePublisher() }
 
                 let app = appKind.getApp()
@@ -69,9 +69,9 @@ class IndicatorWindowController: FloatWindowController {
                     return self.autoHidePublisher(event: event, inputSource: inputSource, appKind: appKind)
                 }
 
-                if preferencesVM.isShowAlwaysOnIndicator(app: app) {
+                if self.preferencesVM.isShowAlwaysOnIndicator(app: app) {
                     return self.alwaysOnPublisher(event: event, inputSource: inputSource, appKind: appKind)
-                } else if preferencesVM.needDetectFocusedFieldChanges(app: app) {
+                } else if self.preferencesVM.needDetectFocusedFieldChanges(app: app) {
                     return self.autoShowPublisher(event: event, inputSource: inputSource, appKind: appKind)
                 } else if event.isAppChangesWithUnchangedInputSource {
                     // App switch that keeps the same input source: nothing switched,
