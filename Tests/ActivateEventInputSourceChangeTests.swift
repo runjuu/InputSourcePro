@@ -38,4 +38,18 @@ final class ActivateEventInputSourceChangeTests: XCTestCase {
         XCTAssertFalse(IndicatorVM.ActivateEvent.justHide.isAppChangesWithUnchangedInputSource)
         XCTAssertFalse(IndicatorVM.ActivateEvent.longMouseDown.isAppChangesWithUnchangedInputSource)
     }
+
+    func testJustHideIsFlaggedAndNotAppChange() {
+        let event = IndicatorVM.ActivateEvent.justHide
+        XCTAssertTrue(event.isJustHide)
+        XCTAssertFalse(event.isAppChangesWithUnchangedInputSource)
+        XCTAssertFalse(event.isAppChangesWithSameAppOrWebsite())
+    }
+
+    func testTimerToleranceCanBeSpecified() {
+        let delayPublisher = Timer.delay(seconds: 0.1, tolerance: 0.05)
+        let intervalPublisher = Timer.interval(seconds: 0.5, tolerance: 0.05)
+        XCTAssertNotNil(delayPublisher)
+        XCTAssertNotNil(intervalPublisher)
+    }
 }
