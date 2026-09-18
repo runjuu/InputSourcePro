@@ -45,29 +45,39 @@ extension IndicatorVM {
     }
 
     func longMouseDownPublisher() -> AnyPublisher<ActivateEvent, Never> {
-        AnyPublisher<NSEvent, Never>
-            .create { observer in
-                let monitor = NSEvent.addGlobalMonitorForEvents(
-                    matching: [.leftMouseDown, .leftMouseUp, .leftMouseDragged],
-                    handler: { observer.send($0) }
-                )
+        preferencesVM.$preferences
+            .map(\.isActiveWhenLongpressLeftMouse)
+            .removeDuplicates()
+            .flatMapLatest { isEnabled -> AnyPublisher<ActivateEvent, Never> in
+                guard isEnabled else { return Empty().eraseToAnyPublisher() }
 
-                return AnyCancellable { NSEvent.removeMonitor(monitor!) }
+                return AnyPublisher<NSEvent, Never>
+                    .create { observer in
+                        let monitor = NSEvent.addGlobalMonitorForEvents(
+                            matching: [.leftMouseDown, .leftMouseUp, .leftMouseDragged],
+                            handler: { observer.send($0) }
+                        )
+
+                        return AnyCancellable {
+                            if let monitor = monitor {
+                                NSEvent.removeMonitor(monitor)
+                            }
+                        }
+                    }
+                    .flatMapLatest { event -> AnyPublisher<Void, Never> in
+                        if event.type == .leftMouseDown {
+                            return Timer
+                                .delay(seconds: 0.35)
+                                .mapToVoid()
+                                .eraseToAnyPublisher()
+                        } else {
+                            return Empty<Void, Never>().eraseToAnyPublisher()
+                        }
+                    }
+                    .mapTo(.longMouseDown)
+                    .eraseToAnyPublisher()
             }
-            .flatMapLatest { event -> AnyPublisher<Void, Never> in
-                if event.type == .leftMouseDown {
-                    return Timer
-                        .delay(seconds: 0.35)
-                        .mapToVoid()
-                        .eraseToAnyPublisher()
-                } else {
-                    return Empty<Void, Never>().eraseToAnyPublisher()
-                }
-            }
-            .filter { [weak self] _ in
-                self?.preferencesVM.preferences.isActiveWhenLongpressLeftMouse ?? false
-            }
-            .mapTo(.longMouseDown)
+            .eraseToAnyPublisher()
     }
 
     func functionKeyModeChangesPublisher() -> AnyPublisher<ActivateEvent, Never> {

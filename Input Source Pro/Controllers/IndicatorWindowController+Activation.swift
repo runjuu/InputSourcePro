@@ -316,16 +316,17 @@ extension IndicatorWindowController {
     /// can find one and otherwise moves it with the pointer, and refreshes its
     /// content itself. The activate-event pipeline is idle in that mode.
     func watchAlwaysNearMouse() {
-        preferencesVM.$preferences
-            .map(\.isAlwaysDisplayIndicatorNearMouseEnabled)
-            .removeDuplicates()
-            .flatMapLatest { [weak self] isEnabled -> AnyPublisher<Void, Never> in
-                guard let self = self, isEnabled else { return Empty().eraseToAnyPublisher() }
+        Publishers.CombineLatest(
+            preferencesVM.$preferences.map(\.isAlwaysDisplayIndicatorNearMouseEnabled).removeDuplicates(),
+            indicatorVM.screenIsLockedPublisher.removeDuplicates()
+        )
+        .flatMapLatest { [weak self] isEnabled, isLocked -> AnyPublisher<Void, Never> in
+            guard let self = self, isEnabled, !isLocked else { return Empty().eraseToAnyPublisher() }
 
-                return self.alwaysNearMousePublisher()
-            }
-            .sink { _ in }
-            .store(in: cancelBag)
+            return self.alwaysNearMousePublisher()
+        }
+        .sink { _ in }
+        .store(in: cancelBag)
     }
 
     private func alwaysNearMousePublisher() -> AnyPublisher<Void, Never> {
