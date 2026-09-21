@@ -183,6 +183,7 @@
 		D60001022F20000000000102 /* AppKindComparisonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60001012F20000000000101 /* AppKindComparisonTests.swift */; };
 		D60003022F20000000000302 /* ShortcutConflict.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60003012F20000000000301 /* ShortcutConflict.swift */; };
 		D60003042F20000000000304 /* ShortcutConflictTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60003032F20000000000303 /* ShortcutConflictTests.swift */; };
+		D60003142F20000000000314 /* ModifierComboTriggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60003132F20000000000313 /* ModifierComboTriggerTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -382,6 +383,7 @@
 		D60001012F20000000000101 /* AppKindComparisonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKindComparisonTests.swift; sourceTree = "<group>"; };
 		D60003012F20000000000301 /* ShortcutConflict.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutConflict.swift; sourceTree = "<group>"; };
 		D60003032F20000000000303 /* ShortcutConflictTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutConflictTests.swift; sourceTree = "<group>"; };
+		D60003132F20000000000313 /* ModifierComboTriggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModifierComboTriggerTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -768,6 +770,7 @@
 				D60002412F20000000000241 /* SpotlightCompatibilityTests.swift */,
 				D60002312F20000000000231 /* SpotlightIndicatorPositionTests.swift */,
 				D60003032F20000000000303 /* ShortcutConflictTests.swift */,
+				D60003132F20000000000313 /* ModifierComboTriggerTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -1094,6 +1097,7 @@
 				D60002422F20000000000242 /* SpotlightCompatibilityTests.swift in Sources */,
 				D60002322F20000000000232 /* SpotlightIndicatorPositionTests.swift in Sources */,
 				D60003042F20000000000304 /* ShortcutConflictTests.swift in Sources */,
+				D60003142F20000000000314 /* ModifierComboTriggerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

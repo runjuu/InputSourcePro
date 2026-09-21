@@ -477,7 +477,7 @@ final class ShortcutTriggerManager {
         }
     }
 
-    private func handleFlagsChanged(_ event: NSEvent) {
+    func handleFlagsChanged(_ event: NSEvent) {
         if InputSourceSwitcher.isSyntheticEvent(event.cgEvent) {
             return
         }
@@ -495,6 +495,8 @@ final class ShortcutTriggerManager {
         flags.remove(.capsLock)
 
         let isKeyDown = flags.contains(key.modifierFlag)
+
+        forgetMissedReleases(eventKey: key, isKeyDown: isKeyDown, flags: flags)
 
         if isKeyDown {
             lastKeyDownTimestamps[event.keyCode] = event.timestamp
@@ -519,6 +521,31 @@ final class ShortcutTriggerManager {
             }
 
             triggerCompletedCombos(at: event.timestamp)
+            comboInvalidated.removeAll()
+            comboCompleted.removeAll()
+            comboPressTimestamps.removeAll()
+        }
+    }
+
+    /// Each flagsChanged event carries the full modifier state, so drop modifiers still
+    /// tracked as pressed whose release was never seen, e.g. it happened on the lock
+    /// screen, or it was right Shift let go while left Shift kept `.shift` set: the event
+    /// reports them up, or reports a new press of the same key. A stale key would
+    /// otherwise invalidate every combo until it is pressed again.
+    private func forgetMissedReleases(
+        eventKey: SingleModifierKey,
+        isKeyDown: Bool,
+        flags: NSEvent.ModifierFlags
+    ) {
+        let staleKeys = pressedModifiers.keys.filter { key in
+            key == eventKey ? isKeyDown : !flags.contains(key.modifierFlag)
+        }
+        guard !staleKeys.isEmpty else { return }
+
+        staleKeys.forEach { pressedModifiers.removeValue(forKey: $0) }
+
+        // The missed release ended the previous hold cycle.
+        if pressedModifiers.isEmpty {
             comboInvalidated.removeAll()
             comboCompleted.removeAll()
             comboPressTimestamps.removeAll()
