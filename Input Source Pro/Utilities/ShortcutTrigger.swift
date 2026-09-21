@@ -271,8 +271,10 @@ final class ShortcutTriggerManager {
     }
 
     deinit {
-        // deinit is nonisolated; schedule main-actor cleanup asynchronously
-        Task { @MainActor in
+        // Clean up synchronously: a Task would keep `self` alive past deinit, and the
+        // event tap callback holds an unretained pointer to it. The manager is only
+        // ever released on the main thread.
+        MainActor.assumeIsolated {
             removeAllMonitors()
         }
     }

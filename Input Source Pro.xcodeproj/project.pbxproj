@@ -167,6 +167,7 @@
 		D5F73B022A2C1DCD00BBC10A /* InputSourceVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5F73B012A2C1DCD00BBC10A /* InputSourceVM.swift */; };
 		D5FC8F552A4134B5002AE1F2 /* IndicatorSize.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5FC8F542A4134B5002AE1F2 /* IndicatorSize.swift */; };
 		D60000032F20000000000003 /* TestHarnessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000022F20000000000002 /* TestHarnessTests.swift */; };
+		D60003242F20000000000324 /* ShortcutTriggerManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60003232F20000000000323 /* ShortcutTriggerManagerTests.swift */; };
 		D60000122F20000000000012 /* BrowserRuleSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000112F20000000000011 /* BrowserRuleSelectionTests.swift */; };
 		D60000222F20000000000022 /* RuntimeRuleChangeNotifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000212F20000000000021 /* RuntimeRuleChangeNotifierTests.swift */; };
 		D60000322F20000000000032 /* BrowserRuleValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000312F20000000000031 /* BrowserRuleValidationTests.swift */; };
@@ -367,6 +368,7 @@
 		D5FC8F542A4134B5002AE1F2 /* IndicatorSize.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndicatorSize.swift; sourceTree = "<group>"; };
 		D60000012F20000000000001 /* Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D60000022F20000000000002 /* TestHarnessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHarnessTests.swift; sourceTree = "<group>"; };
+		D60003232F20000000000323 /* ShortcutTriggerManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutTriggerManagerTests.swift; sourceTree = "<group>"; };
 		D60000112F20000000000011 /* BrowserRuleSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserRuleSelectionTests.swift; sourceTree = "<group>"; };
 		D60000212F20000000000021 /* RuntimeRuleChangeNotifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeRuleChangeNotifierTests.swift; sourceTree = "<group>"; };
 		D60000312F20000000000031 /* BrowserRuleValidationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserRuleValidationTests.swift; sourceTree = "<group>"; };
@@ -762,6 +764,7 @@
 				D60000312F20000000000031 /* BrowserRuleValidationTests.swift */,
 				D60000212F20000000000021 /* RuntimeRuleChangeNotifierTests.swift */,
 				D60000022F20000000000002 /* TestHarnessTests.swift */,
+				D60003232F20000000000323 /* ShortcutTriggerManagerTests.swift */,
 				D60000712F20000000000071 /* AppURLActionTests.swift */,
 				D60000812F20000000000081 /* URLActivationSuppressionTests.swift */,
 				D60001912F20000000000191 /* ActivateEventInputSourceChangeTests.swift */,
@@ -1089,6 +1092,7 @@
 				D60000322F20000000000032 /* BrowserRuleValidationTests.swift in Sources */,
 				D60000222F20000000000022 /* RuntimeRuleChangeNotifierTests.swift in Sources */,
 				D60000032F20000000000003 /* TestHarnessTests.swift in Sources */,
+				D60003242F20000000000324 /* ShortcutTriggerManagerTests.swift in Sources */,
 				D60000722F20000000000072 /* AppURLActionTests.swift in Sources */,
 				D60000822F20000000000082 /* URLActivationSuppressionTests.swift in Sources */,
 				D60001922F20000000000192 /* ActivateEventInputSourceChangeTests.swift in Sources */,
