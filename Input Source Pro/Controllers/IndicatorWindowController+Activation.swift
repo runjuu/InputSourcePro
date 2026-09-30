@@ -318,10 +318,10 @@ extension IndicatorWindowController {
     func watchAlwaysNearMouse() {
         Publishers.CombineLatest(
             preferencesVM.$preferences.map(\.isAlwaysDisplayIndicatorNearMouseEnabled).removeDuplicates(),
-            indicatorVM.screenIsLockedPublisher.removeDuplicates()
+            indicatorVM.indicatorIsSuspendedPublisher.removeDuplicates()
         )
-        .flatMapLatest { [weak self] isEnabled, isLocked -> AnyPublisher<Void, Never> in
-            guard let self = self, isEnabled, !isLocked else { return Empty().eraseToAnyPublisher() }
+        .flatMapLatest { [weak self] isEnabled, isSuspended -> AnyPublisher<Void, Never> in
+            guard let self = self, isEnabled, !isSuspended else { return Empty().eraseToAnyPublisher() }
 
             return self.alwaysNearMousePublisher()
         }
