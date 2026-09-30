@@ -129,6 +129,15 @@
 "Punctuation" = "구두점";
 "ASCII Punctuation" = "ASCII 구두점";
 "Force English Punctuation" = "영어 구두점 강제 사용";
+"Markdown Mode" = "Markdown 모드";
+"Enable Markdown Mode" = "Markdown 모드 활성화";
+"Markdown Mode Description" = "간체 병음의 기본 또는 ABC/미국식 배열에서 지정된 키를 Markdown 기호 `, $, >, []로 바꿉니다. Shift+쉼표는 《》를 입력합니다. 반각 문장 부호 설정에서도 같은 키 매핑이 적용됩니다.";
+"Markdown Mode Permissions Description" = "Markdown 모드에는 입력 모니터링 및 손쉬운 사용 권한이 필요합니다. 권한을 허용한 후 켜 주세요.";
+"Markdown Mode Is Off" = "Markdown 모드가 꺼져 있습니다";
+"Markdown Mode Another Instance Description" = "다른 Input Source Pro 인스턴스를 종료한 후 Markdown 모드를 다시 켜 주세요.";
+"Markdown Mode Activation Failed Description" = "macOS에서 키보드 이벤트 처리를 시작하지 못했습니다. 권한을 확인한 후 Markdown 모드를 다시 켜 주세요.";
+"Markdown Mode Tap Disabled Description" = "macOS에서 키보드 이벤트 처리를 중지했습니다. 권한을 확인한 후 Markdown 모드를 다시 켜 주세요.";
+"Markdown Mode Timeout Description" = "키보드 처리 시간이 너무 길어 문장 부호 대체를 중지했습니다. Markdown 모드를 다시 켜서 재시도하세요.";
 "Use Function Keys" = "기능 키 사용 (F1, F2 등)";
 "Use Media Keys" = "미디어 키 사용 (밝기, 음량 등)";
 "Use Global Setting" = "전역 설정 사용";

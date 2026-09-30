@@ -20,12 +20,38 @@ final class PermissionsVM: ObservableObject {
         }
     }
 
-    @Published var isAccessibilityEnabled = PermissionsVM.checkAccessibility(prompt: false)
-    @Published var isInputMonitoringEnabled = PermissionsVM.checkInputMonitoring(prompt: false)
+    @Published var isAccessibilityEnabled: Bool
+    @Published var isInputMonitoringEnabled: Bool
 
-    init() {
+    private let accessibilityCheck: @MainActor () -> Bool
+    private let inputMonitoringCheck: @MainActor () -> Bool
+    private var activationSubscription: AnyCancellable?
+
+    init(
+        accessibilityCheck: @escaping @MainActor () -> Bool = { PermissionsVM.checkAccessibility(prompt: false) },
+        inputMonitoringCheck: @escaping @MainActor () -> Bool = { PermissionsVM.checkInputMonitoring(prompt: false) },
+        notificationCenter: NotificationCenter = .default
+    ) {
+        self.accessibilityCheck = accessibilityCheck
+        self.inputMonitoringCheck = inputMonitoringCheck
+        isAccessibilityEnabled = accessibilityCheck()
+        isInputMonitoringEnabled = inputMonitoringCheck()
         watchAccessibilityChange()
         watchInputMonitoringChange()
+        activationSubscription = notificationCenter.publisher(for: NSApplication.didBecomeActiveNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.refresh() }
+    }
+
+    func refresh() {
+        let accessibilityEnabled = accessibilityCheck()
+        let inputMonitoringEnabled = inputMonitoringCheck()
+        if isAccessibilityEnabled != accessibilityEnabled {
+            isAccessibilityEnabled = accessibilityEnabled
+        }
+        if isInputMonitoringEnabled != inputMonitoringEnabled {
+            isInputMonitoringEnabled = inputMonitoringEnabled
+        }
     }
 
     private func watchAccessibilityChange() {
@@ -33,7 +59,7 @@ final class PermissionsVM: ObservableObject {
 
         Timer
             .interval(seconds: 1)
-            .map { _ in Self.checkAccessibility(prompt: false) }
+            .map { [accessibilityCheck] _ in accessibilityCheck() }
             .filter { $0 }
             .first()
             .assign(to: &$isAccessibilityEnabled)
@@ -44,7 +70,7 @@ final class PermissionsVM: ObservableObject {
 
         Timer
             .interval(seconds: 1)
-            .map { _ in Self.checkInputMonitoring(prompt: false) }
+            .map { [inputMonitoringCheck] _ in inputMonitoringCheck() }
             .filter { $0 }
             .first()
             .assign(to: &$isInputMonitoringEnabled)

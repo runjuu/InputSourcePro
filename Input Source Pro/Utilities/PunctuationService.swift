@@ -1,23 +1,71 @@
 import AppKit
 import Carbon
 import Combine
-import IOKit
-import os
 
 @MainActor
-class PunctuationService: ObservableObject {
+final class PunctuationService: ObservableObject {
+    enum Mode: Equatable {
+        case appEnglish
+        case markdown
+    }
+
+    enum Failure: Error, Equatable {
+        case missingPermissions(inputMonitoring: Bool, accessibility: Bool)
+        case anotherInstanceRunning
+        case eventTapCreationFailed
+        case eventTapDisabled
+        case handlerTimedOut
+    }
+
+    struct SafetyShutdown: Equatable {
+        let mode: Mode
+        let failure: Failure
+    }
+
+    final class EventTap {
+        private var invalidateHandler: (() -> Void)?
+
+        init(invalidate: @escaping () -> Void) {
+            invalidateHandler = invalidate
+        }
+
+        func invalidate() {
+            let invalidate = invalidateHandler
+            invalidateHandler = nil
+            invalidate?()
+        }
+
+        deinit {
+            invalidateHandler?()
+        }
+    }
+
+    struct Dependencies {
+        var hasInputMonitoring: @MainActor () -> Bool = { PermissionsVM.checkInputMonitoring(prompt: false) }
+        var hasAccessibility: @MainActor () -> Bool = { PermissionsVM.checkAccessibility(prompt: false) }
+        var hasAnotherInstance: () -> Bool = {
+            ["com.runjuu.Input-Source-Pro", "com.runjuu.Input-Source-Pro.Markdown"]
+                .flatMap { NSRunningApplication.runningApplications(withBundleIdentifier: $0) }
+                .contains { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier && !$0.isTerminated }
+        }
+        var createEventTap: @MainActor (CGEventTapCallBack, UnsafeMutableRawPointer) -> EventTap? = PunctuationService.createEventTap
+        var markdownInputContext: () -> MarkdownPunctuationMapping.InputContext? = MarkdownPunctuationMapping.currentInputContext
+        var now: () -> TimeInterval = CACurrentMediaTime
+    }
+
     private let logger = ISPLogger(category: String(describing: PunctuationService.self))
-    
-    private var isEnabled = false
-    private var eventTap: CFMachPort?
-    private weak var preferencesVM: PreferencesVM?
-    
-    // Performance optimization: Cache input source state to reduce system calls
+    private let generatedEventMarker: Int64 = 0x4953_504D_44
+    private let maximumHandlerDuration: TimeInterval = 0.05
+    private let dependencies: Dependencies
+    private var eventTap: EventTap?
+    private(set) var activeMode: Mode?
+    var onSafetyShutdown: ((SafetyShutdown) -> Void)?
+
     private var cachedInputSource: InputSource?
     private var inputSourceCacheTime: TimeInterval = 0
-    private let inputSourceCacheTimeout: TimeInterval = 0.5 // Cache for 500ms
-    
-    private let cjkvToEnglishPunctuationMap: [UInt16: (normal: String?, shifted: String?)] = [
+    private let inputSourceCacheTimeout: TimeInterval = 0.5
+
+    private let appEnglishPunctuationMap: [UInt16: (normal: String?, shifted: String?)] = [
         UInt16(kVK_ANSI_Grave): ("`", "~"),
         UInt16(kVK_ANSI_4): (nil, "$"),
         UInt16(kVK_ANSI_6): (nil, "^"),
@@ -30,173 +78,137 @@ class PunctuationService: ObservableObject {
         UInt16(kVK_ANSI_LeftBracket): ("[", "{"),
         UInt16(kVK_ANSI_RightBracket): ("]", "}")
     ]
-    
-    init(preferencesVM: PreferencesVM) {
-        self.preferencesVM = preferencesVM
+
+    init(dependencies: Dependencies = Dependencies()) {
+        self.dependencies = dependencies
     }
-    
-    deinit {
-        // Ensure cleanup happens regardless of disable() being called
-        // Note: Direct cleanup since deinit is not on MainActor
-        if let eventTap = eventTap {
-            CGEvent.tapEnable(tap: eventTap, enable: false)
-            CFMachPortInvalidate(eventTap)
-        }
-    }
-    
-    func enable() {
-        guard !isEnabled else { return }
-        
-        let hasPermission = PermissionsVM.checkInputMonitoring(prompt: false)
-        
-        if !hasPermission {
-            logger.debug { "Input Monitoring permission check failed, attempting fallback activation" }
-            // Try to enable anyway - permission check might be unreliable
-            // If it fails, startMonitoring() will handle it gracefully
-        } else {
-            logger.debug { "Input Monitoring permission verified" }
-        }
-        
-        logger.debug { "Enabling English punctuation service for app-aware switching" }
-        let success = startMonitoring()
-        
-        if success {
-            isEnabled = true
-            logger.debug { "English punctuation service started successfully" }
-        } else {
-            logger.debug { "Failed to start English punctuation service - Input Monitoring permission required" }
-            // Service will remain disabled until next enable() call or permission state change
-        }
-    }
-    
-    func disable() {
-        guard isEnabled else { return }
-        
-        logger.debug { "Disabling English punctuation service" }
-        stopMonitoring()
-        isEnabled = false
-    }
-    
+
     @discardableResult
-    private func startMonitoring() -> Bool {
-        stopMonitoring()
-        
-        // Skip unreliable preflight checks - directly attempt event tap creation
-        // We've already verified permissions through IOHIDCheckAccess
-        logger.debug { "Starting event tap creation (skipping preflight checks)" }
-        
-        let eventMask = (1 << CGEventType.keyDown.rawValue)
-        
-        let callback: CGEventTapCallBack = { proxy, type, event, refcon in
+    func enable(mode: Mode) -> Result<Void, Failure> {
+        if mode == .markdown, let failure = markdownActivationFailure() {
+            if activeMode == .markdown {
+                disable()
+            }
+            return .failure(failure)
+        }
+
+        if eventTap != nil {
+            activeMode = mode
+            return .success(())
+        }
+
+        let callback: CGEventTapCallBack = { _, type, event, refcon in
             guard let refcon = refcon else {
                 return Unmanaged.passUnretained(event)
             }
-            
             let service = Unmanaged<PunctuationService>.fromOpaque(refcon).takeUnretainedValue()
-            return service.handleKeyEvent(proxy: proxy, type: type, event: event)
+            return service.handleKeyEvent(type: type, event: event)
         }
-        
-        // Try different event tap configurations for better compatibility
-        // IMPORTANT: We must NOT use `.listenOnly` here because we need to
-        // modify/replace key events. `.listenOnly` ignores returned events.
-        let configurations: [(options: CGEventTapOptions, place: CGEventTapPlacement, description: String)] = [
-            // Prefer default (modifiable) taps first
-            (.defaultTap, .headInsertEventTap, "Default + Head insertion"),
-            (.defaultTap, .tailAppendEventTap, "Default + Tail insertion")
-        ]
-        
-        for config in configurations {
-            logger.debug { "Attempting event tap creation - \(config.description)" }
-            
-            eventTap = CGEvent.tapCreate(
-                tap: .cgSessionEventTap,
-                place: config.place,
-                options: config.options,
-                eventsOfInterest: CGEventMask(eventMask),
-                callback: callback,
-                userInfo: Unmanaged.passUnretained(self).toOpaque()
-            )
-            
-            if let eventTap = eventTap {
-                let runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0)
-                CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
-                CGEvent.tapEnable(tap: eventTap, enable: true)
-                
-                logger.debug { "✅ Event tap created successfully using \(config.description)" }
-                return true
-            } else {
-                logger.debug { "❌ Failed: \(config.description) - trying next configuration" }
-            }
+        guard let eventTap = dependencies.createEventTap(callback, Unmanaged.passUnretained(self).toOpaque()) else {
+            disable()
+            return .failure(.eventTapCreationFailed)
         }
-        
-        // If all configurations failed, provide detailed diagnostic info
-        logger.debug { "❌ All event tap configurations failed. Diagnostic info:" }
-        #if DEBUG
-        checkServiceStatus()
-        #endif
-        
-        return false
+
+        self.eventTap = eventTap
+        activeMode = mode
+        return .success(())
     }
-    
-    private func stopMonitoring() {
-        if let eventTap = eventTap {
-            CGEvent.tapEnable(tap: eventTap, enable: false)
-            CFMachPortInvalidate(eventTap)
-            self.eventTap = nil
-            logger.debug { "Event tap disabled and invalidated" }
-        }
-        
-        // Clear cached input source to ensure fresh state on next enable
+
+    func disable() {
+        activeMode = nil
+        let eventTap = eventTap
+        self.eventTap = nil
+        eventTap?.invalidate()
         cachedInputSource = nil
         inputSourceCacheTime = 0
     }
-    
-    private func handleKeyEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent> {
-        // Handle event tap being disabled (can happen if permissions are revoked)
-        guard isEnabled else {
-            return Unmanaged.passUnretained(event)
+
+    private func markdownActivationFailure() -> Failure? {
+        let inputMonitoring = dependencies.hasInputMonitoring()
+        let accessibility = dependencies.hasAccessibility()
+        guard inputMonitoring && accessibility else {
+            return .missingPermissions(inputMonitoring: !inputMonitoring, accessibility: !accessibility)
         }
-        
-        guard type == .keyDown else {
-            return Unmanaged.passUnretained(event)
+        return dependencies.hasAnotherInstance() ? .anotherInstanceRunning : nil
+    }
+
+    private static func createEventTap(callback: CGEventTapCallBack, userInfo: UnsafeMutableRawPointer) -> EventTap? {
+        let eventMask = CGEventMask(1 << CGEventType.keyDown.rawValue)
+        for placement in [CGEventTapPlacement.headInsertEventTap, .tailAppendEventTap] {
+            guard let tap = CGEvent.tapCreate(
+                tap: .cgSessionEventTap,
+                place: placement,
+                options: .defaultTap,
+                eventsOfInterest: eventMask,
+                callback: callback,
+                userInfo: userInfo
+            ) else { continue }
+
+            guard let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0) else {
+                CFMachPortInvalidate(tap)
+                continue
+            }
+            let runLoop = CFRunLoopGetCurrent()
+            CFRunLoopAddSource(runLoop, source, .commonModes)
+            CGEvent.tapEnable(tap: tap, enable: true)
+            return EventTap {
+                CGEvent.tapEnable(tap: tap, enable: false)
+                CFRunLoopRemoveSource(runLoop, source, .commonModes)
+                CFMachPortInvalidate(tap)
+            }
         }
-        
-        let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-        
-        // Check if this is a punctuation key we want to intercept
-        guard let mapping = cjkvToEnglishPunctuationMap[UInt16(keyCode)] else {
-            // Not a punctuation key we're interested in
-            return Unmanaged.passUnretained(event)
-        }
-        
-        guard shouldReplacePunctuation(for: event.flags) else {
-            // Preserve shortcuts and system key combinations that use punctuation keys.
+        return nil
+    }
+
+    func handleKeyEvent(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent> {
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            shutdownForSafety(.eventTapDisabled)
             return Unmanaged.passUnretained(event)
         }
 
-        guard let englishReplacement = event.flags.contains(.maskShift) ? mapping.shifted : mapping.normal else {
-            return Unmanaged.passUnretained(event)
+        guard let mode = activeMode, type == .keyDown,
+              event.getIntegerValueField(.eventSourceUserData) != generatedEventMarker,
+              let keyCode = CGKeyCode(exactly: event.getIntegerValueField(.keyboardEventKeycode))
+        else { return Unmanaged.passUnretained(event) }
+
+        let handlerStartTime = dependencies.now()
+        defer {
+            if mode == .markdown, dependencies.now() - handlerStartTime > maximumHandlerDuration {
+                shutdownForSafety(.handlerTimedOut)
+            }
         }
-        
-        // Check if we're in a Chinese/CJKV input method (with caching for performance)
-        let currentInputSource = getCachedCurrentInputSource()
-        guard currentInputSource.isCJKVR else {
-            // Already in English/ASCII input method, no need to intercept
-            return Unmanaged.passUnretained(event)
+
+        let replacement: String?
+        switch mode {
+        case .markdown:
+            replacement = MarkdownPunctuationMapping.replacement(
+                for: keyCode,
+                flags: event.flags,
+                keyboardType: event.getIntegerValueField(.keyboardEventKeyboardType),
+                contextProvider: dependencies.markdownInputContext
+            )
+        case .appEnglish:
+            if let mapping = appEnglishPunctuationMap[keyCode], shouldReplacePunctuation(for: event.flags),
+               let punctuation = event.flags.contains(.maskShift) ? mapping.shifted : mapping.normal,
+               getCachedCurrentInputSource().isCJKVR {
+                replacement = punctuation
+            } else {
+                replacement = nil
+            }
         }
-        
-        logger.debug { "🎯 Intercepting punctuation key: \(keyCode) ('\(englishReplacement)') in CJKV input method: \(currentInputSource.name)" }
-        
-        // Create a new event with English replacement
-        if let newEvent = createEnglishPunctuationEvent(originalEvent: event, replacement: englishReplacement) {
-            logger.debug { "✅ Successfully created replacement event, returning new event" }
-            return Unmanaged.passRetained(newEvent)
-        } else {
-            logger.debug { "❌ Failed to create replacement event, passing through original" }
-            return Unmanaged.passUnretained(event)
-        }
+
+        guard let replacement = replacement,
+              let newEvent = createEnglishPunctuationEvent(originalEvent: event, replacement: replacement)
+        else { return Unmanaged.passUnretained(event) }
+        return Unmanaged.passRetained(newEvent)
     }
-    
+
+    private func shutdownForSafety(_ failure: Failure) {
+        guard let mode = activeMode else { return }
+        disable()
+        onSafetyShutdown?(SafetyShutdown(mode: mode, failure: failure))
+    }
+
     private func createEnglishPunctuationEvent(originalEvent: CGEvent, replacement: String) -> CGEvent? {
         // Use the original keyCode but with English character replacement
         let originalKeyCode = CGKeyCode(originalEvent.getIntegerValueField(.keyboardEventKeycode))
@@ -215,6 +227,7 @@ class PunctuationService: ObservableObject {
         
         // Copy relevant properties from the original event (but not flags to avoid modifier conflicts)
         newEvent.timestamp = originalEvent.timestamp
+        newEvent.setIntegerValueField(.eventSourceUserData, value: generatedEventMarker)
         
         // Explicitly set flags to none to ensure clean character input
         newEvent.flags = []
@@ -229,16 +242,9 @@ class PunctuationService: ObservableObject {
         return flags.intersection(shortcutModifiers).isEmpty
     }
 
-    func shouldEnableForApp(_ app: NSRunningApplication) -> Bool {
-        guard let preferencesVM = preferencesVM else { return false }
-        
-        let appRule = preferencesVM.getAppCustomization(app: app)
-        return appRule?.shouldForceEnglishPunctuation == true
-    }
-    
     /// Get current input source with caching to improve performance during rapid typing
     private func getCachedCurrentInputSource() -> InputSource {
-        let currentTime = CACurrentMediaTime()
+        let currentTime = dependencies.now()
         
         // Return cached value if it's still valid
         if let cached = cachedInputSource, 
@@ -254,22 +260,4 @@ class PunctuationService: ObservableObject {
         return currentInputSource
     }
     
-    /// Check current service status and log detailed information for debugging
-    func checkServiceStatus() {
-        let permissionViaIOHID = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
-        let permissionViaCGEvent = PermissionsVM.checkInputMonitoring(prompt: false)
-        let accessibilityEnabled = PermissionsVM.checkAccessibility(prompt: false)
-        let currentInputSource = InputSource.getCurrentInputSource()
-        
-        logger.debug { """
-            🔍 English Punctuation Service Diagnostic:
-            - Service Enabled: \(isEnabled)
-            - Event Tap Active: \(eventTap != nil)
-            - IOHIDCheckAccess (Input Monitoring): \(permissionViaIOHID ? "✅ Granted" : "❌ Denied")
-            - CGEvent Permission Check: \(permissionViaCGEvent ? "✅ Passed" : "❌ Failed")  
-            - Accessibility Permission: \(accessibilityEnabled ? "✅ Granted" : "❌ Denied")
-            - Current Input Source: \(currentInputSource.name) (CJKV: \(currentInputSource.isCJKVR))
-            - Monitored Keys: \(cjkvToEnglishPunctuationMap.map { "\($0.key)→'\($0.value.normal ?? "pass")'/'\($0.value.shifted ?? "pass")'" }.joined(separator: ", "))
-            """ }
-    }
 }

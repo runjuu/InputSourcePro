@@ -129,6 +129,15 @@
 "Punctuation" = "句読点";
 "ASCII Punctuation" = "ASCII 句読点";
 "Force English Punctuation" = "英語句読点を強制使用";
+"Markdown Mode" = "Markdown モード";
+"Enable Markdown Mode" = "Markdown モードを有効にする";
+"Markdown Mode Description" = "簡体字ピンインの標準または ABC／米国配列で、指定キーを Markdown 用の `、$、>、[] に割り当てます。Shift＋カンマで《》を入力します。半角句読点の設定でも同じ割り当てが適用されます。";
+"Markdown Mode Permissions Description" = "Markdown モードには入力監視とアクセシビリティの権限が必要です。権限を許可してから有効にしてください。";
+"Markdown Mode Is Off" = "Markdown モードはオフです";
+"Markdown Mode Another Instance Description" = "他の Input Source Pro を終了してから、Markdown モードを再度有効にしてください。";
+"Markdown Mode Activation Failed Description" = "macOS がキーボードイベントの処理を開始できませんでした。権限を確認してから、Markdown モードを再度有効にしてください。";
+"Markdown Mode Tap Disabled Description" = "macOS がキーボードイベントの処理を停止しました。権限を確認してから、Markdown モードを再度有効にしてください。";
+"Markdown Mode Timeout Description" = "キーの処理に時間がかかりすぎたため、句読点の置換を停止しました。Markdown モードを再度有効にしてお試しください。";
 "Use Function Keys" = "ファンクションキーを使用 (F1、F2 など)";
 "Use Media Keys" = "メディアキーを使用 (明るさ、音量など)";
 "Use Global Setting" = "グローバル設定を使用";

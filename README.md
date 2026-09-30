@@ -61,6 +61,20 @@ Keep punctuation consistent across different languages by enabling **Force Engli
 - Automatically types standard symbols (`` ` ~ - _ $ ^ , . ; ' " [ ] ``) even when your current input source would normally produce localized or full-width characters.
 - Enable it only for the apps where you need it, such as code editors or terminal windows.
 
+**Markdown Mode** is an optional, system-wide key mapping for Apple's **Pinyin – Simplified**, using its default layout or an ABC/U.S. QWERTY layout. Enable it in General settings after granting Input Monitoring and Accessibility permissions.
+
+| Key | Markdown Mode output |
+| --- | --- |
+| Grave/backtick | `` ` `` |
+| Shift+4 | `$` |
+| Shift+comma | `《》` |
+| Shift+period | `>` |
+| Left/right bracket | `[` / `]` |
+
+These are key mappings, including when Pinyin uses half-width punctuation. Other input sources and layouts pass through unchanged, as do Caps Lock and Command, Control, Option, or Fn combinations. Other punctuation keys are unchanged. While enabled, Markdown Mode takes precedence over per-app punctuation rules; turning it off restores those rules.
+
+If macOS disables the keyboard tap, handling exceeds the safety limit, or another Input Source Pro instance is detected, active Markdown Mode stops and stays off until you explicitly retry. General settings shows the reason. The option is included in settings export/import; an imported enabled setting still requires permissions and successful activation on the receiving Mac.
+
 ### 🎛️ App-Based Function Key Switching
 Automatically switch your macOS function key mode per app.
 - Choose whether an app should use **F1 ~ F12** as:

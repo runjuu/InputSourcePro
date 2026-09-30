@@ -270,6 +270,7 @@ struct Preferences {
 
         static let isLaunchAtLogin = "isLaunchAtLogin"
         static let isShowIconInMenuBar = "isShowIconInMenuBar"
+        static let isMarkdownModeEnabled = "isMarkdownModeEnabled"
         static let isEnhancedModeEnabled = "isDetectSpotlightLikeApp"
         static let isCJKVFixEnabled = "isCJKVFixEnabled"
         static let cJKVFixStrategy = "cJKVFixStrategy"
@@ -338,6 +339,14 @@ struct Preferences {
 
     fileprivate init() {}
 
+    init(markdownModeUserDefaults: UserDefaults) {
+        _isMarkdownModeEnabled = UserDefault(
+            wrappedValue: false,
+            Preferences.Key.isMarkdownModeEnabled,
+            userDefaults: markdownModeUserDefaults
+        )
+    }
+
     @UserDefault(Preferences.Key.prevInstalledBuildVersion)
     var prevInstalledBuildVersion = 0
 
@@ -348,6 +357,9 @@ struct Preferences {
 
     @UserDefault(Preferences.Key.isShowIconInMenuBar)
     var isShowIconInMenuBar = true
+
+    @UserDefault(Preferences.Key.isMarkdownModeEnabled)
+    var isMarkdownModeEnabled = false
 
     @UserDefault(Preferences.Key.isEnhancedModeEnabled)
     var isEnhancedModeEnabled = false

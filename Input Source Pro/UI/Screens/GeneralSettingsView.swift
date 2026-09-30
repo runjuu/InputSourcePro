@@ -86,6 +86,23 @@ struct GeneralSettingsView: View {
                     .padding()
                 }
 
+                MarkdownModeSettingsView(
+                    isEnabled: Binding(
+                        get: { indicatorVM.isMarkdownModeEnabled },
+                        set: {
+                            indicatorVM.setMarkdownModeEnabled($0)
+                            permissionsVM.refresh()
+                        }
+                    ),
+                    isInputMonitoringEnabled: permissionsVM.isInputMonitoringEnabled,
+                    isAccessibilityEnabled: permissionsVM.isAccessibilityEnabled,
+                    failure: indicatorVM.markdownModeFailure
+                )
+                .onAppear { permissionsVM.refresh() }
+                .onChange(of: indicatorVM.markdownModeFailure) { _ in
+                    permissionsVM.refresh()
+                }
+
                 Group {
                     SettingsSection(title: "Indicator Triggers") {
                         HStack {

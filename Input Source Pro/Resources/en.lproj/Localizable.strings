@@ -129,6 +129,15 @@
 "Punctuation" = "Punctuation";
 "ASCII Punctuation" = "ASCII Punctuation";
 "Force English Punctuation" = "Force English Punctuation";
+"Markdown Mode" = "Markdown Mode";
+"Enable Markdown Mode" = "Enable Markdown Mode";
+"Markdown Mode Description" = "With Pinyin – Simplified and its default or ABC/U.S. layout, use `, $, > and [] for Markdown. Shift+comma inserts 《》. These key mappings also apply with half-width punctuation.";
+"Markdown Mode Permissions Description" = "Markdown Mode requires Input Monitoring and Accessibility permissions. Grant access, then turn it on.";
+"Markdown Mode Is Off" = "Markdown Mode is off";
+"Markdown Mode Another Instance Description" = "Quit other Input Source Pro instances, then turn Markdown Mode on to retry.";
+"Markdown Mode Activation Failed Description" = "macOS could not start keyboard interception. Check permissions, then try enabling Markdown Mode again.";
+"Markdown Mode Tap Disabled Description" = "macOS stopped keyboard interception. Check permissions, then turn Markdown Mode on to retry.";
+"Markdown Mode Timeout Description" = "Keyboard handling took too long, so punctuation replacement was stopped. Turn Markdown Mode on to retry.";
 "Use Function Keys" = "Use Function Keys (F1, F2, etc.)";
 "Use Media Keys" = "Use Media Keys (brightness, volume, etc.)";
 "Use Global Setting" = "Use Global Setting";

@@ -96,6 +96,7 @@ struct SettingsBackupApp: Codable {
 struct SettingsBackupPreferences: Codable {
     var isLaunchAtLogin: Bool?
     var isShowIconInMenuBar: Bool?
+    var isMarkdownModeEnabled: Bool?
     var isEnhancedModeEnabled: Bool?
     var isCJKVFixEnabled: Bool?
     var cJKVFixStrategy: CJKVFixStrategy?
@@ -155,6 +156,7 @@ struct SettingsBackupPreferences: Codable {
     init(_ preferences: Preferences) {
         isLaunchAtLogin = preferences.isLaunchAtLogin
         isShowIconInMenuBar = preferences.isShowIconInMenuBar
+        isMarkdownModeEnabled = preferences.isMarkdownModeEnabled
         isEnhancedModeEnabled = preferences.isEnhancedModeEnabled
         isCJKVFixEnabled = preferences.isCJKVFixEnabled
         cJKVFixStrategy = preferences.cJKVFixStrategy
@@ -213,6 +215,7 @@ struct SettingsBackupPreferences: Codable {
     func apply(to preferences: inout Preferences) {
         if let isLaunchAtLogin { preferences.isLaunchAtLogin = isLaunchAtLogin }
         if let isShowIconInMenuBar { preferences.isShowIconInMenuBar = isShowIconInMenuBar }
+        if let isMarkdownModeEnabled { preferences.isMarkdownModeEnabled = isMarkdownModeEnabled }
         if let isEnhancedModeEnabled { preferences.isEnhancedModeEnabled = isEnhancedModeEnabled }
         if let isCJKVFixEnabled { preferences.isCJKVFixEnabled = isCJKVFixEnabled }
         if let cJKVFixStrategy { preferences.cJKVFixStrategy = cJKVFixStrategy }

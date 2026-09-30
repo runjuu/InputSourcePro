@@ -131,6 +131,15 @@
 "Punctuation" = "標點符號";
 "ASCII Punctuation" = "ASCII 標點符號";
 "Force English Punctuation" = "強制使用英文標點符號";
+"Markdown Mode" = "Markdown 模式";
+"Enable Markdown Mode" = "啟用 Markdown 模式";
+"Markdown Mode Description" = "使用簡體拼音及其預設或 ABC／美式鍵盤佈局時，將指定按鍵對應為 Markdown 符號 `、$、> 和 []。Shift＋逗號輸入《》。這些按鍵對應也適用於半形標點模式。";
+"Markdown Mode Permissions Description" = "Markdown 模式需要輸入監控與輔助使用權限。授予權限後，請開啟此模式。";
+"Markdown Mode Is Off" = "Markdown 模式已關閉";
+"Markdown Mode Another Instance Description" = "請結束其他 Input Source Pro 實例，然後重新開啟 Markdown 模式。";
+"Markdown Mode Activation Failed Description" = "macOS 無法啟動鍵盤事件攔截。請檢查權限，然後重新開啟 Markdown 模式。";
+"Markdown Mode Tap Disabled Description" = "macOS 已停止鍵盤事件攔截。請檢查權限，然後重新開啟 Markdown 模式。";
+"Markdown Mode Timeout Description" = "鍵盤事件處理時間過長，標點替換已停止。請重新開啟 Markdown 模式以重試。";
 "Use Function Keys" = "使用功能鍵 (F1、F2 等)";
 "Use Media Keys" = "使用媒體鍵 (亮度、音量等)";
 "Use Global Setting" = "使用全域設定";
