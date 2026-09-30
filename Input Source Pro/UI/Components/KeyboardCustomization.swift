@@ -30,7 +30,8 @@ struct KeyboardCustomization: View {
                         kind: .alwaysOn,
                         size: preferencesVM.preferences.indicatorSize ?? .medium,
                         bgColor: NSColor(bgColor),
-                        textColor: NSColor(textColor)
+                        textColor: NSColor(textColor),
+                        prefersTextInputSourceIcons: preferencesVM.preferences.prefersTextInputSourceIcons
                     ))
 
                     DumpIndicatorView(config: IndicatorViewConfig(
@@ -38,7 +39,8 @@ struct KeyboardCustomization: View {
                         kind: preferencesVM.preferences.indicatorKind,
                         size: preferencesVM.preferences.indicatorSize ?? .medium,
                         bgColor: NSColor(bgColor),
-                        textColor: NSColor(textColor)
+                        textColor: NSColor(textColor),
+                        prefersTextInputSourceIcons: preferencesVM.preferences.prefersTextInputSourceIcons
                     ))
 
                     Text("Always-On Indicator Style")

@@ -321,6 +321,7 @@ struct Preferences {
         static let isAutoAppearanceMode = "isAutoAppearanceMode"
         static let appearanceMode = "appearanceMode"
         static let isShowInputSourcesLabel = "isShowInputSourcesLabel"
+        static let prefersTextInputSourceIcons = "prefersTextInputSourceIcons"
         static let indicatorBackground = "indicatorBackground"
         static let indicatorForgeground = "indicatorForgeground"
 
@@ -510,6 +511,9 @@ struct Preferences {
 
     @CodableUserDefault(Preferences.Key.indicatorSize)
     var indicatorSize = IndicatorSize.medium
+
+    @UserDefault(Preferences.Key.prefersTextInputSourceIcons)
+    var prefersTextInputSourceIcons = true
 
     @UserDefault(Preferences.Key.isAutoAppearanceMode)
     var isAutoAppearanceMode = true

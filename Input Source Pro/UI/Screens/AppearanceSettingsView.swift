@@ -55,6 +55,18 @@ struct AppearanceSettingsView: View {
                         .labelsHidden()
                         .pickerStyle(.segmented)
                         .padding()
+
+                        HStack {
+                            Toggle("", isOn: $preferencesVM.preferences.prefersTextInputSourceIcons)
+                                .toggleStyle(.switch)
+                                .labelsHidden()
+
+                            Text("Use Text Input Source Icons".i18n())
+
+                            Spacer()
+                        }
+                        .padding()
+                        .border(width: 1, edges: [.top], color: NSColor.border2.color)
                     }
                 }
 

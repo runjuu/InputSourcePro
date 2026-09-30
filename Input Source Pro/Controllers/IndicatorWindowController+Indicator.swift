@@ -19,6 +19,7 @@ extension IndicatorWindowController {
                 size: preferences.indicatorSize ?? .medium,
                 bgColor: preferencesVM.defaultIndicatorBgNSColor,
                 textColor: preferencesVM.defaultIndicatorTextNSColor,
+                prefersTextInputSourceIcons: preferences.prefersTextInputSourceIcons,
                 badge: .init(glyph: mode.badgeGlyph, title: mode.displayName)
             ))
 
@@ -34,7 +35,8 @@ extension IndicatorWindowController {
             kind: preferences.indicatorKind,
             size: preferences.indicatorSize ?? .medium,
             bgColor: preferencesVM.getBgNSColor(inputSource),
-            textColor: preferencesVM.getTextNSColor(inputSource)
+            textColor: preferencesVM.getTextNSColor(inputSource),
+            prefersTextInputSourceIcons: preferences.prefersTextInputSourceIcons
         ))
 
         if isActive {
