@@ -40,28 +40,40 @@ final class IndicatorVM: ObservableObject {
     ])
     .share()
 
-    private(set) lazy var screenIsLockedPublisher = Self.screenLockStatePublisher(events: Publishers.MergeMany([
-        DistributedNotificationCenter.default()
-            .publisher(for: Notification.Name(rawValue: "com.apple.screenIsLocked"))
-            .mapTo(true),
+    private(set) lazy var indicatorIsSuspendedPublisher = Self.indicatorSuspensionPublisher(
+        lockNotificationCenter: DistributedNotificationCenter.default(),
+        workspaceNotificationCenter: NSWorkspace.shared.notificationCenter
+    )
 
-        DistributedNotificationCenter.default()
-            .publisher(for: NSWorkspace.willSleepNotification)
-            .mapTo(true),
+    static func indicatorSuspensionPublisher(
+        lockNotificationCenter: NotificationCenter,
+        workspaceNotificationCenter: NotificationCenter
+    ) -> AnyPublisher<Bool, Never> {
+        let isLocked = Publishers.Merge(
+            lockNotificationCenter
+                .publisher(for: Notification.Name(rawValue: "com.apple.screenIsLocked"))
+                .mapTo(true),
+            lockNotificationCenter
+                .publisher(for: Notification.Name(rawValue: "com.apple.screenIsUnlocked"))
+                .mapTo(false)
+        )
+        .receive(on: DispatchQueue.main)
+        .prepend(false)
 
-        DistributedNotificationCenter.default()
-            .publisher(for: Notification.Name(rawValue: "com.apple.screenIsUnlocked"))
-            .mapTo(false),
+        let isSleeping = Publishers.Merge(
+            workspaceNotificationCenter
+                .publisher(for: NSWorkspace.willSleepNotification)
+                .mapTo(true),
+            workspaceNotificationCenter
+                .publisher(for: NSWorkspace.didWakeNotification)
+                .mapTo(false)
+        )
+        .receive(on: DispatchQueue.main)
+        .prepend(false)
 
-        DistributedNotificationCenter.default()
-            .publisher(for: NSWorkspace.didWakeNotification)
-            .mapTo(false),
-    ]).eraseToAnyPublisher())
-
-    static func screenLockStatePublisher(events: AnyPublisher<Bool, Never>) -> AnyPublisher<Bool, Never> {
-        events
-            .receive(on: DispatchQueue.main)
-            .prepend(false)
+        // Waking the Mac must not resume the indicator while the screen is locked.
+        return Publishers.CombineLatest(isLocked, isSleeping)
+            .map { isLocked, isSleeping in isLocked || isSleeping }
             .removeDuplicates()
             .share(replay: 1)
             .eraseToAnyPublisher()

@@ -84,8 +84,8 @@ class IndicatorWindowController: FloatWindowController {
             .map(\.isAlwaysDisplayIndicatorNearMouseEnabled)
             .removeDuplicates()
 
-        Publishers.CombineLatest(indicatorVM.screenIsLockedPublisher, isAlwaysNearMouse)
-            .map { isLocked, isAlwaysNearMouse in isLocked || isAlwaysNearMouse }
+        Publishers.CombineLatest(indicatorVM.indicatorIsSuspendedPublisher, isAlwaysNearMouse)
+            .map { isSuspended, isAlwaysNearMouse in isSuspended || isAlwaysNearMouse }
             .removeDuplicates()
             .flatMapLatest { isIdle in isIdle ? Empty().eraseToAnyPublisher() : indicatorPublisher }
             .sink { _ in }
