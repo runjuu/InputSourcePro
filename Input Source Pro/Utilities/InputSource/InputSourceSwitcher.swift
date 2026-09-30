@@ -23,6 +23,14 @@ enum InputSourceSwitcher {
         let inputModeID: String?
         let isCJKV: Bool
 
+        var persistentIdentifier: String {
+            if let inputModeID, !inputModeID.isEmpty {
+                return "\(sourceID)::\(inputModeID)"
+            }
+
+            return sourceID
+        }
+
         @MainActor
         func matches(_ inputSource: InputSource) -> Bool {
             if let inputModeID {
@@ -31,6 +39,11 @@ enum InputSourceSwitcher {
 
             return inputSource.id == sourceID
         }
+    }
+
+    private struct ShortcutFallback {
+        let previousShortcut: HotKeyInfo
+        let nonCJKVSource: TISInputSource
     }
 
     private static let logger = ISPLogger(category: String(describing: InputSourceSwitcher.self))
@@ -140,7 +153,11 @@ enum InputSourceSwitcher {
         )
     }
 
-    static func switchToInputSource(_ inputSource: InputSource, cJKVFixStrategy: CJKVFixStrategy?) {
+    static func switchToInputSource(
+        _ inputSource: InputSource,
+        cJKVFixStrategy: CJKVFixStrategy?,
+        allowShortcutFallback: Bool = true
+    ) {
         cancelPendingWorkItems()
         let target = SwitchTarget(
             localizedName: inputSource.name,
@@ -150,13 +167,16 @@ enum InputSourceSwitcher {
         )
 
         if inputSource.isCJKVR, let modeID = inputSource.inputModeID {
-            return switchToInputMode(modeID: modeID, cJKVFixStrategy: cJKVFixStrategy)
+            return switchToInputMode(
+                modeID: modeID,
+                cJKVFixStrategy: allowShortcutFallback ? cJKVFixStrategy : nil
+            )
         }
 
         switchToTarget(
             target,
             tisTarget: inputSource.tisInputSource,
-            cJKVFixStrategy: cJKVFixStrategy
+            cJKVFixStrategy: allowShortcutFallback ? cJKVFixStrategy : nil
         )
     }
 
@@ -165,19 +185,34 @@ enum InputSourceSwitcher {
         tisTarget: TISInputSource,
         cJKVFixStrategy: CJKVFixStrategy?
     ) {
-        guard target.isCJKV,
-              let cJKVFixStrategy
-        else {
-            selectInputSource(tisTarget, reason: "target")
+        let shortcutFallback: ShortcutFallback?
+
+        if target.isCJKV,
+           cJKVFixStrategy == .previousInputSourceShortcut,
+           let previousShortcut = getPreviousInputSourceShortcut(),
+           let nonCJKVSource = resolveNonCJKVSource(),
+           canPostShortcuts()
+        {
+            syntheticEventEndTime = ProcessInfo.processInfo.systemUptime + 0.35
+            shortcutFallback = ShortcutFallback(
+                previousShortcut: previousShortcut,
+                nonCJKVSource: nonCJKVSource
+            )
+        } else {
+            shortcutFallback = nil
+        }
+
+        if target.isCJKV, cJKVFixStrategy == .temporaryInputWindow {
+            switchToCJKVTargetWithTemporaryInputWindow(target, tisTarget: tisTarget)
             return
         }
 
-        switch cJKVFixStrategy {
-        case .temporaryInputWindow:
-            switchToCJKVTargetWithTemporaryInputWindow(target, tisTarget: tisTarget)
-        case .previousInputSourceShortcut:
-            switchToCJKVTargetWithPreviousInputSourceShortcut(target, tisTarget: tisTarget)
-        }
+        selectInputSource(tisTarget, reason: "target")
+        scheduleSelectionVerification(
+            for: target,
+            tisTarget: tisTarget,
+            shortcutFallback: shortcutFallback
+        )
     }
 
     private static func switchToCJKVTargetWithTemporaryInputWindow(
@@ -190,39 +225,15 @@ enum InputSourceSwitcher {
 
         scheduleWorkItem(after: temporaryInputWindowDuration + 0.05) {
             let currentInputSource = InputSource.getCurrentInputSource()
-            if !target.matches(currentInputSource) {
-                selectInputSource(tisTarget, reason: "CJKV target mismatch fallback")
-            }
+            guard !isCurrentInputSourceMatched(currentInputSource, with: target) else { return }
+
+            selectInputSource(tisTarget, reason: "CJKV target mismatch fallback")
+            scheduleSelectionVerification(
+                for: target,
+                tisTarget: tisTarget,
+                remainingAttempts: 2
+            )
         }
-    }
-
-    private static func switchToCJKVTargetWithPreviousInputSourceShortcut(
-        _ target: SwitchTarget,
-        tisTarget: TISInputSource
-    ) {
-        guard let previousShortcut = getPreviousInputSourceShortcut(),
-              let nonCJKVSource = resolveNonCJKVSource(),
-              canPostShortcuts()
-        else {
-            selectInputSource(tisTarget, reason: "CJKV target shortcut fallback")
-            return
-        }
-
-        // Suppress modifier event processing in ShortcutTriggerManager for the duration
-        // of the CJKV fix sequence (~300ms) to prevent synthetic keyboard events from
-        // corrupting modifier tracking state and blocking subsequent shortcut triggers.
-        syntheticEventEndTime = ProcessInfo.processInfo.systemUptime + 0.35
-        logger.debug { "Applying CJKV fix using previous input source shortcut" }
-        selectInputSource(tisTarget, reason: "CJKV target")
-        selectInputSource(nonCJKVSource, reason: "CJKV bounce")
-
-        scheduleWorkItem(after: 0.1, execute: {
-            triggerShortcut(previousShortcut, onFinish: { currentInputSouce in
-                if !target.matches(currentInputSouce) {
-                    selectInputSource(tisTarget, reason: "CJKV target mismatch fallback")
-                }
-            })
-        })
     }
 
     @discardableResult
@@ -304,6 +315,84 @@ enum InputSourceSwitcher {
         if let index = pendingWorkItems.firstIndex(where: { $0 === item }) {
             pendingWorkItems.remove(at: index)
         }
+    }
+
+    private static func scheduleSelectionVerification(
+        for target: SwitchTarget,
+        tisTarget: TISInputSource,
+        shortcutFallback: ShortcutFallback? = nil,
+        didApplyShortcutFallback: Bool = false,
+        remainingAttempts: Int = 3
+    ) {
+        guard remainingAttempts > 0 else { return }
+
+        scheduleWorkItem(after: 0.05, execute: {
+            let currentInputSource = InputSource.getCurrentInputSource()
+
+            guard !isCurrentInputSourceMatched(currentInputSource, with: target) else { return }
+
+            if let shortcutFallback, !didApplyShortcutFallback {
+                logger.debug {
+                    "Direct input source selection did not stick for \(target.localizedName) (\(target.persistentIdentifier)); applying CJKV shortcut fallback."
+                }
+
+                applyShortcutFallback(
+                    shortcutFallback,
+                    for: target,
+                    tisTarget: tisTarget,
+                    remainingAttempts: remainingAttempts - 1
+                )
+                return
+            }
+
+            logger.debug {
+                "Retrying input source selection for \(target.localizedName) (\(target.persistentIdentifier)); current=\(currentInputSource.persistentIdentifier)"
+            }
+
+            selectInputSource(tisTarget, reason: "verification retry")
+            scheduleSelectionVerification(
+                for: target,
+                tisTarget: tisTarget,
+                shortcutFallback: nil,
+                didApplyShortcutFallback: didApplyShortcutFallback,
+                remainingAttempts: remainingAttempts - 1
+            )
+        })
+    }
+
+    private static func applyShortcutFallback(
+        _ shortcutFallback: ShortcutFallback,
+        for target: SwitchTarget,
+        tisTarget: TISInputSource,
+        remainingAttempts: Int
+    ) {
+        logger.debug { "Applying CJKV shortcut fallback for \(target.localizedName)" }
+        selectInputSource(shortcutFallback.nonCJKVSource, reason: "CJKV bounce")
+
+        scheduleWorkItem(after: 0.1, execute: {
+            triggerShortcut(shortcutFallback.previousShortcut, onFinish: { currentInputSource in
+                if !isCurrentInputSourceMatched(currentInputSource, with: target) {
+                    selectInputSource(tisTarget, reason: "CJKV fallback target retry")
+                }
+
+                scheduleSelectionVerification(
+                    for: target,
+                    tisTarget: tisTarget,
+                    shortcutFallback: nil,
+                    didApplyShortcutFallback: true,
+                    remainingAttempts: remainingAttempts
+                )
+            })
+        })
+    }
+
+    private static func isCurrentInputSourceMatched(_ currentInputSource: InputSource, with target: SwitchTarget) -> Bool {
+        if let inputModeID = target.inputModeID, !inputModeID.isEmpty {
+            return currentInputSource.inputModeID == inputModeID ||
+                currentInputSource.persistentIdentifier == target.persistentIdentifier
+        }
+
+        return currentInputSource.id == target.sourceID
     }
 
     /// Adapted from macism's showTemporaryInputWindow approach.
