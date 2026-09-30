@@ -52,4 +52,52 @@ final class ActivateEventInputSourceChangeTests: XCTestCase {
         XCTAssertNotNil(delayPublisher)
         XCTAssertNotNil(intervalPublisher)
     }
+
+    func testUnchangedInputSourcePreservesFocusedFieldTracking() {
+        XCTAssertEqual(activationMode(inputSourceDidChange: false, focusedField: true), .autoShow)
+    }
+
+    func testUnchangedInputSourcePreservesAlwaysOnTracking() {
+        XCTAssertEqual(activationMode(inputSourceDidChange: false, alwaysOn: true), .alwaysOn)
+        XCTAssertEqual(activationMode(inputSourceDidChange: false, alwaysOn: true, focusedField: true), .alwaysOn)
+    }
+
+    func testUnchangedInputSourceSuppressesOnlyTransientAppSwitchActivation() {
+        XCTAssertEqual(activationMode(inputSourceDidChange: false), .hide)
+        XCTAssertEqual(activationMode(inputSourceDidChange: true), .autoHide)
+    }
+
+    func testExplicitHideOverridesPersistentModes() {
+        for alwaysOn in [false, true] {
+            for focusedField in [false, true] {
+                XCTAssertEqual(IndicatorWindowController.activationMode(
+                    event: .justHide,
+                    alwaysOn: alwaysOn,
+                    focusedField: focusedField
+                ), .hide)
+            }
+        }
+    }
+
+    func testFunctionKeyFeedbackRemainsTransientInPersistentModes() {
+        for mode in [FKeyMode.functionKeys, .mediaKeys] {
+            XCTAssertEqual(IndicatorWindowController.activationMode(
+                event: .functionKeyModeChanges(mode),
+                alwaysOn: true,
+                focusedField: true
+            ), .autoHide)
+        }
+    }
+
+    private func activationMode(
+        inputSourceDidChange: Bool,
+        alwaysOn: Bool = false,
+        focusedField: Bool = false
+    ) -> IndicatorWindowController.ActivationMode {
+        IndicatorWindowController.activationMode(
+            event: .appChanges(current: appKind(), prev: appKind(), inputSourceDidChange: inputSourceDidChange),
+            alwaysOn: alwaysOn,
+            focusedField: focusedField
+        )
+    }
 }

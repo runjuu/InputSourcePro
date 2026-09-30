@@ -40,7 +40,7 @@ final class IndicatorVM: ObservableObject {
     ])
     .share()
 
-    private(set) lazy var screenIsLockedPublisher = Publishers.MergeMany([
+    private(set) lazy var screenIsLockedPublisher = Self.screenLockStatePublisher(events: Publishers.MergeMany([
         DistributedNotificationCenter.default()
             .publisher(for: Notification.Name(rawValue: "com.apple.screenIsLocked"))
             .mapTo(true),
@@ -56,11 +56,16 @@ final class IndicatorVM: ObservableObject {
         DistributedNotificationCenter.default()
             .publisher(for: NSWorkspace.didWakeNotification)
             .mapTo(false),
-    ])
-    .receive(on: DispatchQueue.main)
-    .prepend(false)
-    .removeDuplicates()
-    .share()
+    ]).eraseToAnyPublisher())
+
+    static func screenLockStatePublisher(events: AnyPublisher<Bool, Never>) -> AnyPublisher<Bool, Never> {
+        events
+            .receive(on: DispatchQueue.main)
+            .prepend(false)
+            .removeDuplicates()
+            .share(replay: 1)
+            .eraseToAnyPublisher()
+    }
 
     init(
         permissionsVM: PermissionsVM,
