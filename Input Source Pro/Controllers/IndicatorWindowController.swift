@@ -56,28 +56,23 @@ class IndicatorWindowController: FloatWindowController {
 
                 guard let self = self else { return Empty().eraseToAnyPublisher() }
                 guard let appKind = self.applicationVM.appKind,
-                      !event.isJustHide,
                       !preferencesVM.isHideIndicator(appKind)
                 else { return self.justHidePublisher() }
 
                 let app = appKind.getApp()
 
-                // Function-key toggles are one-shot status changes: always use the
-                // transient auto-hide path, never the persistent always-on / auto-show
-                // flows that are tied to the focused input field.
-                if case .functionKeyModeChanges = event {
-                    return self.autoHidePublisher(event: event, inputSource: inputSource, appKind: appKind)
-                }
-
-                if event.isJustHide || event.isAppChangesWithUnchangedInputSource {
+                switch Self.activationMode(
+                    event: event,
+                    alwaysOn: preferencesVM.isShowAlwaysOnIndicator(app: app),
+                    focusedField: preferencesVM.needDetectFocusedFieldChanges(app: app)
+                ) {
+                case .hide:
                     return self.justHidePublisher()
-                }
-
-                if preferencesVM.isShowAlwaysOnIndicator(app: app) {
+                case .alwaysOn:
                     return self.alwaysOnPublisher(event: event, inputSource: inputSource, appKind: appKind)
-                } else if preferencesVM.needDetectFocusedFieldChanges(app: app) {
+                case .autoShow:
                     return self.autoShowPublisher(event: event, inputSource: inputSource, appKind: appKind)
-                } else {
+                case .autoHide:
                     return self.autoHidePublisher(event: event, inputSource: inputSource, appKind: appKind)
                 }
             }
@@ -102,5 +97,36 @@ class IndicatorWindowController: FloatWindowController {
     @available(*, unavailable)
     required init?(coder _: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+}
+
+extension IndicatorWindowController {
+    enum ActivationMode {
+        case hide, autoHide, autoShow, alwaysOn
+    }
+
+    static func activationMode(
+        event: IndicatorVM.ActivateEvent,
+        alwaysOn: Bool,
+        focusedField: Bool
+    ) -> ActivationMode {
+        if event.isJustHide {
+            return .hide
+        }
+
+        // Function-key feedback is transient even when field tracking is enabled.
+        if case .functionKeyModeChanges = event {
+            return .autoHide
+        }
+
+        if alwaysOn {
+            return .alwaysOn
+        }
+
+        if focusedField {
+            return .autoShow
+        }
+
+        return event.isAppChangesWithUnchangedInputSource ? .hide : .autoHide
     }
 }
