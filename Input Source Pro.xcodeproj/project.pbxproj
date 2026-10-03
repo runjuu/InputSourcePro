@@ -42,7 +42,6 @@
 		4A2A177F280BA7FA00E13249 /* StatusItemController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2A1751280BA7FA00E13249 /* StatusItemController.swift */; };
 		4A2A1780280BA7FA00E13249 /* IndicatorViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2A1752280BA7FA00E13249 /* IndicatorViewController.swift */; };
 		4A2A1781280BA7FA00E13249 /* IndicatorWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2A1753280BA7FA00E13249 /* IndicatorWindowController.swift */; };
-		B60003000000000000000002 /* AlwaysOnIndicatorWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60003000000000000000001 /* AlwaysOnIndicatorWindowController.swift */; };
 		4A2A1787280BA7FA00E13249 /* CodableUserDefault.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2A175E280BA7FA00E13249 /* CodableUserDefault.swift */; };
 		4A2A1788280BA7FA00E13249 /* NSImage+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2A175F280BA7FA00E13249 /* NSImage+Extension.swift */; };
 		4A2A1789280BA7FA00E13249 /* TISInputSource+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2A1760280BA7FA00E13249 /* TISInputSource+Extension.swift */; };
@@ -120,7 +119,10 @@
 		4ADDC326281AC4DD0075528A /* NSApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ADDC325281AC4DD0075528A /* NSApplication.swift */; };
 		4AEEE08428126A4900C883F8 /* BrowserURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AEEE08328126A4900C883F8 /* BrowserURL.swift */; };
 		66A637AB8EE9446FA7D8EF7F /* ModifierComboPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25018ACF8C9046C29F0F3462 /* ModifierComboPicker.swift */; };
+		B60003000000000000000002 /* AlwaysOnIndicatorWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60003000000000000000001 /* AlwaysOnIndicatorWindowController.swift */; };
+		B60003100000000000000002 /* AlwaysOnIndicatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60003100000000000000001 /* AlwaysOnIndicatorTests.swift */; };
 		B7F201B136534D7A8A40F340 /* PreferencesVM+ShortcutTrigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B665FC5A40B248929C5EB938 /* PreferencesVM+ShortcutTrigger.swift */; };
+		C31000000000000000000002 /* CapsLockStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C31000000000000000000001 /* CapsLockStateTests.swift */; };
 		D50821F229FE29C40078ADEC /* EnhancedModeToggle.swift in Sources */ = {isa = PBXBuildFile; fileRef = D50821F129FE29C40078ADEC /* EnhancedModeToggle.swift */; };
 		D508B6A32A140289002E272E /* FileManager+Ext.swift in Sources */ = {isa = PBXBuildFile; fileRef = D508B6A22A140289002E272E /* FileManager+Ext.swift */; };
 		D5115A142A32F70300D94E51 /* PositionSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5115A132A32F70300D94E51 /* PositionSettingsView.swift */; };
@@ -168,7 +170,6 @@
 		D5F73B022A2C1DCD00BBC10A /* InputSourceVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5F73B012A2C1DCD00BBC10A /* InputSourceVM.swift */; };
 		D5FC8F552A4134B5002AE1F2 /* IndicatorSize.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5FC8F542A4134B5002AE1F2 /* IndicatorSize.swift */; };
 		D60000032F20000000000003 /* TestHarnessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000022F20000000000002 /* TestHarnessTests.swift */; };
-		D60003242F20000000000324 /* ShortcutTriggerManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60003232F20000000000323 /* ShortcutTriggerManagerTests.swift */; };
 		D60000122F20000000000012 /* BrowserRuleSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000112F20000000000011 /* BrowserRuleSelectionTests.swift */; };
 		D60000222F20000000000022 /* RuntimeRuleChangeNotifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000212F20000000000021 /* RuntimeRuleChangeNotifierTests.swift */; };
 		D60000322F20000000000032 /* BrowserRuleValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000312F20000000000031 /* BrowserRuleValidationTests.swift */; };
@@ -176,19 +177,27 @@
 		D60000622F20000000000062 /* AppURLAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000612F20000000000061 /* AppURLAction.swift */; };
 		D60000722F20000000000072 /* AppURLActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000712F20000000000071 /* AppURLActionTests.swift */; };
 		D60000822F20000000000082 /* URLActivationSuppressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000812F20000000000081 /* URLActivationSuppressionTests.swift */; };
+		D60001022F20000000000102 /* AppKindComparisonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60001012F20000000000101 /* AppKindComparisonTests.swift */; };
 		D60001922F20000000000192 /* ActivateEventInputSourceChangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60001912F20000000000191 /* ActivateEventInputSourceChangeTests.swift */; };
-		D60003122F20000000000312 /* ScreenLockStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60003112F20000000000311 /* ScreenLockStateTests.swift */; };
-		C31000000000000000000002 /* CapsLockStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C31000000000000000000001 /* CapsLockStateTests.swift */; };
 		D60002022F20000000000202 /* IndicatorNearMousePointTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60002012F20000000000201 /* IndicatorNearMousePointTests.swift */; };
 		D60002122F20000000000212 /* AlwaysNearMousePlacementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60002112F20000000000211 /* AlwaysNearMousePlacementTests.swift */; };
-		B60003100000000000000002 /* AlwaysOnIndicatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60003100000000000000001 /* AlwaysOnIndicatorTests.swift */; };
-		D60002422F20000000000242 /* SpotlightCompatibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60002412F20000000000241 /* SpotlightCompatibilityTests.swift */; };
 		D60002222F20000000000222 /* SpotlightIndicatorPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60002212F20000000000221 /* SpotlightIndicatorPosition.swift */; };
 		D60002322F20000000000232 /* SpotlightIndicatorPositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60002312F20000000000231 /* SpotlightIndicatorPositionTests.swift */; };
-		D60001022F20000000000102 /* AppKindComparisonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60001012F20000000000101 /* AppKindComparisonTests.swift */; };
+		D60002422F20000000000242 /* SpotlightCompatibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60002412F20000000000241 /* SpotlightCompatibilityTests.swift */; };
 		D60003022F20000000000302 /* ShortcutConflict.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60003012F20000000000301 /* ShortcutConflict.swift */; };
 		D60003042F20000000000304 /* ShortcutConflictTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60003032F20000000000303 /* ShortcutConflictTests.swift */; };
+		D60003122F20000000000312 /* ScreenLockStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60003112F20000000000311 /* ScreenLockStateTests.swift */; };
 		D60003142F20000000000314 /* ModifierComboTriggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60003132F20000000000313 /* ModifierComboTriggerTests.swift */; };
+		D60003242F20000000000324 /* ShortcutTriggerManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60003232F20000000000323 /* ShortcutTriggerManagerTests.swift */; };
+		D70000012F20000000000001 /* CaretPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70000022F20000000000002 /* CaretPalette.swift */; };
+		D70000032F20000000000003 /* CaretPaletteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70000042F20000000000004 /* CaretPaletteTests.swift */; };
+		D70000052F20000000000005 /* CaretPollingSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70000062F20000000000006 /* CaretPollingSchedule.swift */; };
+		D70000072F20000000000007 /* CaretGeometryFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70000082F20000000000008 /* CaretGeometryFilter.swift */; };
+		D71000012F20000000000001 /* CaretHelperManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71000022F20000000000001 /* CaretHelperManager.swift */; };
+		D71000032F20000000000001 /* AdditionalCursorSupportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71000042F20000000000001 /* AdditionalCursorSupportView.swift */; };
+		D71000052F20000000000001 /* Tools/CaretPalette/CaretHelperFiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71000062F20000000000001 /* Tools/CaretPalette/CaretHelperFiles.swift */; };
+		D71000072F20000000000001 /* CaretHelperSetupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71000082F20000000000001 /* CaretHelperSetupTests.swift */; };
+		D71000212F20000000000001 /* CaretInputSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71000222F20000000000001 /* CaretInputSource.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -252,7 +261,6 @@
 		4A2A1751280BA7FA00E13249 /* StatusItemController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = StatusItemController.swift; sourceTree = "<group>"; };
 		4A2A1752280BA7FA00E13249 /* IndicatorViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = IndicatorViewController.swift; sourceTree = "<group>"; };
 		4A2A1753280BA7FA00E13249 /* IndicatorWindowController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = IndicatorWindowController.swift; sourceTree = "<group>"; };
-		B60003000000000000000001 /* AlwaysOnIndicatorWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlwaysOnIndicatorWindowController.swift; sourceTree = "<group>"; };
 		4A2A175E280BA7FA00E13249 /* CodableUserDefault.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CodableUserDefault.swift; sourceTree = "<group>"; };
 		4A2A175F280BA7FA00E13249 /* NSImage+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "NSImage+Extension.swift"; sourceTree = "<group>"; };
 		4A2A1760280BA7FA00E13249 /* TISInputSource+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "TISInputSource+Extension.swift"; sourceTree = "<group>"; };
@@ -326,7 +334,10 @@
 		4ADDC325281AC4DD0075528A /* NSApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NSApplication.swift; sourceTree = "<group>"; };
 		4AEEE08328126A4900C883F8 /* BrowserURL.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserURL.swift; sourceTree = "<group>"; };
 		B18B53A0848947E3A2D4EFA8 /* ShortcutTrigger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutTrigger.swift; sourceTree = "<group>"; };
+		B60003000000000000000001 /* AlwaysOnIndicatorWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlwaysOnIndicatorWindowController.swift; sourceTree = "<group>"; };
+		B60003100000000000000001 /* AlwaysOnIndicatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlwaysOnIndicatorTests.swift; sourceTree = "<group>"; };
 		B665FC5A40B248929C5EB938 /* PreferencesVM+ShortcutTrigger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesVM+ShortcutTrigger.swift"; sourceTree = "<group>"; };
+		C31000000000000000000001 /* CapsLockStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapsLockStateTests.swift; sourceTree = "<group>"; };
 		D50821F129FE29C40078ADEC /* EnhancedModeToggle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnhancedModeToggle.swift; sourceTree = "<group>"; };
 		D508B6A22A140289002E272E /* FileManager+Ext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FileManager+Ext.swift"; sourceTree = "<group>"; };
 		D5115A132A32F70300D94E51 /* PositionSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositionSettingsView.swift; sourceTree = "<group>"; };
@@ -373,7 +384,6 @@
 		D5FC8F542A4134B5002AE1F2 /* IndicatorSize.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndicatorSize.swift; sourceTree = "<group>"; };
 		D60000012F20000000000001 /* Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D60000022F20000000000002 /* TestHarnessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHarnessTests.swift; sourceTree = "<group>"; };
-		D60003232F20000000000323 /* ShortcutTriggerManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutTriggerManagerTests.swift; sourceTree = "<group>"; };
 		D60000112F20000000000011 /* BrowserRuleSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserRuleSelectionTests.swift; sourceTree = "<group>"; };
 		D60000212F20000000000021 /* RuntimeRuleChangeNotifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeRuleChangeNotifierTests.swift; sourceTree = "<group>"; };
 		D60000312F20000000000031 /* BrowserRuleValidationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserRuleValidationTests.swift; sourceTree = "<group>"; };
@@ -381,19 +391,27 @@
 		D60000612F20000000000061 /* AppURLAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppURLAction.swift; sourceTree = "<group>"; };
 		D60000712F20000000000071 /* AppURLActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppURLActionTests.swift; sourceTree = "<group>"; };
 		D60000812F20000000000081 /* URLActivationSuppressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLActivationSuppressionTests.swift; sourceTree = "<group>"; };
+		D60001012F20000000000101 /* AppKindComparisonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKindComparisonTests.swift; sourceTree = "<group>"; };
 		D60001912F20000000000191 /* ActivateEventInputSourceChangeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivateEventInputSourceChangeTests.swift; sourceTree = "<group>"; };
-		D60003112F20000000000311 /* ScreenLockStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenLockStateTests.swift; sourceTree = "<group>"; };
-		C31000000000000000000001 /* CapsLockStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapsLockStateTests.swift; sourceTree = "<group>"; };
 		D60002012F20000000000201 /* IndicatorNearMousePointTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndicatorNearMousePointTests.swift; sourceTree = "<group>"; };
 		D60002112F20000000000211 /* AlwaysNearMousePlacementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlwaysNearMousePlacementTests.swift; sourceTree = "<group>"; };
-		B60003100000000000000001 /* AlwaysOnIndicatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlwaysOnIndicatorTests.swift; sourceTree = "<group>"; };
-		D60002412F20000000000241 /* SpotlightCompatibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotlightCompatibilityTests.swift; sourceTree = "<group>"; };
 		D60002212F20000000000221 /* SpotlightIndicatorPosition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotlightIndicatorPosition.swift; sourceTree = "<group>"; };
 		D60002312F20000000000231 /* SpotlightIndicatorPositionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotlightIndicatorPositionTests.swift; sourceTree = "<group>"; };
-		D60001012F20000000000101 /* AppKindComparisonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKindComparisonTests.swift; sourceTree = "<group>"; };
+		D60002412F20000000000241 /* SpotlightCompatibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotlightCompatibilityTests.swift; sourceTree = "<group>"; };
 		D60003012F20000000000301 /* ShortcutConflict.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutConflict.swift; sourceTree = "<group>"; };
 		D60003032F20000000000303 /* ShortcutConflictTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutConflictTests.swift; sourceTree = "<group>"; };
+		D60003112F20000000000311 /* ScreenLockStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenLockStateTests.swift; sourceTree = "<group>"; };
 		D60003132F20000000000313 /* ModifierComboTriggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModifierComboTriggerTests.swift; sourceTree = "<group>"; };
+		D60003232F20000000000323 /* ShortcutTriggerManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutTriggerManagerTests.swift; sourceTree = "<group>"; };
+		D70000022F20000000000002 /* CaretPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaretPalette.swift; sourceTree = "<group>"; };
+		D70000042F20000000000004 /* CaretPaletteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaretPaletteTests.swift; sourceTree = "<group>"; };
+		D70000062F20000000000006 /* CaretPollingSchedule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CaretPollingSchedule.swift; path = Tools/CaretPalette/CaretPollingSchedule.swift; sourceTree = SOURCE_ROOT; };
+		D70000082F20000000000008 /* CaretGeometryFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CaretGeometryFilter.swift; path = Tools/CaretPalette/CaretGeometryFilter.swift; sourceTree = SOURCE_ROOT; };
+		D71000022F20000000000001 /* CaretHelperManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaretHelperManager.swift; sourceTree = "<group>"; };
+		D71000042F20000000000001 /* AdditionalCursorSupportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdditionalCursorSupportView.swift; sourceTree = "<group>"; };
+		D71000062F20000000000001 /* Tools/CaretPalette/CaretHelperFiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tools/CaretPalette/CaretHelperFiles.swift; sourceTree = SOURCE_ROOT; };
+		D71000082F20000000000001 /* CaretHelperSetupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaretHelperSetupTests.swift; sourceTree = "<group>"; };
+		D71000222F20000000000001 /* CaretInputSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CaretInputSource.swift; path = Tools/CaretPalette/CaretInputSource.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -547,6 +565,9 @@
 			isa = PBXGroup;
 			children = (
 				4A2A176D280BA7FA00E13249 /* AppDelegate.swift */,
+				D70000022F20000000000002 /* CaretPalette.swift */,
+				D71000022F20000000000001 /* CaretHelperManager.swift */,
+				D71000222F20000000000001 /* CaretInputSource.swift */,
 				D60000612F20000000000061 /* AppURLAction.swift */,
 				4A2A176E280BA7FA00E13249 /* main.swift */,
 				4A2A176F280BA7FA00E13249 /* AppMenu.swift */,
@@ -638,6 +659,7 @@
 				D525609829B56843009EB7BA /* ISPTextEditor.swift */,
 				D525609D29B58448009EB7BA /* LoadingView.swift */,
 				D50821F129FE29C40078ADEC /* EnhancedModeToggle.swift */,
+				D71000042F20000000000001 /* AdditionalCursorSupportView.swift */,
 				D5CC44952A33F485007FF839 /* EnhancedModeRequiredBadge.swift */,
 				4A15EE422E0E1309007B76C3 /* RebootRequiredBadge.swift */,
 				D5115A172A33A61500D94E51 /* QuestionButton.swift */,
@@ -781,6 +803,11 @@
 				C31000000000000000000001 /* CapsLockStateTests.swift */,
 				D60002012F20000000000201 /* IndicatorNearMousePointTests.swift */,
 				D60002112F20000000000211 /* AlwaysNearMousePlacementTests.swift */,
+				D70000042F20000000000004 /* CaretPaletteTests.swift */,
+				D71000082F20000000000001 /* CaretHelperSetupTests.swift */,
+				D71000062F20000000000001 /* Tools/CaretPalette/CaretHelperFiles.swift */,
+				D70000062F20000000000006 /* CaretPollingSchedule.swift */,
+				D70000082F20000000000008 /* CaretGeometryFilter.swift */,
 				B60003100000000000000001 /* AlwaysOnIndicatorTests.swift */,
 				D60002412F20000000000241 /* SpotlightCompatibilityTests.swift */,
 				D60002312F20000000000231 /* SpotlightIndicatorPositionTests.swift */,
@@ -802,6 +829,7 @@
 				4A2A1729280BA6A600E13249 /* Resources */,
 				4A2AACC1280BAA1F00CA8124 /* Copy “Launch at Login Helper” */,
 				D508B69E2A13FE49002E272E /* Embed Browser Ext Helper  */,
+				D71000102F20000000000001 /* Embed Cursor Helper */,
 			);
 			buildRules = (
 			);
@@ -940,6 +968,21 @@
 			shellPath = /bin/sh;
 			shellScript = "\"${BUILT_PRODUCTS_DIR}/LaunchAtLogin_LaunchAtLogin.bundle/Contents/Resources/copy-helper-swiftpm.sh\"\n";
 		};
+		D71000102F20000000000001 /* Embed Cursor Helper */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Embed Cursor Helper";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "bash \"$SRCROOT/Tools/CaretPalette/build.sh\" \"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers/CaretPalette\"\n";
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -1011,6 +1054,10 @@
 				4AC26157287AA11D0032AAFE /* IndicatorWindowController+Activation.swift in Sources */,
 				4A4167342814086E00CCC28C /* IndicatorPosition.swift in Sources */,
 				D60002222F20000000000222 /* SpotlightIndicatorPosition.swift in Sources */,
+				D70000012F20000000000001 /* CaretPalette.swift in Sources */,
+				D71000032F20000000000001 /* AdditionalCursorSupportView.swift in Sources */,
+				D71000012F20000000000001 /* CaretHelperManager.swift in Sources */,
+				D71000212F20000000000001 /* CaretInputSource.swift in Sources */,
 				4A881A802888559200B76498 /* NSString.swift in Sources */,
 				4A2A1790280BA7FA00E13249 /* Color.swift in Sources */,
 				D579258C2A1AB0A4003B83EA /* NSRunningApplication+WindowInfo.swift in Sources */,
@@ -1113,6 +1160,11 @@
 				C31000000000000000000002 /* CapsLockStateTests.swift in Sources */,
 				D60002022F20000000000202 /* IndicatorNearMousePointTests.swift in Sources */,
 				D60002122F20000000000212 /* AlwaysNearMousePlacementTests.swift in Sources */,
+				D70000032F20000000000003 /* CaretPaletteTests.swift in Sources */,
+				D71000072F20000000000001 /* CaretHelperSetupTests.swift in Sources */,
+				D71000052F20000000000001 /* Tools/CaretPalette/CaretHelperFiles.swift in Sources */,
+				D70000052F20000000000005 /* CaretPollingSchedule.swift in Sources */,
+				D70000072F20000000000007 /* CaretGeometryFilter.swift in Sources */,
 				B60003100000000000000002 /* AlwaysOnIndicatorTests.swift in Sources */,
 				D60002422F20000000000242 /* SpotlightCompatibilityTests.swift in Sources */,
 				D60002322F20000000000232 /* SpotlightIndicatorPositionTests.swift in Sources */,

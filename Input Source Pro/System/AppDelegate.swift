@@ -54,6 +54,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         navigationVM = NavigationVM()
         permissionsVM = PermissionsVM()
         preferencesVM = PreferencesVM(permissionsVM: permissionsVM)
+        CaretHelperManager.shared.configure(preferences: preferencesVM, permissions: permissionsVM)
         applicationVM = ApplicationVM(preferencesVM: preferencesVM)
         inputSourceVM = InputSourceVM(preferencesVM: preferencesVM)
         indicatorVM = IndicatorVM(permissionsVM: permissionsVM, preferencesVM: preferencesVM, applicationVM: applicationVM, inputSourceVM: inputSourceVM)

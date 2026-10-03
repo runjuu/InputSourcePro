@@ -208,6 +208,9 @@ struct PositionSettingsView: View {
                         }
                         .padding(.horizontal)
                         .padding(.vertical, 10)
+
+                        AdditionalCursorSupportView()
+                            .border(width: 1, edges: [.top], color: NSColor.border2.color)
                     }
                 }
             }

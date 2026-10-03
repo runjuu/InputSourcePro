@@ -24,6 +24,31 @@ extension PreferencesVM {
     }
 
     typealias IndicatorPositionInfo = (kind: IndicatorActuallyPositionKind, point: CGPoint)
+    typealias CursorPosition = (point: CGPoint, isContainer: Bool)
+
+    static func preferredCaretPositionPublisher(
+        palette: @escaping () -> CGPoint?,
+        accessibility: @escaping () -> AnyPublisher<CursorPosition?, Never>,
+        awaitingConfirmation: @escaping () -> Bool = { false }
+    ) -> AnyPublisher<CursorPosition?, Never> {
+        Deferred {
+            if let point = palette() {
+                return Just<CursorPosition?>((point, false)).eraseToAnyPublisher()
+            }
+            if awaitingConfirmation() {
+                return Just<CursorPosition?>(nil).eraseToAnyPublisher()
+            }
+            return accessibility()
+                .map { position in
+                    // The helper may have connected while the Accessibility query was running.
+                    if let point = palette() { return (point: point, isContainer: false) }
+                    return awaitingConfirmation() ? nil : position
+                }
+                .eraseToAnyPublisher()
+        }
+        .eraseToAnyPublisher()
+    }
+
 
     func getIndicatorPositionPublisher(
         appSize: CGSize,
@@ -66,7 +91,7 @@ extension PreferencesVM {
                            self.preferences.tryToDisplayIndicatorNearCursor == true,
                            self.isAbleToQueryLocation(app)
                         {
-                            return self.getPositionAroundInputCursor()
+                            return self.getPositionAroundInputCursor(app: app)
                                 .map { cursorPosition -> AnyPublisher<IndicatorPositionInfo?, Never> in
                                     guard let cursorPosition = cursorPosition else { return DEFAULT }
 
@@ -92,7 +117,7 @@ extension PreferencesVM {
               !NSApplication.isSpotlightLikeApp(app.bundleIdentifier)
         else { return Just(nil).eraseToAnyPublisher() }
 
-        return getPositionAroundInputCursor()
+        return getPositionAroundInputCursor(app: app)
             .map { position in
                 position.map { ($0.isContainer ? .inputRect : .inputCursor, $0.point) }
             }
@@ -161,30 +186,36 @@ private extension PreferencesVM {
         .eraseToAnyPublisher()
     }
 
-    func getPositionAroundInputCursor() -> AnyPublisher<(point: CGPoint, isContainer: Bool)?, Never> {
-        Future { promise in
-            DispatchQueue.global().async {
-                guard let rectInfo = systemWideElement.getCursorRectInfo(),
-                      let screen = NSScreen.getScreenInclude(rect: rectInfo.rect)
-                else { return promise(.success(nil)) }
+    func getPositionAroundInputCursor(app: NSRunningApplication) -> AnyPublisher<(point: CGPoint, isContainer: Bool)?, Never> {
+        Self.preferredCaretPositionPublisher(
+            palette: { CaretPalette.shared.point(for: app) },
+            accessibility: {
+                Future<(point: CGPoint, isContainer: Bool)?, Never> { promise in
+                    DispatchQueue.global().async {
+                        guard let rectInfo = systemWideElement.getCursorRectInfo(),
+                              let screen = NSScreen.getScreenInclude(rect: rectInfo.rect)
+                        else { return promise(.success(nil)) }
 
-                if rectInfo.isContainer,
-                   rectInfo.rect.width / screen.frame.width > 0.7 &&
-                   rectInfo.rect.height / screen.frame.height > 0.7
-                {
-                    return promise(.success(nil))
+                        if rectInfo.isContainer,
+                           rectInfo.rect.width / screen.frame.width > 0.7 &&
+                           rectInfo.rect.height / screen.frame.height > 0.7
+                        {
+                            return promise(.success(nil))
+                        }
+
+                        let offset: CGFloat = 6
+
+                        return promise(.success((
+                            CGPoint(x: rectInfo.rect.minX, y: rectInfo.rect.maxY + offset),
+                            rectInfo.isContainer
+                        )))
+                    }
                 }
-
-                let offset: CGFloat = 6
-
-                return promise(.success((
-                    CGPoint(x: rectInfo.rect.minX, y: rectInfo.rect.maxY + offset),
-                    rectInfo.isContainer
-                )))
-            }
-        }
-        .receive(on: DispatchQueue.main)
-        .eraseToAnyPublisher()
+                .receive(on: DispatchQueue.main)
+                .eraseToAnyPublisher()
+            },
+            awaitingConfirmation: { CaretPalette.shared.suppressesAccessibilityFallback(for: app) }
+        )
     }
 
     func getPositionNearMouse(size: CGSize) -> AnyPublisher<CGPoint?, Never> {

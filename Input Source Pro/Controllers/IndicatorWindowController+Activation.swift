@@ -200,6 +200,7 @@ extension IndicatorWindowController {
         )
         .mapToVoid()
         .merge(with: Timer.interval(seconds: 1).mapToVoid())
+        .merge(with: CaretPalette.shared.changes)
 
         let isScrolling = NSEvent.watch(matching: [.scrollWheel])
             .flatMapLatest { _ in

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>ISP Palette Control</string>
+	<key>CFBundleExecutable</key>
+	<string>CaretControl</string>
+	<key>CFBundleIdentifier</key>
+	<string>dev.inputsourcepro.inputmethod.PaletteControl</string>
+	<key>CFBundleName</key>
+	<string>ISP Palette Control</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>InputMethodConnectionName</key>
+	<string>dev_inputsourcepro_PaletteControl_Connection</string>
+	<key>InputMethodServerControllerClass</key>
+	<string>CaretProbeController</string>
+	<key>InputMethodType</key>
+	<string>palette</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+	<key>TISInputSourceID</key>
+	<string>dev.inputsourcepro.inputmethod.PaletteControl</string>
+	<key>TISIntendedLanguage</key>
+	<string>en</string>
+	<key>ComponentInvisibleInSystemUI</key>
+	<true/>
+	<key>tsInputMethodIconFileKey</key>
+	<string>CursorMenu.tiff</string>
+	<key>tsInputMethodAlternateIconFileKey</key>
+	<string>CursorMenuAlternate.tiff</string>
+	<key>tsInputMethodCharacterRepertoireKey</key>
+	<array>
+		<string>Latn</string>
+	</array>
+</dict>
+</plist>
