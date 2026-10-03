@@ -62,44 +62,43 @@ extension IndicatorWindowController {
         let app = appKind.getApp()
         let application = app.getApplication(preferencesVM: preferencesVM)
 
-        let needActivateAtFirstTime = {
-            // App-switch trigger: suppress only when the same input source stays
-            // active, so unchanged-keyboard app switches don't pop the indicator.
-            if preferencesVM.preferences.isActiveWhenSwitchApp,
-               !event.isAppChangesWithUnchangedInputSource
-            {
-                return true
-            }
-
-            // Focused-field trigger is independent: even on unchanged-keyboard
-            // app switches (e.g. browser address-bar transitions), the indicator
-            // should still appear immediately if the focused element is an input
-            // container. The AX watcher installed below does not replay the
-            // current focus, so we must evaluate it here.
-            if preferencesVM.preferences.isActiveWhenFocusedElementChangesEnabled,
-               let focusedUIElement = app.focuedUIElement(application: application),
-               UIElement.isInputContainer(focusedUIElement)
-            {
-                return true
-            }
-
-            return false
-        }()
+        let needActivateAtFirstTime = event.shouldActivateInitially(
+            onAppSwitch: preferencesVM.preferences.isActiveWhenSwitchApp,
+            onInputFocus: preferencesVM.preferences.isActiveWhenFocusedElementChangesEnabled,
+            isInputFocused: UIElement.isInputContainer(app.focuedUIElement(application: application))
+        )
 
         if !needActivateAtFirstTime, isActive {
             isActive = false
         }
 
-        return app
+        let focusedInputs = app
             .watchAX([.focusedUIElementChanged], [.application, .window])
             .compactMap { _ in app.focuedUIElement(application: application) }
             .removeDuplicates()
             .filter { UIElement.isInputContainer($0) }
+            .mapToVoid()
+            .eraseToAnyPublisher()
+
+        return Self.focusTriggeredIndicatorPublisher(
+            activateInitially: needActivateAtFirstTime,
+            focusedInputs: focusedInputs
+        ) { [weak self] in
+            self?.autoHidePublisher(event: event, inputSource: inputSource, appKind: appKind)
+                ?? Empty().eraseToAnyPublisher()
+        }
+    }
+
+    static func focusTriggeredIndicatorPublisher(
+        activateInitially: Bool,
+        focusedInputs: AnyPublisher<Void, Never>,
+        show: @escaping () -> AnyPublisher<Void, Never>
+    ) -> AnyPublisher<Void, Never> {
+        focusedInputs
             .mapTo(true)
-            .prepend(needActivateAtFirstTime)
+            .prepend(activateInitially)
             .filter { $0 }
-            .compactMap { [weak self] _ in self?.autoHidePublisher(event: event, inputSource: inputSource, appKind: appKind) }
-            .switchToLatest()
+            .flatMapLatest { _ in show() }
             .eraseToAnyPublisher()
     }
 }
@@ -115,142 +114,98 @@ extension IndicatorWindowController {
     }
 }
 
-// MARK: - AlwaysOn
+// MARK: - Always-on indicator
 
 extension IndicatorWindowController {
-    @MainActor
-    enum AlwaysOn {
-        enum Event {
-            case cursorMoved, showAlwaysOnIndicator, scrollStart, scrollEnd
-        }
+    func watchAlwaysOnIndicator() {
+        let configs = Publishers.CombineLatest3(
+            indicatorVM.$state.map(\.inputSource),
+            preferencesVM.$preferences,
+            preferencesVM.$keyboardConfigs
+        )
+        .receive(on: DispatchQueue.main)
+        .compactMap { [weak self] inputSource, preferences, _ -> IndicatorViewConfig? in
+            guard let self = self else { return nil }
 
-        struct State {
-            typealias Changes = (current: State, prev: State)
-
-            static let initial = State(isShowAlwaysOnIndicator: false, isScrolling: false)
-
-            var isShowAlwaysOnIndicator: Bool
-            var isScrolling: Bool
-
-            func reducer(_ event: Event) -> State {
-                switch event {
-                case .scrollStart:
-                    return update {
-                        $0.isScrolling = true
-                    }
-                case .scrollEnd:
-                    return update {
-                        $0.isScrolling = false
-                    }
-                case .showAlwaysOnIndicator:
-                    return update {
-                        $0.isShowAlwaysOnIndicator = true
-                    }
-                case .cursorMoved:
-                    return self
-                }
-            }
-
-            func update(_ change: (inout State) -> Void) -> State {
-                var draft = self
-
-                change(&draft)
-
-                return draft
-            }
-        }
-
-        static func statePublisher(app: NSRunningApplication) -> AnyPublisher<State.Changes, Never> {
-            let show = app.watchAX(
-                [.selectedTextChanged],
-                [.application, .window] + Role.validInputElms
+            return IndicatorViewConfig(
+                inputSource: inputSource,
+                kind: .alwaysOn,
+                size: preferences.indicatorSize ?? .medium,
+                bgColor: self.preferencesVM.getBgNSColor(inputSource),
+                textColor: self.preferencesVM.getTextNSColor(inputSource)
             )
-            .mapTo(Event.cursorMoved)
-
-            let checkIfUnfocusedTimer = Timer.interval(seconds: 1)
-                .mapTo(Event.cursorMoved)
-
-            let showAlwaysOnIndicatorTimer = Timer.delay(seconds: 0.8)
-                .mapTo(Event.showAlwaysOnIndicator)
-
-            let hide = NSEvent.watch(matching: [.scrollWheel])
-                .flatMapLatest { _ in Timer
-                    .delay(seconds: 0.3)
-                    .mapTo(Event.scrollEnd)
-                    .prepend(Event.scrollStart)
-                }
-                .removeDuplicates()
-                .eraseToAnyPublisher()
-
-            return Publishers.MergeMany([show, hide, checkIfUnfocusedTimer, showAlwaysOnIndicatorTimer])
-                .prepend(.cursorMoved)
-                .scan((State.initial, State.initial)) { changes, event -> State.Changes in
-                    (changes.current.reducer(event), changes.current)
-                }
-                .receive(on: DispatchQueue.main)
-                .eraseToAnyPublisher()
         }
-    }
+        .eraseToAnyPublisher()
 
-    func alwaysOnPublisher(
-        event: IndicatorVM.ActivateEvent,
-        inputSource: InputSource,
-        appKind: AppKind
-    ) -> AnyPublisher<Void, Never> {
-        typealias Action = () -> Void
-
-        let app = appKind.getApp()
-        var isAlwaysOnIndicatorShowed = false
-
-        updateIndicator(
-            event: event,
-            inputSource: inputSource
+        let positions = Self.alwaysOnPositionPublisher(
+            context: Publishers.CombineLatest3(
+                applicationVM.$appKind,
+                preferencesVM.$preferences,
+                indicatorVM.indicatorIsSuspendedPublisher
+            ).eraseToAnyPublisher(),
+            isAppAllowed: { [weak self] appKind in
+                guard let self = self else { return false }
+                return self.preferencesVM.isAbleToQueryLocation(appKind.getApp()) &&
+                    !self.preferencesVM.isHideIndicator(appKind)
+            },
+            getPosition: { [weak self] app in
+                self?.caretPlacementPublisher(app: app) ?? Just(.hidden).eraseToAnyPublisher()
+            }
         )
 
-        return AlwaysOn
-            .statePublisher(app: app)
-            .flatMapLatest { [weak self] state -> AnyPublisher<Action, Never> in
-                let ACTION_HIDE: Action = { self?.isActive = false }
-                let ACTION_SHOW: Action = { self?.isActive = true }
-                let ACTION_SHOW_ALWAYS_ON_INDICATOR: Action = { self?.indicatorVC.showAlwaysOnView() }
+        alwaysOnIndicator.observe(configs: configs, positions: positions)
 
-                if !state.current.isScrolling,
-                   let self = self,
-                   let appSize = self.getAppSize()
-                {
-                    return self.preferencesVM.getIndicatorPositionPublisher(appSize: appSize, app: app)
-                        .map { position -> Action in
-                            guard let position = position
-                            else { return ACTION_HIDE }
+        NSWorkspace.shared.notificationCenter
+            .publisher(for: NSWorkspace.activeSpaceDidChangeNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.alwaysOnIndicator.reorderOnActiveSpace() }
+            .store(in: cancelBag)
+    }
 
-                            return {
-                                if state.current.isShowAlwaysOnIndicator,
-                                   !isAlwaysOnIndicatorShowed
-                                {
-                                    isAlwaysOnIndicatorShowed = true
-                                    ACTION_SHOW_ALWAYS_ON_INDICATOR()
-                                }
+    static func alwaysOnPositionPublisher(
+        context: AnyPublisher<(AppKind?, Preferences, Bool), Never>,
+        isAppAllowed: @escaping (AppKind) -> Bool,
+        getPosition: @escaping (NSRunningApplication) -> AnyPublisher<AlwaysNearMouse.Placement, Never>
+    ) -> AnyPublisher<CGPoint?, Never> {
+        context
+            .receive(on: DispatchQueue.main)
+            .flatMapLatest { appKind, preferences, isSuspended -> AnyPublisher<CGPoint?, Never> in
+                guard let appKind = appKind,
+                      !isSuspended,
+                      preferences.isAlwaysOnIndicatorEnabled,
+                      !preferences.isAlwaysDisplayIndicatorNearMouseEnabled,
+                      isAppAllowed(appKind)
+                else { return Just(nil).eraseToAnyPublisher() }
 
-                                if position.kind.isInputArea {
-                                    self.moveIndicator(position: position)
-                                    ACTION_SHOW()
-                                } else {
-                                    if state.current.isShowAlwaysOnIndicator {
-                                        ACTION_HIDE()
-                                    } else {
-                                        self.moveIndicator(position: position)
-                                        ACTION_SHOW()
-                                    }
-                                }
-                            }
-                        }
-                        .eraseToAnyPublisher()
-                } else {
-                    return Just(ACTION_HIDE).eraseToAnyPublisher()
-                }
+                return getPosition(appKind.getApp())
+                    .map { placement -> CGPoint? in
+                        if case let .caret(point) = placement { return point }
+                        return nil
+                    }
+                    .prepend(nil)
+                    .eraseToAnyPublisher()
             }
-            .tap { $0() }
-            .mapToVoid()
+            .eraseToAnyPublisher()
+    }
+
+    private static func caretTrackingEvents(app: NSRunningApplication) -> AnyPublisher<Bool, Never> {
+        let cursorMoved = app.watchAX(
+            [.selectedTextChanged, .focusedUIElementChanged],
+            [.application, .window] + Role.validInputElms
+        )
+        .mapToVoid()
+        .merge(with: Timer.interval(seconds: 1).mapToVoid())
+
+        let isScrolling = NSEvent.watch(matching: [.scrollWheel])
+            .flatMapLatest { _ in
+                Timer.delay(seconds: 0.3).mapTo(false).prepend(true)
+            }
+            .prepend(false)
+            .removeDuplicates()
+
+        return Publishers.CombineLatest(cursorMoved.prepend(()), isScrolling)
+            .map { _, isScrolling in isScrolling }
+            .receive(on: DispatchQueue.main)
             .eraseToAnyPublisher()
     }
 }
@@ -335,7 +290,7 @@ extension IndicatorWindowController {
 
         // Caret tracking needs the same preferences as the always-on indicator.
         let caretTrackingPreferred = preferencesVM.$preferences
-            .map { $0.isEnhancedModeEnabled && $0.tryToDisplayIndicatorNearCursor && $0.isEnableAlwaysOnIndicator }
+            .map(\.isAlwaysOnIndicatorEnabled)
             .removeDuplicates()
 
         // The function-key badge shows for a second after a toggle, the same as
@@ -397,6 +352,7 @@ extension IndicatorWindowController {
             .eraseToAnyPublisher()
 
         return Publishers.CombineLatest(applicationVM.$appKind, caretTrackingPreferred)
+            .receive(on: DispatchQueue.main)
             .flatMapLatest { [weak self] appKind, caretTrackingPreferred -> AnyPublisher<Void, Never> in
                 guard let self = self else { return Empty().eraseToAnyPublisher() }
 
@@ -452,14 +408,11 @@ extension IndicatorWindowController {
     /// by the same signals it uses (caret changes, a 1s poll, scrolling).
     private func caretPlacementPublisher(app: NSRunningApplication) -> AnyPublisher<AlwaysNearMouse.Placement, Never> {
         AlwaysNearMouse.placementPublisher(
-            isScrolling: AlwaysOn.statePublisher(app: app)
-                .map(\.current.isScrolling)
-                .eraseToAnyPublisher()
+            isScrolling: Self.caretTrackingEvents(app: app)
         ) { [weak self] in
-            guard let self = self, let appSize = self.getAppSize()
-            else { return Just(nil).eraseToAnyPublisher() }
+            guard let self = self else { return Just(nil).eraseToAnyPublisher() }
 
-            return self.preferencesVM.getIndicatorPositionPublisher(appSize: appSize, app: app)
+            return self.preferencesVM.getAlwaysOnIndicatorPositionPublisher(app: app)
         }
     }
 

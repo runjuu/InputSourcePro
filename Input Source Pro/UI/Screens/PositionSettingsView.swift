@@ -145,8 +145,9 @@ struct PositionSettingsView: View {
                 SettingsSection(title: "Advanced", tips: EnhancedModeRequiredBadge()) {
                     VStack(spacing: 0) {
                         HStack {
-                            Toggle(isOn: $preferencesVM.preferences.tryToDisplayIndicatorNearCursor) {}
+                            Toggle("tryToDisplayIndicatorNearCursor".i18n(), isOn: $preferencesVM.preferences.tryToDisplayIndicatorNearCursor)
                                 .toggleStyle(.switch)
+                                .labelsHidden()
                                 .disabled(!preferencesVM.preferences.isEnhancedModeEnabled)
 
                             Text("tryToDisplayIndicatorNearCursor".i18n())
@@ -178,10 +179,10 @@ struct PositionSettingsView: View {
                         .border(width: 1, edges: [.bottom], color: NSColor.border2.color)
 
                         VStack {
-                            let needDisableAlwaysOnIndicator = !preferencesVM.preferences.isEnhancedModeEnabled || !preferencesVM.preferences.tryToDisplayIndicatorNearCursor
+                            let needDisableAlwaysOnIndicator = !preferencesVM.preferences.isEnhancedModeEnabled
 
                             HStack {
-                                Toggle("", isOn: $preferencesVM.preferences.isEnableAlwaysOnIndicator)
+                                Toggle("isEnableAlwaysOnIndicator".i18n(), isOn: $preferencesVM.preferences.isEnableAlwaysOnIndicator)
                                     .disabled(needDisableAlwaysOnIndicator)
                                     .toggleStyle(.switch)
                                     .labelsHidden()
@@ -192,17 +193,11 @@ struct PositionSettingsView: View {
 
                                 QuestionButton(
                                     content: {
-                                        SwiftUI.Image(systemName: "video")
+                                        SwiftUI.Image(systemName: "questionmark")
                                             .font(.system(size: 11, weight: .bold))
                                             .padding(6)
                                     },
-                                    popover: {
-                                        PlayerView(url: Bundle.main.url(
-                                            forResource: "Always-On-Indicator-Demo-\($0 == .dark ? "Dark" : "Light")",
-                                            withExtension: "mp4"
-                                        )!)
-                                            .frame(height: 118)
-
+                                    popover: { _ in
                                         Text("alwaysOnIndicatorTips".i18n())
                                             .font(.footnote)
                                             .padding(.vertical, 10)

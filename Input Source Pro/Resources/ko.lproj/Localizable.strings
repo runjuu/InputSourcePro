@@ -64,9 +64,9 @@
 "Always-On Indicator Style" = "항상 켜진 표시기";
 "Reset" = "재설정";
 
-"tryToDisplayIndicatorNearCursor" = "가능한 경우 입력 커서 근처에 표시";
+"tryToDisplayIndicatorNearCursor" = "가능한 경우 기본 표시기를 입력 커서 근처에 표시";
 "isEnableAlwaysOnIndicator" = "입력 커서 근처에 항상 켜진 표시기 표시";
-"alwaysOnIndicatorTips" = "이 기능은 \"가능한 경우 입력 커서 근처에 표시\"가 활성화되어야 합니다.";
+"alwaysOnIndicatorTips" = "상시 표시기는 기본 표시기의 위치 및 표시 조건과 관계없이 입력 커서를 따라갑니다. 고급 모드가 필요합니다.";
 "isAlwaysDisplayIndicatorNearMouse" = "마우스 커서 근처에 항상 표시기 표시";
 "alwaysDisplayIndicatorNearMouseTips" = "표시기가 사라지지 않고 마우스 커서를 따라다닙니다. \"입력 커서 근처에 항상 켜진 표시기 표시\"가 켜져 있으면 텍스트 필드에 포커스가 있는 동안은 입력 커서 옆에 머물고, 그 외에는 마우스를 따라갑니다.";
 "Customize Styles" = "스타일 사용자 정의";

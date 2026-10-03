@@ -42,6 +42,22 @@ extension IndicatorVM {
             default: return false
             }
         }
+
+        func shouldActivateInitially(
+            onAppSwitch: Bool,
+            onInputFocus: Bool,
+            isInputFocused: @autoclosure () -> Bool
+        ) -> Bool {
+            switch self {
+            case .inputSourceChanges, .longMouseDown, .functionKeyModeChanges:
+                // These events have already passed their own trigger preferences.
+                return true
+            case let .appChanges(_, _, inputSourceDidChange):
+                return (onAppSwitch && inputSourceDidChange) || (onInputFocus && isInputFocused())
+            case .justHide:
+                return false
+            }
+        }
     }
 
     func longMouseDownPublisher() -> AnyPublisher<ActivateEvent, Never> {

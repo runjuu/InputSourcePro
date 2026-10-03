@@ -42,6 +42,7 @@
 		4A2A177F280BA7FA00E13249 /* StatusItemController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2A1751280BA7FA00E13249 /* StatusItemController.swift */; };
 		4A2A1780280BA7FA00E13249 /* IndicatorViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2A1752280BA7FA00E13249 /* IndicatorViewController.swift */; };
 		4A2A1781280BA7FA00E13249 /* IndicatorWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2A1753280BA7FA00E13249 /* IndicatorWindowController.swift */; };
+		B60003000000000000000002 /* AlwaysOnIndicatorWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60003000000000000000001 /* AlwaysOnIndicatorWindowController.swift */; };
 		4A2A1787280BA7FA00E13249 /* CodableUserDefault.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2A175E280BA7FA00E13249 /* CodableUserDefault.swift */; };
 		4A2A1788280BA7FA00E13249 /* NSImage+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2A175F280BA7FA00E13249 /* NSImage+Extension.swift */; };
 		4A2A1789280BA7FA00E13249 /* TISInputSource+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2A1760280BA7FA00E13249 /* TISInputSource+Extension.swift */; };
@@ -179,6 +180,7 @@
 		D60003122F20000000000312 /* ScreenLockStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60003112F20000000000311 /* ScreenLockStateTests.swift */; };
 		D60002022F20000000000202 /* IndicatorNearMousePointTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60002012F20000000000201 /* IndicatorNearMousePointTests.swift */; };
 		D60002122F20000000000212 /* AlwaysNearMousePlacementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60002112F20000000000211 /* AlwaysNearMousePlacementTests.swift */; };
+		B60003100000000000000002 /* AlwaysOnIndicatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60003100000000000000001 /* AlwaysOnIndicatorTests.swift */; };
 		D60002422F20000000000242 /* SpotlightCompatibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60002412F20000000000241 /* SpotlightCompatibilityTests.swift */; };
 		D60002222F20000000000222 /* SpotlightIndicatorPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60002212F20000000000221 /* SpotlightIndicatorPosition.swift */; };
 		D60002322F20000000000232 /* SpotlightIndicatorPositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60002312F20000000000231 /* SpotlightIndicatorPositionTests.swift */; };
@@ -249,6 +251,7 @@
 		4A2A1751280BA7FA00E13249 /* StatusItemController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = StatusItemController.swift; sourceTree = "<group>"; };
 		4A2A1752280BA7FA00E13249 /* IndicatorViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = IndicatorViewController.swift; sourceTree = "<group>"; };
 		4A2A1753280BA7FA00E13249 /* IndicatorWindowController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = IndicatorWindowController.swift; sourceTree = "<group>"; };
+		B60003000000000000000001 /* AlwaysOnIndicatorWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlwaysOnIndicatorWindowController.swift; sourceTree = "<group>"; };
 		4A2A175E280BA7FA00E13249 /* CodableUserDefault.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CodableUserDefault.swift; sourceTree = "<group>"; };
 		4A2A175F280BA7FA00E13249 /* NSImage+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "NSImage+Extension.swift"; sourceTree = "<group>"; };
 		4A2A1760280BA7FA00E13249 /* TISInputSource+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "TISInputSource+Extension.swift"; sourceTree = "<group>"; };
@@ -381,6 +384,7 @@
 		D60003112F20000000000311 /* ScreenLockStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenLockStateTests.swift; sourceTree = "<group>"; };
 		D60002012F20000000000201 /* IndicatorNearMousePointTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndicatorNearMousePointTests.swift; sourceTree = "<group>"; };
 		D60002112F20000000000211 /* AlwaysNearMousePlacementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlwaysNearMousePlacementTests.swift; sourceTree = "<group>"; };
+		B60003100000000000000001 /* AlwaysOnIndicatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlwaysOnIndicatorTests.swift; sourceTree = "<group>"; };
 		D60002412F20000000000241 /* SpotlightCompatibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotlightCompatibilityTests.swift; sourceTree = "<group>"; };
 		D60002212F20000000000221 /* SpotlightIndicatorPosition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotlightIndicatorPosition.swift; sourceTree = "<group>"; };
 		D60002312F20000000000231 /* SpotlightIndicatorPositionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotlightIndicatorPositionTests.swift; sourceTree = "<group>"; };
@@ -495,6 +499,7 @@
 				4A2A1751280BA7FA00E13249 /* StatusItemController.swift */,
 				4A2A1752280BA7FA00E13249 /* IndicatorViewController.swift */,
 				4A2A1753280BA7FA00E13249 /* IndicatorWindowController.swift */,
+				B60003000000000000000001 /* AlwaysOnIndicatorWindowController.swift */,
 				4AC26156287AA11D0032AAFE /* IndicatorWindowController+Activation.swift */,
 				D525609429B3F255009EB7BA /* IndicatorWindowController+Indicator.swift */,
 			);
@@ -773,6 +778,7 @@
 				D60003112F20000000000311 /* ScreenLockStateTests.swift */,
 				D60002012F20000000000201 /* IndicatorNearMousePointTests.swift */,
 				D60002112F20000000000211 /* AlwaysNearMousePlacementTests.swift */,
+				B60003100000000000000001 /* AlwaysOnIndicatorTests.swift */,
 				D60002412F20000000000241 /* SpotlightCompatibilityTests.swift */,
 				D60002312F20000000000231 /* SpotlightIndicatorPositionTests.swift */,
 				D60003032F20000000000303 /* ShortcutConflictTests.swift */,
@@ -1065,6 +1071,7 @@
 				D5115A182A33A61500D94E51 /* QuestionButton.swift in Sources */,
 				4AC450B4281CFB4400DA0329 /* Combine.swift in Sources */,
 				4A2A1781280BA7FA00E13249 /* IndicatorWindowController.swift in Sources */,
+				B60003000000000000000002 /* AlwaysOnIndicatorWindowController.swift in Sources */,
 				4A35D55A2819834600DDC108 /* NSRunningApplication.swift in Sources */,
 				4A093079285EE63D00232089 /* RunningApplicationsPicker.swift in Sources */,
 				4A8E49912F0AF69300424D11 /* FKeyManager.swift in Sources */,
@@ -1102,6 +1109,7 @@
 				D60003122F20000000000312 /* ScreenLockStateTests.swift in Sources */,
 				D60002022F20000000000202 /* IndicatorNearMousePointTests.swift in Sources */,
 				D60002122F20000000000212 /* AlwaysNearMousePlacementTests.swift in Sources */,
+				B60003100000000000000002 /* AlwaysOnIndicatorTests.swift in Sources */,
 				D60002422F20000000000242 /* SpotlightCompatibilityTests.swift in Sources */,
 				D60002322F20000000000232 /* SpotlightIndicatorPositionTests.swift in Sources */,
 				D60003042F20000000000304 /* ShortcutConflictTests.swift in Sources */,

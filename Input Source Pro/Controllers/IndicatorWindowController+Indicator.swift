@@ -45,5 +45,6 @@ extension IndicatorWindowController {
     func moveIndicator(position: PreferencesVM.IndicatorPositionInfo) {
         indicatorVC.refresh()
         moveTo(point: position.point)
+        alwaysOnIndicator.defaultIndicatorFrame = isActive ? window?.frame : nil
     }
 }

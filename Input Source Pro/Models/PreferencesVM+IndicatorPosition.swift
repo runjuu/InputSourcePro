@@ -66,7 +66,7 @@ extension PreferencesVM {
                            self.preferences.tryToDisplayIndicatorNearCursor == true,
                            self.isAbleToQueryLocation(app)
                         {
-                            return self.getPositionAroundInputCursor(size: appSize)
+                            return self.getPositionAroundInputCursor()
                                 .map { cursorPosition -> AnyPublisher<IndicatorPositionInfo?, Never> in
                                     guard let cursorPosition = cursorPosition else { return DEFAULT }
 
@@ -80,6 +80,21 @@ extension PreferencesVM {
                         return DEFAULT
                     }
                     .eraseToAnyPublisher()
+            }
+            .eraseToAnyPublisher()
+    }
+
+    func getAlwaysOnIndicatorPositionPublisher(
+        app: NSRunningApplication
+    ) -> AnyPublisher<IndicatorPositionInfo?, Never> {
+        guard preferences.isEnhancedModeEnabled,
+              isAbleToQueryLocation(app),
+              !NSApplication.isSpotlightLikeApp(app.bundleIdentifier)
+        else { return Just(nil).eraseToAnyPublisher() }
+
+        return getPositionAroundInputCursor()
+            .map { position in
+                position.map { ($0.isContainer ? .inputRect : .inputCursor, $0.point) }
             }
             .eraseToAnyPublisher()
     }
@@ -146,9 +161,7 @@ private extension PreferencesVM {
         .eraseToAnyPublisher()
     }
 
-    func getPositionAroundInputCursor(
-        size _: CGSize
-    ) -> AnyPublisher<(point: CGPoint, isContainer: Bool)?, Never> {
+    func getPositionAroundInputCursor() -> AnyPublisher<(point: CGPoint, isContainer: Bool)?, Never> {
         Future { promise in
             DispatchQueue.global().async {
                 guard let rectInfo = systemWideElement.getCursorRectInfo(),

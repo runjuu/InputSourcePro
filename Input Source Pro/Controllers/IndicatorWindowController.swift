@@ -14,6 +14,7 @@ class IndicatorWindowController: FloatWindowController {
     let inputSourceVM: InputSourceVM
 
     let indicatorVC = IndicatorViewController()
+    let alwaysOnIndicator = AlwaysOnIndicatorWindowController()
 
     var isActive = false {
         didSet {
@@ -25,6 +26,8 @@ class IndicatorWindowController: FloatWindowController {
                 indicatorVC.view.animator().alphaValue = 0
                 deactive()
             }
+
+            alwaysOnIndicator.defaultIndicatorFrame = isActive ? window?.frame : nil
         }
     }
 
@@ -63,13 +66,10 @@ class IndicatorWindowController: FloatWindowController {
 
                 switch Self.activationMode(
                     event: event,
-                    alwaysOn: preferencesVM.isShowAlwaysOnIndicator(app: app),
                     focusedField: preferencesVM.needDetectFocusedFieldChanges(app: app)
                 ) {
                 case .hide:
                     return self.justHidePublisher()
-                case .alwaysOn:
-                    return self.alwaysOnPublisher(event: event, inputSource: inputSource, appKind: appKind)
                 case .autoShow:
                     return self.autoShowPublisher(event: event, inputSource: inputSource, appKind: appKind)
                 case .autoHide:
@@ -87,11 +87,15 @@ class IndicatorWindowController: FloatWindowController {
         Publishers.CombineLatest(indicatorVM.indicatorIsSuspendedPublisher, isAlwaysNearMouse)
             .map { isSuspended, isAlwaysNearMouse in isSuspended || isAlwaysNearMouse }
             .removeDuplicates()
-            .flatMapLatest { isIdle in isIdle ? Empty().eraseToAnyPublisher() : indicatorPublisher }
+            .flatMapLatest { [weak self] isIdle -> AnyPublisher<Void, Never> in
+                if isIdle { return self?.justHidePublisher() ?? Empty().eraseToAnyPublisher() }
+                return indicatorPublisher
+            }
             .sink { _ in }
             .store(in: cancelBag)
 
         watchAlwaysNearMouse()
+        watchAlwaysOnIndicator()
     }
 
     @available(*, unavailable)
@@ -102,12 +106,11 @@ class IndicatorWindowController: FloatWindowController {
 
 extension IndicatorWindowController {
     enum ActivationMode {
-        case hide, autoHide, autoShow, alwaysOn
+        case hide, autoHide, autoShow
     }
 
     static func activationMode(
         event: IndicatorVM.ActivateEvent,
-        alwaysOn: Bool,
         focusedField: Bool
     ) -> ActivationMode {
         if event.isJustHide {
@@ -117,10 +120,6 @@ extension IndicatorWindowController {
         // Function-key feedback is transient even when field tracking is enabled.
         if case .functionKeyModeChanges = event {
             return .autoHide
-        }
-
-        if alwaysOn {
-            return .alwaysOn
         }
 
         if focusedField {

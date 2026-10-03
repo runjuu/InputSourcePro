@@ -336,7 +336,7 @@ struct Preferences {
         static let indicatorInfo = "indicatorInfo"
     }
 
-    fileprivate init() {}
+    init() {}
 
     @UserDefault(Preferences.Key.prevInstalledBuildVersion)
     var prevInstalledBuildVersion = 0
@@ -555,6 +555,10 @@ extension Preferences {
         return isEnhancedModeEnabled && isActiveWhenFocusedElementChanges
     }
 
+    var isAlwaysOnIndicatorEnabled: Bool {
+        return isEnhancedModeEnabled && isEnableAlwaysOnIndicator
+    }
+
     /// The option is a sub-setting of "Follow Mouse", so it only takes effect
     /// while that position mode is selected.
     var isAlwaysDisplayIndicatorNearMouseEnabled: Bool {
@@ -695,16 +699,6 @@ extension PreferencesVM {
             return false
         } else {
             return true
-        }
-    }
-
-    func isShowAlwaysOnIndicator(app: NSRunningApplication) -> Bool {
-        if preferences.isEnableAlwaysOnIndicator,
-           isAbleToQueryLocation(app)
-        {
-            return true
-        } else {
-            return false
         }
     }
 

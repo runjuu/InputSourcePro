@@ -66,9 +66,9 @@
 "Reset" = "重置";
 
 "Enhanced" = "实验功能";
-"tryToDisplayIndicatorNearCursor" = "优先在输入光标附近显示";
+"tryToDisplayIndicatorNearCursor" = "优先在输入光标附近显示默认提示";
 "isEnableAlwaysOnIndicator" = "在输入光标处显示常驻提示";
-"alwaysOnIndicatorTips" = "开启此功能需先启用「优先在输入光标附近显示」";
+"alwaysOnIndicatorTips" = "常驻提示跟随输入光标，不受默认提示的位置和触发条件影响。需要开启增强模式。";
 "isAlwaysDisplayIndicatorNearMouse" = "始终在鼠标指针附近显示提示";
 "alwaysDisplayIndicatorNearMouseTips" = "提示不会隐藏，并会跟随鼠标指针移动。若已开启「在输入光标处显示常驻提示」，在文本框获得焦点时提示会停留在输入光标旁，其余情况跟随鼠标。";
 "Customize Styles" = "自定义样式";

@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import XCTest
 @testable import Input_Source_Pro
 
@@ -57,25 +58,17 @@ final class ActivateEventInputSourceChangeTests: XCTestCase {
         XCTAssertEqual(activationMode(inputSourceDidChange: false, focusedField: true), .autoShow)
     }
 
-    func testUnchangedInputSourcePreservesAlwaysOnTracking() {
-        XCTAssertEqual(activationMode(inputSourceDidChange: false, alwaysOn: true), .alwaysOn)
-        XCTAssertEqual(activationMode(inputSourceDidChange: false, alwaysOn: true, focusedField: true), .alwaysOn)
-    }
-
     func testUnchangedInputSourceSuppressesOnlyTransientAppSwitchActivation() {
         XCTAssertEqual(activationMode(inputSourceDidChange: false), .hide)
         XCTAssertEqual(activationMode(inputSourceDidChange: true), .autoHide)
     }
 
-    func testExplicitHideOverridesPersistentModes() {
-        for alwaysOn in [false, true] {
-            for focusedField in [false, true] {
-                XCTAssertEqual(IndicatorWindowController.activationMode(
-                    event: .justHide,
-                    alwaysOn: alwaysOn,
-                    focusedField: focusedField
-                ), .hide)
-            }
+    func testExplicitHideOverridesFocusedFieldTracking() {
+        for focusedField in [false, true] {
+            XCTAssertEqual(IndicatorWindowController.activationMode(
+                event: .justHide,
+                focusedField: focusedField
+            ), .hide)
         }
     }
 
@@ -83,20 +76,110 @@ final class ActivateEventInputSourceChangeTests: XCTestCase {
         for mode in [FKeyMode.functionKeys, .mediaKeys] {
             XCTAssertEqual(IndicatorWindowController.activationMode(
                 event: .functionKeyModeChanges(mode),
-                alwaysOn: true,
                 focusedField: true
             ), .autoHide)
         }
     }
 
+    func testIndependentTriggersActivateWithoutAppSwitchTriggerOrTextFocus() {
+        let events: [IndicatorVM.ActivateEvent] = [
+            .inputSourceChanges(InputSource.getCurrentInputSource(), .system),
+            .longMouseDown,
+        ]
+
+        for event in events {
+            XCTAssertTrue(event.shouldActivateInitially(
+                onAppSwitch: false,
+                onInputFocus: true,
+                isInputFocused: false
+            ))
+        }
+    }
+
+    func testAppSwitchStillRespectsInputSourceChangesAndFocusedFieldPreference() {
+        let unchanged = IndicatorVM.ActivateEvent.appChanges(
+            current: appKind(), prev: appKind(), inputSourceDidChange: false
+        )
+        XCTAssertFalse(unchanged.shouldActivateInitially(
+            onAppSwitch: true, onInputFocus: false, isInputFocused: true
+        ))
+        XCTAssertFalse(unchanged.shouldActivateInitially(
+            onAppSwitch: true, onInputFocus: true, isInputFocused: false
+        ))
+        XCTAssertTrue(unchanged.shouldActivateInitially(
+            onAppSwitch: false, onInputFocus: true, isInputFocused: true
+        ))
+
+        let changed = IndicatorVM.ActivateEvent.appChanges(
+            current: appKind(), prev: appKind(), inputSourceDidChange: true
+        )
+        XCTAssertTrue(changed.shouldActivateInitially(
+            onAppSwitch: true, onInputFocus: false, isInputFocused: false
+        ))
+        XCTAssertFalse(changed.shouldActivateInitially(
+            onAppSwitch: false, onInputFocus: false, isInputFocused: true
+        ))
+    }
+
+    func testExplicitTriggersKeepWatchingFocusAfterImmediateHintCompletes() {
+        let events: [IndicatorVM.ActivateEvent] = [
+            .inputSourceChanges(InputSource.getCurrentInputSource(), .system),
+            .longMouseDown,
+        ]
+
+        for event in events {
+            let focusedInputs = PassthroughSubject<Void, Never>()
+            var showCount = 0
+            var completed = false
+            let subscription = IndicatorWindowController.focusTriggeredIndicatorPublisher(
+                activateInitially: event.shouldActivateInitially(
+                    onAppSwitch: false, onInputFocus: true, isInputFocused: false
+                ),
+                focusedInputs: focusedInputs.eraseToAnyPublisher(),
+                show: {
+                    showCount += 1
+                    return Just(()).eraseToAnyPublisher()
+                }
+            )
+            .sink(receiveCompletion: { _ in completed = true }, receiveValue: { _ in })
+
+            XCTAssertEqual(showCount, 1)
+            XCTAssertFalse(completed)
+            focusedInputs.send(())
+            XCTAssertEqual(showCount, 2)
+            XCTAssertFalse(completed)
+
+            subscription.cancel()
+            focusedInputs.send(())
+            XCTAssertEqual(showCount, 2)
+        }
+    }
+
+    func testSuppressedInitialHintStillWatchesLaterFocus() {
+        let focusedInputs = PassthroughSubject<Void, Never>()
+        var showCount = 0
+        let subscription = IndicatorWindowController.focusTriggeredIndicatorPublisher(
+            activateInitially: false,
+            focusedInputs: focusedInputs.eraseToAnyPublisher(),
+            show: {
+                showCount += 1
+                return Just(()).eraseToAnyPublisher()
+            }
+        )
+        .sink { _ in }
+
+        XCTAssertEqual(showCount, 0)
+        focusedInputs.send(())
+        XCTAssertEqual(showCount, 1)
+        subscription.cancel()
+    }
+
     private func activationMode(
         inputSourceDidChange: Bool,
-        alwaysOn: Bool = false,
         focusedField: Bool = false
     ) -> IndicatorWindowController.ActivationMode {
         IndicatorWindowController.activationMode(
             event: .appChanges(current: appKind(), prev: appKind(), inputSourceDidChange: inputSourceDidChange),
-            alwaysOn: alwaysOn,
             focusedField: focusedField
         )
     }

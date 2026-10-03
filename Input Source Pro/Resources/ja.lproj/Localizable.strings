@@ -64,9 +64,9 @@
 "Always-On Indicator Style" = "常時表示インジケーター";
 "Reset" = "リセット";
 
-"tryToDisplayIndicatorNearCursor" = "利用可能な場合、入力カーソルの近くに表示";
+"tryToDisplayIndicatorNearCursor" = "利用可能な場合、通常のインジケーターを入力カーソルの近くに表示";
 "isEnableAlwaysOnIndicator" = "入力カーソルの近くに常時表示インジケーターを表示";
-"alwaysOnIndicatorTips" = "この機能は、「利用可能な場合、入力カーソルの近くに表示」が有効になっている必要があります。";
+"alwaysOnIndicatorTips" = "常時表示インジケーターは、通常のインジケーターの位置や表示条件に関係なく入力カーソルに追従します。拡張モードが必要です。";
 "isAlwaysDisplayIndicatorNearMouse" = "マウスカーソルの近くに常にインジケーターを表示";
 "alwaysDisplayIndicatorNearMouseTips" = "インジケーターは非表示にならず、マウスカーソルに追従します。「入力カーソルの近くに常時表示インジケーターを表示」が有効な場合、テキストフィールドにフォーカスがある間は入力カーソルの横に留まり、それ以外ではマウスに追従します。";
 "Customize Styles" = "スタイルのカスタマイズ";
