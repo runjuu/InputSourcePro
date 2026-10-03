@@ -81,24 +81,27 @@ extension IndicatorWindowController {
             .eraseToAnyPublisher()
 
         return Self.focusTriggeredIndicatorPublisher(
-            activateInitially: needActivateAtFirstTime,
+            initialEvent: needActivateAtFirstTime ? event : nil,
+            inputSource: inputSource,
             focusedInputs: focusedInputs
-        ) { [weak self] in
+        ) { [weak self] event in
             self?.autoHidePublisher(event: event, inputSource: inputSource, appKind: appKind)
                 ?? Empty().eraseToAnyPublisher()
         }
     }
 
     static func focusTriggeredIndicatorPublisher(
-        activateInitially: Bool,
+        initialEvent: IndicatorVM.ActivateEvent?,
+        inputSource: InputSource,
         focusedInputs: AnyPublisher<Void, Never>,
-        show: @escaping () -> AnyPublisher<Void, Never>
+        show: @escaping (IndicatorVM.ActivateEvent) -> AnyPublisher<Void, Never>
     ) -> AnyPublisher<Void, Never> {
         focusedInputs
-            .mapTo(true)
-            .prepend(activateInitially)
-            .filter { $0 }
-            .flatMapLatest { _ in show() }
+            // Focus changes show the input source, never replay a previous status badge.
+            .map { _ -> IndicatorVM.ActivateEvent? in .inputSourceChanges(inputSource, .noChanges) }
+            .prepend(initialEvent)
+            .compactMap { $0 }
+            .flatMapLatest { show($0) }
             .eraseToAnyPublisher()
     }
 }

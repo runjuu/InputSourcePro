@@ -117,13 +117,6 @@ extension IndicatorWindowController {
             return .hide
         }
 
-        switch event {
-        case .functionKeyModeChanges, .capsLockChanges:
-            return .autoHide
-        default:
-            break
-        }
-
         if focusedField {
             return .autoShow
         }

@@ -34,13 +34,13 @@ final class CapsLockStateTests: XCTestCase {
         subscription.cancel()
     }
 
-    func testCapsLockFeedbackIsTransientAndIndependentOfOtherTriggers() {
+    func testCapsLockFeedbackPreservesFocusTrackingAndIsIndependentOfOtherTriggers() {
         for isOn in [true, false] {
             let event = IndicatorVM.ActivateEvent.capsLockChanges(isOn)
             for focusedField in [true, false] {
                 XCTAssertEqual(IndicatorWindowController.activationMode(
                     event: event, focusedField: focusedField
-                ), .autoHide)
+                ), focusedField ? .autoShow : .autoHide)
             }
             XCTAssertTrue(event.shouldActivateInitially(
                 onAppSwitch: false, onInputFocus: false, isInputFocused: false

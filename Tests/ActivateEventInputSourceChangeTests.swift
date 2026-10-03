@@ -72,12 +72,12 @@ final class ActivateEventInputSourceChangeTests: XCTestCase {
         }
     }
 
-    func testFunctionKeyFeedbackRemainsTransientInPersistentModes() {
+    func testFunctionKeyFeedbackPreservesFocusedFieldTracking() {
         for mode in [FKeyMode.functionKeys, .mediaKeys] {
             XCTAssertEqual(IndicatorWindowController.activationMode(
                 event: .functionKeyModeChanges(mode),
                 focusedField: true
-            ), .autoHide)
+            ), .autoShow)
         }
     }
 
@@ -132,11 +132,12 @@ final class ActivateEventInputSourceChangeTests: XCTestCase {
             var showCount = 0
             var completed = false
             let subscription = IndicatorWindowController.focusTriggeredIndicatorPublisher(
-                activateInitially: event.shouldActivateInitially(
+                initialEvent: event.shouldActivateInitially(
                     onAppSwitch: false, onInputFocus: true, isInputFocused: false
-                ),
+                ) ? event : nil,
+                inputSource: InputSource.getCurrentInputSource(),
                 focusedInputs: focusedInputs.eraseToAnyPublisher(),
-                show: {
+                show: { _ in
                     showCount += 1
                     return Just(()).eraseToAnyPublisher()
                 }
@@ -155,13 +156,71 @@ final class ActivateEventInputSourceChangeTests: XCTestCase {
         }
     }
 
+    func testStatusBadgesKeepWatchingFocusWithoutReplayingBadge() {
+        let inputSource = InputSource.getCurrentInputSource()
+        let events: [IndicatorVM.ActivateEvent] = [
+            .capsLockChanges(true), .capsLockChanges(false),
+            .functionKeyModeChanges(.functionKeys), .functionKeyModeChanges(.mediaKeys),
+        ]
+
+        for event in events {
+            for completeBadgeBeforeFocus in [true, false] {
+                XCTAssertEqual(IndicatorWindowController.activationMode(
+                    event: event, focusedField: true
+                ), .autoShow)
+
+                let focusedInputs = PassthroughSubject<Void, Never>()
+                let badge = PassthroughSubject<Void, Never>()
+                var shown: [String] = []
+                var completed = false
+                var badgeCancelled = false
+                let subscription = IndicatorWindowController.focusTriggeredIndicatorPublisher(
+                    initialEvent: event,
+                    inputSource: inputSource,
+                    focusedInputs: focusedInputs.eraseToAnyPublisher()
+                ) { shownEvent in
+                    shown.append(shownEvent.description)
+                    if case let .inputSourceChanges(source, reason) = shownEvent {
+                        XCTAssertEqual(source.persistentIdentifier, inputSource.persistentIdentifier)
+                        if case .noChanges = reason {} else {
+                            XCTFail("Focusing a field must not report an input-source change")
+                        }
+                        return Just(()).eraseToAnyPublisher()
+                    }
+                    return badge
+                        .handleEvents(receiveCancel: { badgeCancelled = true })
+                        .eraseToAnyPublisher()
+                }
+                .sink(receiveCompletion: { _ in completed = true }, receiveValue: { _ in })
+
+                XCTAssertEqual(shown, [event.description])
+                if completeBadgeBeforeFocus {
+                    badge.send(())
+                    badge.send(completion: .finished)
+                }
+                XCTAssertFalse(completed)
+
+                focusedInputs.send(())
+                focusedInputs.send(())
+                XCTAssertEqual(shown, [event.description, "inputSourceChanges", "inputSourceChanges"])
+                XCTAssertEqual(badgeCancelled, !completeBadgeBeforeFocus)
+                XCTAssertFalse(completed)
+
+                subscription.cancel()
+                focusedInputs.send(())
+                XCTAssertEqual(shown.count, 3)
+            }
+        }
+    }
+
     func testSuppressedInitialHintStillWatchesLaterFocus() {
         let focusedInputs = PassthroughSubject<Void, Never>()
         var showCount = 0
         let subscription = IndicatorWindowController.focusTriggeredIndicatorPublisher(
-            activateInitially: false,
+            initialEvent: nil,
+            inputSource: InputSource.getCurrentInputSource(),
             focusedInputs: focusedInputs.eraseToAnyPublisher(),
-            show: {
+            show: { _ in
                 showCount += 1
                 return Just(()).eraseToAnyPublisher()
             }
