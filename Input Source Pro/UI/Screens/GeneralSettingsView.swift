@@ -118,7 +118,7 @@ struct GeneralSettingsView: View {
                         }
                         .padding()
                         .border(width: 1, edges: [.bottom], color: NSColor.border2.color)
-                        .help("Show a message when Caps Lock changes and a marker while it is on.".i18n())
+                        .help("Display the input source when Caps Lock changes, with a symbol while it is on.".i18n())
 
                         HStack {
                             Toggle("", isOn: $preferencesVM.preferences.isActiveWhenSwitchApp)

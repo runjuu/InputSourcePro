@@ -251,6 +251,5 @@
 // Caps Lock
 "Caps Lock" = "Caps Lock";
 "Display When Caps Lock Changes" = "Caps Lock の切り替え時に表示";
-"Show a message when Caps Lock changes and a marker while it is on." = "Caps Lock の切り替え時に通知し、オンの間はマークを表示します。";
+"Display the input source when Caps Lock changes, with a symbol while it is on." = "Caps Lock の切り替え時に入力ソースを表示し、オンの間はマークを添えます。";
 "Caps Lock On" = "Caps Lock オン";
-"Caps Lock Off" = "Caps Lock オフ";

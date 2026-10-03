@@ -14,13 +14,6 @@ struct IndicatorViewConfig {
     struct Badge {
         let glyph: BadgeGlyph
         let title: String
-
-        static func capsLock(isOn: Bool) -> Self {
-            .init(
-                glyph: .symbol(isOn ? "capslock.fill" : "capslock"),
-                title: (isOn ? "Caps Lock On" : "Caps Lock Off").i18n()
-            )
-        }
     }
 
     let inputSource: InputSource
@@ -58,10 +51,10 @@ struct IndicatorViewConfig {
     }
 
     func renderAlwaysOn() -> NSView? {
-        if showsCapsLock {
+        if let marker = capsLockMarker() {
             var config = self
             config.showsCapsLock = false
-            return config.renderBadgeWithoutLabel(.capsLock(isOn: true))
+            return config.renderIconPill(leading: marker)
         }
 
         let containerView = getContainerView()

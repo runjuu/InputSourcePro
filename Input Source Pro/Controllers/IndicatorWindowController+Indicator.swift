@@ -9,17 +9,7 @@ extension IndicatorWindowController {
     func updateIndicator(event: IndicatorVM.ActivateEvent, inputSource: InputSource) {
         let preferences = preferencesVM.preferences
 
-        let badge: IndicatorViewConfig.Badge?
-        switch event {
-        case let .functionKeyModeChanges(mode):
-            badge = .init(glyph: mode.badgeGlyph, title: mode.displayName)
-        case let .capsLockChanges(isOn) where preferences.isShowCapsLockStatus:
-            badge = .capsLock(isOn: isOn)
-        default:
-            badge = nil
-        }
-
-        if let badge {
+        if let badge = Self.statusBadge(for: event) {
             indicatorVC.prepare(config: IndicatorViewConfig(
                 inputSource: inputSource,
                 kind: preferences.indicatorKind,
@@ -50,8 +40,14 @@ extension IndicatorWindowController {
         }
     }
 
+    static func statusBadge(for event: IndicatorVM.ActivateEvent) -> IndicatorViewConfig.Badge? {
+        guard case let .functionKeyModeChanges(mode) = event else { return nil }
+        return .init(glyph: mode.badgeGlyph, title: mode.displayName)
+    }
+
     func moveIndicator(position: PreferencesVM.IndicatorPositionInfo) {
         indicatorVC.refresh()
         moveTo(point: position.point)
+        alwaysOnIndicator.defaultIndicatorFrame = isActive ? window?.frame : nil
     }
 }

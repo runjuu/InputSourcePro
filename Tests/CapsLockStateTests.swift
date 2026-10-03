@@ -61,22 +61,46 @@ final class CapsLockStateTests: XCTestCase {
                 XCTAssertGreaterThan(marked.fittingSize.width, original.fittingSize.width)
                 XCTAssertGreaterThan(marked.fittingSize.height, 0)
 
-                for isOn in [true, false] {
-                    config.showsCapsLock = false
-                    config.badge = .capsLock(isOn: isOn)
-                    let badge = try XCTUnwrap(config.render())
-                    XCTAssertGreaterThan(badge.fittingSize.width, 0)
-                    XCTAssertGreaterThan(badge.fittingSize.height, 0)
-                }
+                XCTAssertEqual(labels(in: marked), labels(in: original))
+                config.showsCapsLock = false
+                let restored = try XCTUnwrap(config.render())
+                XCTAssertEqual(restored.fittingSize, original.fittingSize)
+                XCTAssertEqual(labels(in: restored), labels(in: original))
             }
         }
     }
 
-    func testCapsLockOnAndOffBadgesAreVisuallyDistinct() {
-        let on = IndicatorViewConfig.Badge.capsLock(isOn: true)
-        let off = IndicatorViewConfig.Badge.capsLock(isOn: false)
-        XCTAssertNotEqual(on.glyph, off.glyph)
-        XCTAssertNotEqual(on.title, off.title)
+    func testInputSourceAndCapsLockEventsKeepTheInputSourceLabel() throws {
+        let inputSource = InputSource.getCurrentInputSource()
+        let events: [IndicatorVM.ActivateEvent] = [
+            .inputSourceChanges(inputSource, .system),
+            .capsLockChanges(false),
+            .inputSourceChanges(inputSource, .shortcut),
+            .capsLockChanges(true),
+            .capsLockChanges(false),
+        ]
+
+        for event in events {
+            let badge = IndicatorWindowController.statusBadge(for: event)
+            XCTAssertNil(badge)
+            var config = IndicatorViewConfig(
+                inputSource: inputSource, kind: .iconAndTitle, size: .medium,
+                bgColor: .black, textColor: .white, badge: badge
+            )
+            if case let .capsLockChanges(isOn) = event {
+                config.showsCapsLock = isOn
+            }
+            let view = try XCTUnwrap(config.render())
+            XCTAssertEqual(labels(in: view), [inputSource.name])
+        }
+    }
+
+    func testFunctionKeyEventsStillRenderTheirStatusBadge() throws {
+        for mode in [FKeyMode.functionKeys, .mediaKeys] {
+            let badge = try XCTUnwrap(IndicatorWindowController.statusBadge(for: .functionKeyModeChanges(mode)))
+            XCTAssertEqual(badge.title, mode.displayName)
+            XCTAssertEqual(badge.glyph, mode.badgeGlyph)
+        }
     }
 
     func testRenderCapsLockAppearance() throws {
@@ -90,19 +114,15 @@ final class CapsLockStateTests: XCTestCase {
             for (row, size) in IndicatorSize.allCases.enumerated() {
                 var config = IndicatorViewConfig(
                     inputSource: InputSource.getCurrentInputSource(),
-                    kind: .iconAndTitle, size: size, bgColor: .black, textColor: .white,
-                    showsCapsLock: true
+                    kind: .iconAndTitle, size: size, bgColor: .black, textColor: .white
                 )
-                let source = try XCTUnwrap(config.render())
-                let caret = try XCTUnwrap(config.renderAlwaysOn())
-                config.showsCapsLock = false
-                config.badge = .capsLock(isOn: true)
-                let on = try XCTUnwrap(config.render())
-                config.badge = .capsLock(isOn: false)
                 let off = try XCTUnwrap(config.render())
+                config.showsCapsLock = true
+                let on = try XCTUnwrap(config.render())
+                let caret = try XCTUnwrap(config.renderAlwaysOn())
 
                 var x: CGFloat = 16
-                for view in [source, on, off, caret] {
+                for view in [off, on, caret] {
                     view.setFrameSize(view.fittingSize)
                     view.layoutSubtreeIfNeeded()
                     let bitmap = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
@@ -145,5 +165,10 @@ final class CapsLockStateTests: XCTestCase {
         let olderBackup = try JSONDecoder().decode(SettingsBackupPreferences.self, from: Data("{}".utf8))
         olderBackup.apply(to: &preferences)
         XCTAssertFalse(preferences.isShowCapsLockStatus)
+    }
+
+    private func labels(in view: NSView) -> [String] {
+        if let label = view as? NSTextField { return [label.stringValue] }
+        return view.subviews.flatMap { labels(in: $0) }
     }
 }

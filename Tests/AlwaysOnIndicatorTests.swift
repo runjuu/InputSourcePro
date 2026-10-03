@@ -52,74 +52,36 @@ final class AlwaysOnIndicatorTests: XCTestCase {
         XCTAssertFalse(window.isVisible)
     }
 
-    func testDefaultIndicatorHidesCapsLockMarkerRegardlessOfCaretPosition() throws {
+    func testDefaultIndicatorAtAnotherPositionDoesNotHideTheDot() throws {
         let controller = AlwaysOnIndicatorWindowController()
         defer { controller.close() }
-        var capsLockConfig = config(color: .red)
-        capsLockConfig.showsCapsLock = true
-        controller.update(config: capsLockConfig)
+        controller.update(config: config(color: .red))
         controller.position = CGPoint(x: 100, y: 200)
+        controller.defaultIndicatorFrame = CGRect(x: 400, y: 400, width: 100, height: 30)
+
         let window = try XCTUnwrap(controller.window)
         XCTAssertTrue(window.isVisible)
-
-        controller.isDefaultIndicatorActive = true
-        XCTAssertFalse(window.isVisible)
-        controller.position = CGPoint(x: 400, y: 400)
-        XCTAssertFalse(window.isVisible)
-
-        controller.isDefaultIndicatorActive = false
-        XCTAssertTrue(window.isVisible)
-        XCTAssertEqual(window.frame.origin, CGPoint(x: 400, y: 400))
+        XCTAssertEqual(window.frame.origin, CGPoint(x: 100, y: 200))
     }
 
-    func testDefaultIndicatorTemporarilyHidesDot() throws {
+    func testOverlappingDefaultIndicatorTemporarilyHidesDot() throws {
         let controller = AlwaysOnIndicatorWindowController()
         defer { controller.close() }
         controller.update(config: config(color: .red))
         controller.position = CGPoint(x: 100, y: 200)
         let window = try XCTUnwrap(controller.window)
 
-        controller.isDefaultIndicatorActive = true
+        controller.defaultIndicatorFrame = CGRect(x: 100, y: 200, width: 100, height: 30)
         XCTAssertFalse(window.isVisible)
 
-        controller.isDefaultIndicatorActive = false
+        controller.defaultIndicatorFrame = nil
         XCTAssertTrue(window.isVisible)
         XCTAssertEqual(window.frame.size, CGSize(width: 8, height: 8))
 
-        controller.isDefaultIndicatorActive = true
+        controller.defaultIndicatorFrame = window.frame
         XCTAssertFalse(window.isVisible)
         controller.position = CGPoint(x: 200, y: 300)
-        XCTAssertFalse(window.isVisible)
-        controller.isDefaultIndicatorActive = false
         XCTAssertTrue(window.isVisible)
-        XCTAssertEqual(window.frame.origin, CGPoint(x: 200, y: 300))
-    }
-
-    func testContentChangesStayHiddenUntilDefaultIndicatorDismisses() throws {
-        let controller = AlwaysOnIndicatorWindowController()
-        defer { controller.close() }
-        controller.isDefaultIndicatorActive = true
-        var capsLockConfig = config(color: .red)
-        capsLockConfig.showsCapsLock = true
-        controller.update(config: capsLockConfig)
-        controller.position = CGPoint(x: 100, y: 200)
-        let window = try XCTUnwrap(controller.window)
-        XCTAssertFalse(window.isVisible)
-
-        controller.update(config: config(color: .blue))
-        controller.position = CGPoint(x: 200, y: 300)
-        controller.reorderOnActiveSpace()
-        XCTAssertFalse(window.isVisible)
-
-        controller.isDefaultIndicatorActive = false
-        XCTAssertTrue(window.isVisible)
-        XCTAssertEqual(window.frame.origin, CGPoint(x: 200, y: 300))
-        XCTAssertEqual(window.frame.size, CGSize(width: 8, height: 8))
-
-        controller.isDefaultIndicatorActive = true
-        controller.position = nil
-        controller.isDefaultIndicatorActive = false
-        XCTAssertFalse(window.isVisible)
     }
 
     func testContentUpdatesKeepTheDotAtTheCaretWithoutShowingDefaultContent() throws {

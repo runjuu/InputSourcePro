@@ -19,15 +19,15 @@ class IndicatorWindowController: FloatWindowController {
     var isActive = false {
         didSet {
             if isActive {
-                alwaysOnIndicator.isDefaultIndicatorActive = true
                 indicatorVC.view.animator().alphaValue = 1
                 window?.displayIfNeeded()
                 active()
             } else {
                 indicatorVC.view.animator().alphaValue = 0
                 deactive()
-                alwaysOnIndicator.isDefaultIndicatorActive = false
             }
+
+            alwaysOnIndicator.defaultIndicatorFrame = isActive ? window?.frame : nil
         }
     }
 

@@ -251,6 +251,5 @@
 // Caps Lock
 "Caps Lock" = "Caps Lock";
 "Display When Caps Lock Changes" = "Display When Caps Lock Changes";
-"Show a message when Caps Lock changes and a marker while it is on." = "Show a message when Caps Lock changes and a marker while it is on.";
+"Display the input source when Caps Lock changes, with a symbol while it is on." = "Display the input source when Caps Lock changes, with a symbol while it is on.";
 "Caps Lock On" = "Caps Lock On";
-"Caps Lock Off" = "Caps Lock Off";

@@ -298,18 +298,15 @@ extension IndicatorWindowController {
             .map(\.isAlwaysOnIndicatorEnabled)
             .removeDuplicates()
 
-        let badge = Publishers.Merge(
-            indicatorVM.functionKeyModeChangesPublisher(),
-            indicatorVM.capsLockChangesPublisher()
-        )
-        .flatMapLatest { event -> AnyPublisher<IndicatorVM.ActivateEvent?, Never> in
-            Timer.delay(seconds: 1)
-                .map { _ -> IndicatorVM.ActivateEvent? in nil }
-                .prepend(.some(event))
-                .eraseToAnyPublisher()
-        }
-        .prepend(nil)
-        .eraseToAnyPublisher()
+        let badge = indicatorVM.functionKeyModeChangesPublisher()
+            .flatMapLatest { event -> AnyPublisher<IndicatorVM.ActivateEvent?, Never> in
+                Timer.delay(seconds: 1)
+                    .map { _ -> IndicatorVM.ActivateEvent? in nil }
+                    .prepend(.some(event))
+                    .eraseToAnyPublisher()
+            }
+            .prepend(nil)
+            .eraseToAnyPublisher()
 
         // Re-render when the indicator's look changes in Settings (style, size,
         // colours, per-keyboard customisation). A @Published value is delivered
