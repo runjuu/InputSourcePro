@@ -109,6 +109,18 @@ struct GeneralSettingsView: View {
                         .border(width: 1, edges: [.bottom], color: NSColor.border2.color)
 
                         HStack {
+                            Toggle("", isOn: $preferencesVM.preferences.isShowCapsLockStatus)
+                                .accessibilityLabel("Show Caps Lock status".i18n())
+
+                            Text("Show Caps Lock status".i18n())
+
+                            Spacer()
+                        }
+                        .padding()
+                        .border(width: 1, edges: [.bottom], color: NSColor.border2.color)
+                        .help("Show a message when Caps Lock changes and a marker while it is on.".i18n())
+
+                        HStack {
                             Toggle("", isOn: $preferencesVM.preferences.isActiveWhenSwitchApp)
 
                             Text("isActiveWhenSwitchApp".i18n())
