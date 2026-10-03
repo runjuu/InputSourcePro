@@ -15,7 +15,8 @@ struct IndicatorView: NSViewControllerRepresentable {
             kind: preferencesVM.preferences.indicatorKind,
             size: preferencesVM.preferences.indicatorSize ?? .medium,
             bgColor: NSColor(preferencesVM.preferences.indicatorBackgroundColor),
-            textColor: NSColor(preferencesVM.preferences.indicatorForgegroundColor)
+            textColor: NSColor(preferencesVM.preferences.indicatorForgegroundColor),
+            showsCapsLock: preferencesVM.preferences.isShowCapsLockStatus && indicatorVM.isCapsLockOn
         ))
 
         indicatorViewController.refresh()

@@ -247,3 +247,10 @@
 "Import Settings Confirmation Message" = "이 파일을 가져오면 현재 지원되는 설정, 규칙, 색상 구성, 단축키 그룹, 기록된 단축키가 바뀝니다.";
 "Unsupported settings backup version %@" = "지원하지 않는 설정 백업 버전 %@입니다.";
 "Unable to save imported settings." = "가져온 설정을 저장할 수 없습니다.";
+
+// Caps Lock
+"Caps Lock" = "Caps Lock";
+"Show Caps Lock status" = "Caps Lock 상태 표시";
+"Show a message when Caps Lock changes and a marker while it is on." = "Caps Lock 상태가 바뀌면 메시지를 표시하고, 켜져 있는 동안 표시를 유지합니다.";
+"Caps Lock On" = "Caps Lock 켜짐";
+"Caps Lock Off" = "Caps Lock 꺼짐";

@@ -247,3 +247,10 @@
 "Import Settings Confirmation Message" = "Importing this file will replace your current supported settings, rules, color configs, hot key groups, and recorded shortcuts.";
 "Unsupported settings backup version %@" = "Unsupported settings backup version %@.";
 "Unable to save imported settings." = "Unable to save imported settings.";
+
+// Caps Lock
+"Caps Lock" = "Caps Lock";
+"Show Caps Lock status" = "Show Caps Lock status";
+"Show a message when Caps Lock changes and a marker while it is on." = "Show a message when Caps Lock changes and a marker while it is on.";
+"Caps Lock On" = "Caps Lock On";
+"Caps Lock Off" = "Caps Lock Off";

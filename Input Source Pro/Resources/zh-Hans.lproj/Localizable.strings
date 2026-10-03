@@ -249,3 +249,10 @@
 "Import Settings Confirmation Message" = "导入此文件将替换当前支持的设置、规则、颜色配置、热键组和已记录的快捷键。";
 "Unsupported settings backup version %@" = "不支持的设置备份版本 %@。";
 "Unable to save imported settings." = "无法保存导入的设置。";
+
+// Caps Lock
+"Caps Lock" = "大写锁定";
+"Show Caps Lock status" = "显示大写锁定状态";
+"Show a message when Caps Lock changes and a marker while it is on." = "大写锁定状态更改时显示提示，开启时显示标记。";
+"Caps Lock On" = "大写锁定已开启";
+"Caps Lock Off" = "大写锁定已关闭";

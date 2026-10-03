@@ -9,17 +9,24 @@ extension IndicatorWindowController {
     func updateIndicator(event: IndicatorVM.ActivateEvent, inputSource: InputSource) {
         let preferences = preferencesVM.preferences
 
-        // Function-key mode badge: not backed by an input source, so render a glyph
-        // (SF Symbol or text) + title using the default indicator theme colors
-        // (ignoring any per-input-source color override).
-        if case let .functionKeyModeChanges(mode) = event {
+        let badge: IndicatorViewConfig.Badge?
+        switch event {
+        case let .functionKeyModeChanges(mode):
+            badge = .init(glyph: mode.badgeGlyph, title: mode.displayName)
+        case let .capsLockChanges(isOn) where preferences.isShowCapsLockStatus:
+            badge = .capsLock(isOn: isOn)
+        default:
+            badge = nil
+        }
+
+        if let badge {
             indicatorVC.prepare(config: IndicatorViewConfig(
                 inputSource: inputSource,
                 kind: preferences.indicatorKind,
                 size: preferences.indicatorSize ?? .medium,
                 bgColor: preferencesVM.defaultIndicatorBgNSColor,
                 textColor: preferencesVM.defaultIndicatorTextNSColor,
-                badge: .init(glyph: mode.badgeGlyph, title: mode.displayName)
+                badge: badge
             ))
 
             if isActive {
@@ -34,7 +41,8 @@ extension IndicatorWindowController {
             kind: preferences.indicatorKind,
             size: preferences.indicatorSize ?? .medium,
             bgColor: preferencesVM.getBgNSColor(inputSource),
-            textColor: preferencesVM.getTextNSColor(inputSource)
+            textColor: preferencesVM.getTextNSColor(inputSource),
+            showsCapsLock: preferences.isShowCapsLockStatus && indicatorVM.isCapsLockOn
         ))
 
         if isActive {

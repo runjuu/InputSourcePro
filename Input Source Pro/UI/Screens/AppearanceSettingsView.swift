@@ -58,6 +58,18 @@ struct AppearanceSettingsView: View {
                     }
                 }
 
+                SettingsSection(title: "Caps Lock") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle("Show Caps Lock status".i18n(), isOn: $preferencesVM.preferences.isShowCapsLockStatus)
+                            .toggleStyle(.switch)
+                        Text("Show a message when Caps Lock changes and a marker while it is on.".i18n())
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                }
+
                 SettingsSection(title: "Indicator Size") {
                     Picker("Size", selection: sizeBinding) {
                         ForEach(IndicatorSize.allCases) { item in

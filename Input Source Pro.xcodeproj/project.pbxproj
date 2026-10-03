@@ -178,6 +178,7 @@
 		D60000822F20000000000082 /* URLActivationSuppressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000812F20000000000081 /* URLActivationSuppressionTests.swift */; };
 		D60001922F20000000000192 /* ActivateEventInputSourceChangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60001912F20000000000191 /* ActivateEventInputSourceChangeTests.swift */; };
 		D60003122F20000000000312 /* ScreenLockStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60003112F20000000000311 /* ScreenLockStateTests.swift */; };
+		C31000000000000000000002 /* CapsLockStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C31000000000000000000001 /* CapsLockStateTests.swift */; };
 		D60002022F20000000000202 /* IndicatorNearMousePointTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60002012F20000000000201 /* IndicatorNearMousePointTests.swift */; };
 		D60002122F20000000000212 /* AlwaysNearMousePlacementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60002112F20000000000211 /* AlwaysNearMousePlacementTests.swift */; };
 		B60003100000000000000002 /* AlwaysOnIndicatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60003100000000000000001 /* AlwaysOnIndicatorTests.swift */; };
@@ -382,6 +383,7 @@
 		D60000812F20000000000081 /* URLActivationSuppressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLActivationSuppressionTests.swift; sourceTree = "<group>"; };
 		D60001912F20000000000191 /* ActivateEventInputSourceChangeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivateEventInputSourceChangeTests.swift; sourceTree = "<group>"; };
 		D60003112F20000000000311 /* ScreenLockStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenLockStateTests.swift; sourceTree = "<group>"; };
+		C31000000000000000000001 /* CapsLockStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapsLockStateTests.swift; sourceTree = "<group>"; };
 		D60002012F20000000000201 /* IndicatorNearMousePointTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndicatorNearMousePointTests.swift; sourceTree = "<group>"; };
 		D60002112F20000000000211 /* AlwaysNearMousePlacementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlwaysNearMousePlacementTests.swift; sourceTree = "<group>"; };
 		B60003100000000000000001 /* AlwaysOnIndicatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlwaysOnIndicatorTests.swift; sourceTree = "<group>"; };
@@ -776,6 +778,7 @@
 				D60000812F20000000000081 /* URLActivationSuppressionTests.swift */,
 				D60001912F20000000000191 /* ActivateEventInputSourceChangeTests.swift */,
 				D60003112F20000000000311 /* ScreenLockStateTests.swift */,
+				C31000000000000000000001 /* CapsLockStateTests.swift */,
 				D60002012F20000000000201 /* IndicatorNearMousePointTests.swift */,
 				D60002112F20000000000211 /* AlwaysNearMousePlacementTests.swift */,
 				B60003100000000000000001 /* AlwaysOnIndicatorTests.swift */,
@@ -1107,6 +1110,7 @@
 				D60000822F20000000000082 /* URLActivationSuppressionTests.swift in Sources */,
 				D60001922F20000000000192 /* ActivateEventInputSourceChangeTests.swift in Sources */,
 				D60003122F20000000000312 /* ScreenLockStateTests.swift in Sources */,
+				C31000000000000000000002 /* CapsLockStateTests.swift in Sources */,
 				D60002022F20000000000202 /* IndicatorNearMousePointTests.swift in Sources */,
 				D60002122F20000000000212 /* AlwaysNearMousePlacementTests.swift in Sources */,
 				B60003100000000000000002 /* AlwaysOnIndicatorTests.swift in Sources */,

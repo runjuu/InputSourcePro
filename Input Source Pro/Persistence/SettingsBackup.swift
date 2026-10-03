@@ -137,6 +137,7 @@ struct SettingsBackupPreferences: Codable {
     var isEnableURLSwitchForZen: Bool?
     var isEnableURLSwitchForDia: Bool?
     var isEnableURLSwitchForHelium: Bool?
+    var isShowCapsLockStatus: Bool?
     var indicatorInfo: IndicatorInfo?
     var indicatorSize: IndicatorSize?
     var isAutoAppearanceMode: Bool?
@@ -196,6 +197,7 @@ struct SettingsBackupPreferences: Codable {
         isEnableURLSwitchForZen = preferences.isEnableURLSwitchForZen
         isEnableURLSwitchForDia = preferences.isEnableURLSwitchForDia
         isEnableURLSwitchForHelium = preferences.isEnableURLSwitchForHelium
+        isShowCapsLockStatus = preferences.isShowCapsLockStatus
         indicatorInfo = preferences.indicatorInfo
         indicatorSize = preferences.indicatorSize
         isAutoAppearanceMode = preferences.isAutoAppearanceMode
@@ -284,6 +286,7 @@ struct SettingsBackupPreferences: Codable {
         if let isEnableURLSwitchForZen { preferences.isEnableURLSwitchForZen = isEnableURLSwitchForZen }
         if let isEnableURLSwitchForDia { preferences.isEnableURLSwitchForDia = isEnableURLSwitchForDia }
         if let isEnableURLSwitchForHelium { preferences.isEnableURLSwitchForHelium = isEnableURLSwitchForHelium }
+        if let isShowCapsLockStatus { preferences.isShowCapsLockStatus = isShowCapsLockStatus }
         if let indicatorInfo { preferences.indicatorInfo = indicatorInfo }
         if let indicatorSize { preferences.indicatorSize = indicatorSize }
         if let isAutoAppearanceMode { preferences.isAutoAppearanceMode = isAutoAppearanceMode }

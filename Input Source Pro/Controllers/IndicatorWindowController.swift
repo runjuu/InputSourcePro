@@ -117,9 +117,11 @@ extension IndicatorWindowController {
             return .hide
         }
 
-        // Function-key feedback is transient even when field tracking is enabled.
-        if case .functionKeyModeChanges = event {
+        switch event {
+        case .functionKeyModeChanges, .capsLockChanges:
             return .autoHide
+        default:
+            break
         }
 
         if focusedField {

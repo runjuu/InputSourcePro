@@ -247,3 +247,10 @@
 "Import Settings Confirmation Message" = "このファイルを読み込むと、現在サポートされている設定、ルール、カラー設定、ホットキーグループ、記録済みショートカットが置き換えられます。";
 "Unsupported settings backup version %@" = "サポートされていない設定バックアップバージョン %@ です。";
 "Unable to save imported settings." = "読み込んだ設定を保存できません。";
+
+// Caps Lock
+"Caps Lock" = "Caps Lock";
+"Show Caps Lock status" = "Caps Lock の状態を表示";
+"Show a message when Caps Lock changes and a marker while it is on." = "Caps Lock の切り替え時に通知し、オンの間はマークを表示します。";
+"Caps Lock On" = "Caps Lock オン";
+"Caps Lock Off" = "Caps Lock オフ";

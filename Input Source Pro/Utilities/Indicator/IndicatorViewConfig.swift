@@ -14,6 +14,13 @@ struct IndicatorViewConfig {
     struct Badge {
         let glyph: BadgeGlyph
         let title: String
+
+        static func capsLock(isOn: Bool) -> Self {
+            .init(
+                glyph: .symbol(isOn ? "capslock.fill" : "capslock"),
+                title: (isOn ? "Caps Lock On" : "Caps Lock Off").i18n()
+            )
+        }
     }
 
     let inputSource: InputSource
@@ -26,6 +33,7 @@ struct IndicatorViewConfig {
     /// instead of the input source. Lets the same pill machinery show
     /// non-input-source state.
     var badge: Badge? = nil
+    var showsCapsLock = false
 
     func render() -> NSView? {
         switch kind {
@@ -50,6 +58,12 @@ struct IndicatorViewConfig {
     }
 
     func renderAlwaysOn() -> NSView? {
+        if showsCapsLock {
+            var config = self
+            config.showsCapsLock = false
+            return config.renderBadgeWithoutLabel(.capsLock(isOn: true))
+        }
+
         let containerView = getContainerView()
 
         containerView.layer?.cornerRadius = 8
@@ -87,7 +101,7 @@ struct IndicatorViewConfig {
     /// identical across them — only the leading content view differs.
     private func renderLabeledPill(leading: NSView?, label: NSTextField) -> NSView {
         let containerView = getContainerView()
-        let stackView = NSStackView(views: [leading, label].compactMap { $0 })
+        let stackView = NSStackView(views: [leading, label, capsLockMarker()].compactMap { $0 })
 
         switch size {
         case .small:
@@ -124,7 +138,7 @@ struct IndicatorViewConfig {
 
     private func renderIconPill(leading: NSView) -> NSView {
         let containerView = getContainerView()
-        let stackView = NSStackView(views: [leading])
+        let stackView = NSStackView(views: [leading, capsLockMarker()].compactMap { $0 })
 
         containerView.layer?.cornerRadius = 4
         containerView.addSubview(stackView)
@@ -285,6 +299,13 @@ struct IndicatorViewConfig {
         labelView.font = .systemFont(ofSize: labelName.count > 1 ? 10 : 11, weight: .regular)
 
         return view
+    }
+
+    private func capsLockMarker() -> NSView? {
+        guard showsCapsLock, badge == nil else { return nil }
+        let marker = getGlyphBadgeView(.symbol("capslock.fill"))
+        marker?.setAccessibilityLabel("Caps Lock On".i18n())
+        return marker
     }
 
     private func getContainerView() -> NSView {

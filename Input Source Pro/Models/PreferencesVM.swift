@@ -333,6 +333,7 @@ struct Preferences {
         static let indicatorPositionSpacing = "indicatorPositionSpacing"
 
         static let indicatorSize = "indicatorSize"
+        static let isShowCapsLockStatus = "isShowCapsLockStatus"
         static let indicatorInfo = "indicatorInfo"
     }
 
@@ -504,6 +505,9 @@ struct Preferences {
     @available(*, deprecated, message: "Use indicatorInfo instead")
     @UserDefault(Preferences.Key.isShowInputSourcesLabel)
     var isShowInputSourcesLabel = true
+
+    @UserDefault(Preferences.Key.isShowCapsLockStatus)
+    var isShowCapsLockStatus = true
 
     @CodableUserDefault(Preferences.Key.indicatorInfo)
     var indicatorInfo = IndicatorInfo.iconAndTitle

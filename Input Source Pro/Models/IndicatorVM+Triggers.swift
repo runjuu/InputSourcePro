@@ -11,6 +11,7 @@ extension IndicatorVM {
         case appChanges(current: AppKind?, prev: AppKind?, inputSourceDidChange: Bool)
         case inputSourceChanges(InputSource, InputSourceChangeReason)
         case functionKeyModeChanges(FKeyMode)
+        case capsLockChanges(Bool)
 
         func isAppChangesWithSameAppOrWebsite() -> Bool {
             switch self {
@@ -18,7 +19,7 @@ extension IndicatorVM {
                 return current?.isSameAppOrWebsite(with: prev) == true
             case .inputSourceChanges:
                 return false
-            case .functionKeyModeChanges:
+            case .functionKeyModeChanges, .capsLockChanges:
                 return false
             case .longMouseDown:
                 return false
@@ -49,7 +50,7 @@ extension IndicatorVM {
             isInputFocused: @autoclosure () -> Bool
         ) -> Bool {
             switch self {
-            case .inputSourceChanges, .longMouseDown, .functionKeyModeChanges:
+            case .inputSourceChanges, .longMouseDown, .functionKeyModeChanges, .capsLockChanges:
                 // These events have already passed their own trigger preferences.
                 return true
             case let .appChanges(_, _, inputSourceDidChange):
@@ -99,6 +100,26 @@ extension IndicatorVM {
     func functionKeyModeChangesPublisher() -> AnyPublisher<ActivateEvent, Never> {
         functionKeyModeChangeSubject
             .map { ActivateEvent.functionKeyModeChanges($0) }
+            .eraseToAnyPublisher()
+    }
+
+    func capsLockChangesPublisher() -> AnyPublisher<ActivateEvent, Never> {
+        Self.capsLockChangesPublisher(
+            states: $isCapsLockOn.eraseToAnyPublisher(),
+            enabled: preferencesVM.$preferences.map(\.isShowCapsLockStatus).eraseToAnyPublisher()
+        )
+    }
+
+    static func capsLockChangesPublisher(
+        states: AnyPublisher<Bool, Never>,
+        enabled: AnyPublisher<Bool, Never>
+    ) -> AnyPublisher<ActivateEvent, Never> {
+        states
+            .removeDuplicates()
+            .dropFirst()
+            .withLatestFrom(enabled) { (state: $0, enabled: $1) }
+            .filter(\.enabled)
+            .map { .capsLockChanges($0.state) }
             .eraseToAnyPublisher()
     }
 
@@ -161,6 +182,8 @@ extension IndicatorVM.ActivateEvent: @preconcurrency CustomStringConvertible {
             return "inputSourceChanges"
         case let .functionKeyModeChanges(mode):
             return "functionKeyModeChanges(\(mode.rawValue))"
+        case let .capsLockChanges(isOn):
+            return "capsLockChanges(\(isOn))"
         case .longMouseDown:
             return "longMouseDown"
         case .justHide:

@@ -22,6 +22,8 @@ final class IndicatorVM: ObservableObject {
     /// the live mode the indicator shows, instead of the stored global default.
     @Published private(set) var currentFKeyMode: FKeyMode?
 
+    @Published private(set) var isCapsLockOn = NSEvent.modifierFlags.contains(.capsLock)
+
     /// Fires when the user toggles the function-key mode via the shortcut, so the
     /// indicator can show the new mode the same way it shows input-source changes.
     let functionKeyModeChangeSubject = PassthroughSubject<FKeyMode, Never>()
@@ -37,6 +39,7 @@ final class IndicatorVM: ObservableObject {
         longMouseDownPublisher(),
         stateChangesPublisher(),
         functionKeyModeChangesPublisher(),
+        capsLockChangesPublisher(),
     ])
     .share()
 
@@ -101,6 +104,28 @@ final class IndicatorVM: ObservableObject {
         watchState()
         watchPunctuationRules()
         watchFunctionKeyMode()
+        watchCapsLock()
+    }
+
+    private func watchCapsLock() {
+        let flags = Publishers.Merge(
+            NSEvent.watch(matching: .flagsChanged),
+            NSEvent.watchLocal(matching: .flagsChanged)
+        )
+        .map(\.modifierFlags)
+
+        let resumed = Publishers.Merge(
+            NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification).mapToVoid(),
+            DistributedNotificationCenter.default()
+                .publisher(for: Notification.Name("com.apple.screenIsUnlocked")).mapToVoid()
+        )
+        .receive(on: DispatchQueue.main)
+        .map { NSEvent.modifierFlags }
+
+        Publishers.Merge(flags, resumed)
+            .map { $0.contains(.capsLock) }
+            .removeDuplicates()
+            .assign(to: &$isCapsLockOn)
     }
 
     private func clearAppKeyboardCacheIfNeed() {

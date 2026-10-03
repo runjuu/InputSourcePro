@@ -118,13 +118,14 @@ extension IndicatorWindowController {
 
 extension IndicatorWindowController {
     func watchAlwaysOnIndicator() {
-        let configs = Publishers.CombineLatest3(
+        let configs = Publishers.CombineLatest4(
             indicatorVM.$state.map(\.inputSource),
             preferencesVM.$preferences,
-            preferencesVM.$keyboardConfigs
+            preferencesVM.$keyboardConfigs,
+            indicatorVM.$isCapsLockOn
         )
         .receive(on: DispatchQueue.main)
-        .compactMap { [weak self] inputSource, preferences, _ -> IndicatorViewConfig? in
+        .compactMap { [weak self] inputSource, preferences, _, isCapsLockOn -> IndicatorViewConfig? in
             guard let self = self else { return nil }
 
             return IndicatorViewConfig(
@@ -132,7 +133,8 @@ extension IndicatorWindowController {
                 kind: .alwaysOn,
                 size: preferences.indicatorSize ?? .medium,
                 bgColor: self.preferencesVM.getBgNSColor(inputSource),
-                textColor: self.preferencesVM.getTextNSColor(inputSource)
+                textColor: self.preferencesVM.getTextNSColor(inputSource),
+                showsCapsLock: preferences.isShowCapsLockStatus && isCapsLockOn
             )
         }
         .eraseToAnyPublisher()
@@ -293,24 +295,26 @@ extension IndicatorWindowController {
             .map(\.isAlwaysOnIndicatorEnabled)
             .removeDuplicates()
 
-        // The function-key badge shows for a second after a toggle, the same as
-        // the transient indicator does.
-        let badge: AnyPublisher<FKeyMode?, Never> = indicatorVM.functionKeyModeChangeSubject
-            .flatMapLatest { mode -> AnyPublisher<FKeyMode?, Never> in
-                Timer.delay(seconds: 1)
-                    .map { _ -> FKeyMode? in nil }
-                    .prepend(.some(mode))
-                    .eraseToAnyPublisher()
-            }
-            .prepend(nil)
-            .eraseToAnyPublisher()
+        let badge = Publishers.Merge(
+            indicatorVM.functionKeyModeChangesPublisher(),
+            indicatorVM.capsLockChangesPublisher()
+        )
+        .flatMapLatest { event -> AnyPublisher<IndicatorVM.ActivateEvent?, Never> in
+            Timer.delay(seconds: 1)
+                .map { _ -> IndicatorVM.ActivateEvent? in nil }
+                .prepend(.some(event))
+                .eraseToAnyPublisher()
+        }
+        .prepend(nil)
+        .eraseToAnyPublisher()
 
         // Re-render when the indicator's look changes in Settings (style, size,
         // colours, per-keyboard customisation). A @Published value is delivered
         // before its property is updated, so hop to the main queue first.
-        let styleChanged = Publishers.Merge(
+        let styleChanged = Publishers.Merge3(
             preferencesVM.$preferences.mapToVoid().eraseToAnyPublisher(),
-            preferencesVM.$keyboardConfigs.mapToVoid().eraseToAnyPublisher()
+            preferencesVM.$keyboardConfigs.mapToVoid().eraseToAnyPublisher(),
+            indicatorVM.$isCapsLockOn.mapToVoid().eraseToAnyPublisher()
         )
         .receive(on: DispatchQueue.main)
 
@@ -435,8 +439,8 @@ extension IndicatorWindowController {
         }
     }
 
-    private func showNearMouseContent(inputSource: InputSource, badge mode: FKeyMode?) {
-        let event: IndicatorVM.ActivateEvent = mode.map { .functionKeyModeChanges($0) }
+    private func showNearMouseContent(inputSource: InputSource, badge: IndicatorVM.ActivateEvent?) {
+        let event = badge
             ?? .inputSourceChanges(inputSource, .noChanges)
 
         updateIndicator(event: event, inputSource: inputSource)
