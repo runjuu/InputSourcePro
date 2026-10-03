@@ -110,9 +110,9 @@ struct GeneralSettingsView: View {
 
                         HStack {
                             Toggle("", isOn: $preferencesVM.preferences.isShowCapsLockStatus)
-                                .accessibilityLabel("Show Caps Lock status".i18n())
+                                .accessibilityLabel("Display When Caps Lock Changes".i18n())
 
-                            Text("Show Caps Lock status".i18n())
+                            Text("Display When Caps Lock Changes".i18n())
 
                             Spacer()
                         }

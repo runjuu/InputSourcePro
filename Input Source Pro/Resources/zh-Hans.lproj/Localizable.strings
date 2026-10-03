@@ -252,7 +252,7 @@
 
 // Caps Lock
 "Caps Lock" = "大写锁定";
-"Show Caps Lock status" = "显示大写锁定状态";
+"Display When Caps Lock Changes" = "大写锁定状态更改时显示";
 "Show a message when Caps Lock changes and a marker while it is on." = "大写锁定状态更改时显示提示，开启时显示标记。";
 "Caps Lock On" = "大写锁定已开启";
 "Caps Lock Off" = "大写锁定已关闭";

@@ -250,7 +250,7 @@
 
 // Caps Lock
 "Caps Lock" = "Caps Lock";
-"Show Caps Lock status" = "Caps Lock 상태 표시";
+"Display When Caps Lock Changes" = "Caps Lock 상태 변경 시 표시";
 "Show a message when Caps Lock changes and a marker while it is on." = "Caps Lock 상태가 바뀌면 메시지를 표시하고, 켜져 있는 동안 표시를 유지합니다.";
 "Caps Lock On" = "Caps Lock 켜짐";
 "Caps Lock Off" = "Caps Lock 꺼짐";
