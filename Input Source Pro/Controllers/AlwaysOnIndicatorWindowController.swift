@@ -9,7 +9,7 @@ final class AlwaysOnIndicatorWindowController: FloatWindowController {
         didSet { updateVisibility() }
     }
 
-    var defaultIndicatorFrame: CGRect? {
+    var isDefaultIndicatorActive = false {
         didSet { updateVisibility() }
     }
 
@@ -44,7 +44,8 @@ final class AlwaysOnIndicatorWindowController: FloatWindowController {
     }
 
     private func updateVisibility() {
-        guard let position = position,
+        guard !isDefaultIndicatorActive,
+              let position = position,
               let window = window,
               window.contentView != nil
         else {
@@ -54,11 +55,7 @@ final class AlwaysOnIndicatorWindowController: FloatWindowController {
 
         moveTo(point: position)
 
-        if let defaultIndicatorFrame = defaultIndicatorFrame,
-           defaultIndicatorFrame.intersects(window.frame)
-        {
-            deactive()
-        } else if !window.isVisible {
+        if !window.isVisible {
             active()
         }
     }
