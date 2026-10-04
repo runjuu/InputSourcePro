@@ -785,7 +785,129 @@ final class CaretPaletteTests: XCTestCase {
 
     func testAppKitCoordinatesOnDisplayLeftOfMainScreen() {
         let sample = CaretPalette.Sample(rect: CGRect(x: -500, y: -100, width: 1, height: 24), pid: 42, uptime: 10)
-        XCTAssertEqual(sample.point(for: 42, now: 10.1, focusedAt: 9, screens: [screen]), CGPoint(x: -500, y: -70))
+        XCTAssertEqual(sample.point(for: 42, now: 10.1, focusedAt: 9, screens: [screen]), CGPoint(x: -499.5, y: -70))
+    }
+
+    func testHelperCentersOnReportedCaretWidthsIncludingZeroWidthInsertionPoints() {
+        for width: CGFloat in [0, 1, 2, 4, 10] {
+            let rect = CGRect(x: -500, y: 100, width: width, height: 24)
+            let sample = CaretPalette.Sample(rect: rect, pid: 42, uptime: 10)
+            let point = sample.point(for: 42, now: 10.1, focusedAt: 9, screens: [screen])
+            XCTAssertEqual(point?.x, -500 + width / 2)
+            XCTAssertEqual(point?.y, 130, "Caret width must not change the vertical gap")
+        }
+    }
+
+    func testSafariInsertionPointCentersItsTwoPointTextMarkerRectangle() {
+        let caret = CursorRectInfo.textMarker(
+            rect: CGRect(x: 522, y: 642, width: 2, height: 26), length: 0
+        )
+        XCTAssertEqual(caret.indicatorPoint, CGPoint(x: 523, y: 674))
+        XCTAssertFalse(caret.isContainer)
+    }
+
+    func testTextMarkerSelectionsAreNotMistakenForNarrowCarets() {
+        for length: Int? in [nil, -1, 1, 12] {
+            let selection = CursorRectInfo.textMarker(
+                rect: CGRect(x: 522, y: 642, width: 2, height: 26), length: length
+            )
+            XCTAssertEqual(selection.indicatorPoint, CGPoint(x: 522, y: 674))
+            XCTAssertFalse(selection.isContainer)
+        }
+    }
+
+    func testEmptyEditorLineBoundsDoNotBecomeACaretAtTheMiddleOfTheField() {
+        let emptyLine = CGRect(x: 585, y: 66, width: 712, height: 44)
+        let typedCaret = CGRect(x: 596, y: 66, width: 2, height: 44)
+        for (rect, expectedX) in [(emptyLine, CGFloat(585)), (typedCaret, 597), (emptyLine, 585)] {
+            let info = CursorRectInfo.textMarker(rect: rect, length: 0)
+            XCTAssertEqual(info.indicatorPoint, CGPoint(x: expectedX, y: 116))
+            XCTAssertEqual(info.kind, rect == emptyLine ? .text : .caret)
+        }
+    }
+
+    func testEmptySelectionRequiresPlausibleCaretDimensionsBeforeCentering() {
+        for rect in [CGRect.zero,
+                     CGRect(x: 50, y: 100, width: 11, height: 24),
+                     CGRect(x: 50, y: 100, width: 2, height: 500)] {
+            XCTAssertEqual(CursorRectInfo.textMarker(rect: rect, length: 0).kind, .text)
+        }
+        for width: CGFloat in [0, 1, 2, 4, 10] {
+            let rect = CGRect(x: 50, y: 100, width: width, height: 24)
+            XCTAssertEqual(CursorRectInfo.textMarker(rect: rect, length: 0).indicatorPoint.x, 50 + width / 2)
+        }
+    }
+
+    func testEmptyInputFallbackCentersOnTwoPhysicalPixels() {
+        let emptyLine = CGRect(x: 585, y: 66, width: 712, height: 44)
+        let typedCaret = CGRect(x: 596, y: 66, width: 2, height: 44)
+        for scale: CGFloat in [1, 2] {
+            for rect in [emptyLine, typedCaret, emptyLine] {
+                let info = CursorRectInfo.textMarker(rect: rect, length: 0, emptyInputCaretWidth: 2 / scale)
+                XCTAssertEqual(info.rect.width, rect == emptyLine ? 2 / scale : typedCaret.width)
+                XCTAssertEqual(info.indicatorPoint, CGPoint(x: rect == emptyLine ? 585 + 1 / scale : 597, y: 116))
+                XCTAssertEqual(info.kind, .caret)
+            }
+        }
+    }
+
+    func testEmptyInputFallbackDoesNotChangeSelectionsOrInvalidBounds() {
+        let line = CGRect(x: 585, y: 66, width: 712, height: 44)
+        for length: Int? in [nil, -1, 1, 12] {
+            let info = CursorRectInfo.textMarker(rect: line, length: length, emptyInputCaretWidth: 1)
+            XCTAssertEqual(info.rect, line)
+            XCTAssertEqual(info.indicatorPoint, CGPoint(x: 585, y: 116))
+            XCTAssertEqual(info.kind, .text)
+        }
+        let tallBounds = CGRect(x: 585, y: 66, width: 712, height: 500)
+        let info = CursorRectInfo.textMarker(rect: tallBounds, length: 0, emptyInputCaretWidth: 1)
+        XCTAssertEqual(info.rect, tallBounds)
+        XCTAssertEqual(info.kind, .text)
+    }
+
+    func testMessagesInsertionPointsUseCaretPositionForTypedAndEmptyInputs() throws {
+        // Messages reports a zero-width insertion point in both cases. The typed
+        // input's last character begins at x=423, and the empty field begins at x=396.
+        for x: CGFloat in [431, 401] {
+            let bounds = CGRect(x: x, y: 310.5, width: 0, height: 16)
+            for scale: CGFloat in [1, 2] {
+                let info = try XCTUnwrap(CursorRectInfo.insertionPoint(rect: bounds, zeroWidthCaretWidth: 2 / scale))
+                XCTAssertEqual(info.indicatorPoint, CGPoint(x: x + 1 / scale, y: 332.5))
+                XCTAssertEqual(info.kind, .caret)
+                XCTAssertFalse(info.isContainer)
+            }
+        }
+    }
+
+    func testNativeInsertionPointsPreserveReportedWidthsAndLegacyZeroWidth() throws {
+        for width: CGFloat in [0, 1, 2, 4, 10] {
+            let bounds = CGRect(x: -500, y: 100, width: width, height: 24)
+            let legacy = try XCTUnwrap(CursorRectInfo.insertionPoint(rect: bounds))
+            XCTAssertEqual(legacy.indicatorPoint, CGPoint(x: -500 + width / 2, y: 130))
+
+            let modern = try XCTUnwrap(CursorRectInfo.insertionPoint(rect: bounds, zeroWidthCaretWidth: 1))
+            XCTAssertEqual(modern.rect.width, width == 0 ? 1 : width)
+        }
+    }
+
+    func testNativeInsertionPointRejectsWholeFieldAndInvalidBounds() {
+        for bounds in [CGRect.zero,
+                       CGRect(x: 396, y: 303, width: 424.5, height: 31),
+                       CGRect(x: 401, y: 310.5, width: 0, height: 500),
+                       CGRect(x: CGFloat.nan, y: 310.5, width: 0, height: 16)] {
+            XCTAssertNil(CursorRectInfo.insertionPoint(rect: bounds, zeroWidthCaretWidth: 1))
+        }
+    }
+
+    func testCharacterLineAndContainerWidthsKeepTheirLeadingEdge() {
+        for width: CGFloat in [2, 12, 500] {
+            let bounds = CGRect(x: -500, y: 100, width: width, height: 24)
+            for kind: CursorRectInfo.Kind in [.text, .container] {
+                let info = CursorRectInfo(rect: bounds, kind: kind)
+                XCTAssertEqual(info.indicatorPoint, CGPoint(x: -500, y: 130))
+                XCTAssertEqual(info.isContainer, kind == .container)
+            }
+        }
     }
 
     func testRejectsStaleFutureAndPreviousFocusSamples() {

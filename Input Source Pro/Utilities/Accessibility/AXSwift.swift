@@ -1,8 +1,59 @@
 import AXSwift
 import Cocoa
 
+struct CursorRectInfo {
+    enum Kind { case caret, text, container }
+
+    let rect: CGRect
+    let kind: Kind
+
+    var isContainer: Bool { kind == .container }
+    var indicatorPoint: CGPoint {
+        CGPoint(x: kind == .caret ? rect.midX : rect.minX, y: rect.maxY + 6)
+    }
+
+    static func insertionPoint(rect: CGRect, zeroWidthCaretWidth: CGFloat? = nil) -> CursorRectInfo? {
+        guard [rect.origin.x, rect.origin.y, rect.width, rect.height].allSatisfy(\.isFinite),
+              rect.width >= 0, rect.width <= 10, rect.height > 0, rect.height <= 200
+        else { return nil }
+
+        var caretRect = rect
+        if caretRect.width == 0, let zeroWidthCaretWidth {
+            caretRect.size.width = zeroWidthCaretWidth
+        }
+        return CursorRectInfo(rect: caretRect, kind: .caret)
+    }
+
+    static func fallbackCaretWidth(for rect: CGRect) -> CGFloat? {
+        if #available(macOS 26, *) {
+            let scale = NSScreen.getScreenInclude(rect: rect)?.backingScaleFactor ?? 1
+            return 2 / scale
+        }
+        return nil
+    }
+
+    static func textMarker(rect: CGRect, length: Int?, emptyInputCaretWidth: CGFloat? = nil) -> CursorRectInfo {
+        // Empty editors can report the whole line for an empty selection. Apply the
+        // same caret bounds as the helper before using the rectangle's center.
+        let hasValidBounds = [rect.origin.x, rect.origin.y, rect.width, rect.height].allSatisfy(\.isFinite)
+            && rect.width >= 0 && rect.height > 0 && rect.height <= 200
+        guard length == 0, hasValidBounds else {
+            return CursorRectInfo(rect: rect, kind: .text)
+        }
+        if rect.width <= 10 {
+            return CursorRectInfo(rect: rect, kind: .caret)
+        }
+        if let emptyInputCaretWidth {
+            var caretRect = rect
+            caretRect.size.width = emptyInputCaretWidth
+            return CursorRectInfo(rect: caretRect, kind: .caret)
+        }
+        return CursorRectInfo(rect: rect, kind: .text)
+    }
+}
+
 extension UIElement {
-    func getCursorRectInfo(traceID: String = UUID().uuidString) -> (rect: CGRect, isContainer: Bool)? {
+    func getCursorRectInfo(traceID: String = UUID().uuidString) -> CursorRectInfo? {
         let focusedElement: UIElement
         do {
             guard let element: UIElement = try attribute(.focusedUIElement) else {
@@ -29,12 +80,12 @@ extension UIElement {
         }
 
         let cursorRect = Self.findCursorRect(focusedElement, traceID: traceID)
-        if let cursorRect = cursorRect, inputAreaRect.contains(cursorRect) {
-            IndicatorDiagnostics.record("AX.accepted id=\(traceID) cursor=\(cursorRect) area=\(inputAreaRect)")
-            return (rect: cursorRect, isContainer: false)
+        if let cursorRect = cursorRect, inputAreaRect.contains(cursorRect.rect) {
+            IndicatorDiagnostics.record("AX.accepted id=\(traceID) cursor=\(cursorRect.rect) kind=\(cursorRect.kind) area=\(inputAreaRect)")
+            return cursorRect
         } else {
             IndicatorDiagnostics.record("AX.containerFallback id=\(traceID) cursor=\(String(describing: cursorRect)) area=\(inputAreaRect) reason=missing-or-outside-area")
-            return (rect: inputAreaRect, isContainer: true)
+            return CursorRectInfo(rect: inputAreaRect, kind: .container)
         }
     }
 }
@@ -69,9 +120,9 @@ extension UIElement {
 }
 
 extension UIElement {
-    static func findCursorRect(_ focusedElement: UIElement, traceID: String = UUID().uuidString) -> CGRect? {
+    static func findCursorRect(_ focusedElement: UIElement, traceID: String = UUID().uuidString) -> CursorRectInfo? {
         if let rect = findWebAreaCursor(focusedElement) {
-            IndicatorDiagnostics.record("AX.cursor id=\(traceID) method=text-marker rect=\(rect)")
+            IndicatorDiagnostics.record("AX.cursor id=\(traceID) method=text-marker rect=\(rect.rect) kind=\(rect.kind)")
             return rect
         }
         let rect = findNativeInputAreaCursor(focusedElement, traceID: traceID)
@@ -79,17 +130,36 @@ extension UIElement {
         return rect
     }
 
-    static func findWebAreaCursor(_ focusedElement: UIElement) -> CGRect? {
+    static func findWebAreaCursor(_ focusedElement: UIElement) -> CursorRectInfo? {
         guard let range: AXTextMarkerRange = try? focusedElement.attribute("AXSelectedTextMarkerRange"),
               let bounds: CGRect = try? focusedElement.parameterizedAttribute("AXBoundsForTextMarkerRange", param: range)
         else { return nil }
 
-        return NSScreen.convertFromQuartz(bounds)
+        let length: Int? = try? focusedElement.parameterizedAttribute("AXLengthForTextMarkerRange", param: range)
+        return NSScreen.convertFromQuartz(bounds).map { rect in
+            CursorRectInfo.textMarker(rect: rect, length: length, emptyInputCaretWidth: CursorRectInfo.fallbackCaretWidth(for: rect))
+        }
     }
 
-    static func findNativeInputAreaCursor(_ focusedElement: UIElement, traceID: String = UUID().uuidString) -> CGRect? {
-        guard let selectedRange: CFRange = try? focusedElement.attribute(.selectedTextRange),
-              let visibleRange: CFRange = try? focusedElement.attribute(.visibleCharacterRange),
+    static func findNativeInputAreaCursor(_ focusedElement: UIElement, traceID: String = UUID().uuidString) -> CursorRectInfo? {
+        guard let selectedRange: CFRange = try? focusedElement.attribute(.selectedTextRange)
+        else { return nil }
+
+        // A zero-length range asks for the insertion point, including at the end of
+        // text. Empty native fields can provide this even when AXValue is unavailable.
+        if selectedRange.location >= 0, selectedRange.length == 0,
+           let bounds: CGRect = try? focusedElement.parameterizedAttribute(
+               kAXBoundsForRangeParameterizedAttribute,
+               param: AXValue.range(CFRange(location: selectedRange.location, length: 0))
+           ),
+           let rect = NSScreen.convertFromQuartz(bounds),
+           let caret = CursorRectInfo.insertionPoint(rect: rect, zeroWidthCaretWidth: CursorRectInfo.fallbackCaretWidth(for: rect))
+        {
+            IndicatorDiagnostics.record("AX.insertionPoint id=\(traceID) raw=\(rect) caret=\(caret.rect)")
+            return caret
+        }
+
+        guard let visibleRange: CFRange = try? focusedElement.attribute(.visibleCharacterRange),
               let rawValue: AnyObject = try? focusedElement.attribute(.value),
               CFGetTypeID(rawValue) == CFStringGetTypeID(),
               let value = rawValue as? String
@@ -152,10 +222,10 @@ extension UIElement {
             return NSScreen.convertFromQuartz(bounds)
         }
 
-        if let bounds = getCursorBounds() { return bounds }
+        if let bounds = getCursorBounds() { return CursorRectInfo(rect: bounds, kind: .text) }
         let bounds = getLineBounds()
         IndicatorDiagnostics.record("AX.lineFallback id=\(traceID) rect=\(String(describing: bounds))")
-        return bounds
+        return bounds.map { CursorRectInfo(rect: $0, kind: .text) }
     }
 }
 

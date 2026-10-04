@@ -1,9 +1,11 @@
 import AppKit
 import Combine
+import SnapKit
 
 @MainActor
 final class AlwaysOnIndicatorWindowController: FloatWindowController {
     private var cancelBag = CancelBag()
+    private(set) var indicatorView: NSView?
 
     var position: CGPoint? {
         didSet { updateVisibility() }
@@ -35,8 +37,16 @@ final class AlwaysOnIndicatorWindowController: FloatWindowController {
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0
             context.allowsImplicitAnimation = false
-            window?.contentView = view
-            window?.setContentSize(view.fittingSize)
+            let size = view.fittingSize
+            let container = NSView()
+            container.addSubview(view)
+            view.snp.makeConstraints {
+                $0.leading.bottom.equalToSuperview()
+                $0.size.equalTo(size)
+            }
+            indicatorView = view
+            window?.contentView = container
+            window?.setContentSize(size)
             updateVisibility()
         }
     }
@@ -52,13 +62,23 @@ final class AlwaysOnIndicatorWindowController: FloatWindowController {
         IndicatorDiagnostics.record("alwaysOn.visibility point=\(String(describing: position)) defaultVisible=\(isDefaultIndicatorVisible) frame=\(String(describing: window?.frame))")
         guard let position = position,
               let window = window,
-              window.contentView != nil
+              let indicatorView = indicatorView
         else {
             deactive()
             return
         }
 
-        moveTo(point: CGPoint(x: position.x - window.frame.width / 2, y: position.y))
+        let size = indicatorView.fittingSize
+        let origin = CGPoint(x: position.x - size.width / 2, y: position.y)
+        let layout = PixelAlignedWindowLayout(
+            origin: NSScreen.pixelAlignedOrigin(origin, near: position), size: size
+        )
+        indicatorView.snp.updateConstraints {
+            $0.leading.equalToSuperview().offset(layout.contentOffset.x)
+            $0.bottom.equalToSuperview().offset(-layout.contentOffset.y)
+        }
+        window.setFrame(layout.frame, display: true)
+        window.contentView?.layoutSubtreeIfNeeded()
 
         if isDefaultIndicatorVisible {
             IndicatorDiagnostics.record("alwaysOn.hidden reason=default-visible")

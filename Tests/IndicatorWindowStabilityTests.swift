@@ -185,6 +185,62 @@ final class IndicatorWindowLayoutTests: XCTestCase {
         XCTAssertEqual(controller.alwaysOnView?.alphaValue, 1)
     }
 
+    func testPinnedIndicatorAlignsCompactContentInsteadOfHiddenLabelToPixels() throws {
+        let controller = IndicatorViewController()
+        let panel = FloatWindowController()
+        panel.contentViewController = controller
+        defer { panel.close() }
+        let window = try XCTUnwrap(panel.window)
+        XCTAssertFalse(NSScreen.screens.isEmpty)
+
+        for screen in NSScreen.screens {
+            let point = CGPoint(x: screen.frame.midX + 0.37, y: screen.frame.midY + 0.19)
+            for capsLock in [false, true, false] {
+                var configuration = config(title: "")
+                configuration.badge = nil
+                configuration.showsCapsLock = capsLock
+                controller.prepare(config: configuration)
+                controller.refresh(at: point, displayMode: .alwaysOn)
+                let indicator = try XCTUnwrap(controller.alwaysOnView)
+                let frame = window.frame
+                let visibleFrame = window.convertToScreen(indicator.convert(indicator.bounds, to: nil))
+                let pixels = screen.convertRectToBacking(visibleFrame)
+                XCTAssertEqual(pixels.minX, pixels.minX.rounded(), accuracy: 0.001)
+                XCTAssertEqual(pixels.minY, pixels.minY.rounded(), accuracy: 0.001)
+                XCTAssertEqual(visibleFrame.midX, point.x, accuracy: 0.5 / screen.backingScaleFactor + 0.001)
+                XCTAssertEqual(visibleFrame.minY, point.y, accuracy: 0.5 / screen.backingScaleFactor + 0.001)
+                XCTAssertTrue(frame.contains(visibleFrame))
+
+                controller.refresh(at: point, displayMode: .alwaysOn)
+                let repeatedFrame = window.convertToScreen(indicator.convert(indicator.bounds, to: nil))
+                XCTAssertEqual(repeatedFrame, visibleFrame)
+            }
+        }
+    }
+
+    func testPixelAlignedContentFitsWholePointWindowsOnBothSidesOfScreenOrigin() {
+        for scale: CGFloat in [1, 2] {
+            for origin in [CGPoint(x: 100.5, y: 200.5), CGPoint(x: -500.5, y: -100.5)] {
+                for width: CGFloat in [8, 22] {
+                    let pixelOrigin = CGPoint(
+                        x: (origin.x * scale).rounded() / scale,
+                        y: (origin.y * scale).rounded() / scale
+                    )
+                    let size = CGSize(width: width, height: 8)
+                    let layout = PixelAlignedWindowLayout(origin: pixelOrigin, size: size)
+                    XCTAssertEqual(layout.frame.minX, floor(layout.frame.minX))
+                    XCTAssertEqual(layout.frame.minY, floor(layout.frame.minY))
+                    let content = CGRect(origin: CGPoint(
+                        x: layout.frame.minX + layout.contentOffset.x,
+                        y: layout.frame.minY + layout.contentOffset.y
+                    ), size: size)
+                    XCTAssertEqual(content.origin, pixelOrigin)
+                    XCTAssertTrue(layout.frame.contains(content))
+                }
+            }
+        }
+    }
+
     private func config(title: String) -> IndicatorViewConfig {
         IndicatorViewConfig(
             inputSource: InputSource.getCurrentInputSource(), kind: .title, size: .medium,

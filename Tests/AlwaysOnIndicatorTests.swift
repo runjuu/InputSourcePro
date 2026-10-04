@@ -102,6 +102,36 @@ final class AlwaysOnIndicatorTests: XCTestCase {
         XCTAssertEqual(window.frame.minY, 200)
     }
 
+    func testFractionalCaretPositionUsesDestinationPixelsAfterContentResizing() throws {
+        let controller = AlwaysOnIndicatorWindowController()
+        defer { controller.close() }
+        let window = try XCTUnwrap(controller.window)
+        XCTAssertFalse(NSScreen.screens.isEmpty)
+
+        for screen in NSScreen.screens {
+            let point = CGPoint(x: screen.frame.midX + 0.37, y: screen.frame.midY + 0.19)
+            controller.position = point
+            for capsLock in [false, true, false] {
+                var configuration = config(color: .red)
+                configuration.showsCapsLock = capsLock
+                controller.update(config: configuration)
+                let frame = window.frame
+                let indicator = try XCTUnwrap(controller.indicatorView)
+                let visibleFrame = window.convertToScreen(indicator.convert(indicator.bounds, to: nil))
+                let pixels = screen.convertRectToBacking(visibleFrame)
+                XCTAssertEqual(pixels.minX, pixels.minX.rounded(), accuracy: 0.001)
+                XCTAssertEqual(pixels.minY, pixels.minY.rounded(), accuracy: 0.001)
+                XCTAssertEqual(visibleFrame.midX, point.x, accuracy: 0.5 / screen.backingScaleFactor + 0.001)
+                XCTAssertEqual(visibleFrame.minY, point.y, accuracy: 0.5 / screen.backingScaleFactor + 0.001)
+                XCTAssertEqual(visibleFrame.width, capsLock ? 22 : 8)
+                XCTAssertTrue(frame.contains(visibleFrame), "Fractional placement must not clip the indicator")
+
+                controller.position = point
+                XCTAssertEqual(window.frame, frame, "Repeated heartbeats must not change rounding")
+            }
+        }
+    }
+
     func testCaretAndContentUpdatesDoNotRestoreDotWhileDefaultIndicatorIsVisible() throws {
         let controller = AlwaysOnIndicatorWindowController()
         defer { controller.close() }

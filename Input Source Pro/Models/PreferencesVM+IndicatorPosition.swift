@@ -306,10 +306,8 @@ private extension PreferencesVM {
                             return promise(.success(nil))
                         }
 
-                        let offset: CGFloat = 6
-
                         return promise(.success((
-                            CGPoint(x: rectInfo.rect.minX, y: rectInfo.rect.maxY + offset),
+                            rectInfo.indicatorPoint,
                             rectInfo.isContainer
                         )))
                     }

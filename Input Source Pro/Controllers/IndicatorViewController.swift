@@ -8,6 +8,7 @@ class IndicatorViewController: NSViewController {
     }
 
     private var displayMode: DisplayMode = .normal
+    private var caretContentOffset = CGPoint.zero
     let hoverableView = NSViewHoverable(frame: .zero)
 
     private(set) var config: IndicatorViewConfig? = nil {
@@ -38,7 +39,7 @@ class IndicatorViewController: NSViewController {
                 normalView.snp.makeConstraints { make in
                     let size = normalView.fittingSize
 
-                    make.edges.equalToSuperview()
+                    make.leading.bottom.equalToSuperview()
                     make.width.equalTo(size.width)
                     make.height.equalTo(size.height)
                 }
@@ -55,7 +56,8 @@ class IndicatorViewController: NSViewController {
                 view.addSubview(alwaysOnView)
 
                 alwaysOnView.snp.makeConstraints { make in
-                    make.leading.bottom.equalToSuperview()
+                    make.leading.equalToSuperview().offset(caretContentOffset.x)
+                    make.bottom.equalToSuperview().offset(-caretContentOffset.y)
                 }
             }
         }
@@ -101,13 +103,24 @@ class IndicatorViewController: NSViewController {
             refresh()
             view.layoutSubtreeIfNeeded()
             var origin = point
+            var frame = CGRect(origin: origin, size: CGSize(width: ceil(size.width), height: ceil(size.height)))
+            caretContentOffset = .zero
             if displayMode == .alwaysOn, config?.badge == nil, let alwaysOnView = alwaysOnView {
-                origin.x -= alwaysOnView.fittingSize.width / 2
+                let compactSize = alwaysOnView.fittingSize
+                origin.x -= compactSize.width / 2
+                let layout = PixelAlignedWindowLayout(
+                    origin: NSScreen.pixelAlignedOrigin(origin, near: point),
+                    size: CGSize(width: max(size.width, compactSize.width), height: max(size.height, compactSize.height))
+                )
+                frame = layout.frame
+                caretContentOffset = layout.contentOffset
             }
-            window.setFrame(
-                CGRect(origin: origin, size: CGSize(width: ceil(size.width), height: ceil(size.height))),
-                display: true
-            )
+            alwaysOnView?.snp.updateConstraints {
+                $0.leading.equalToSuperview().offset(caretContentOffset.x)
+                $0.bottom.equalToSuperview().offset(-caretContentOffset.y)
+            }
+            window.setFrame(frame, display: true)
+            view.layoutSubtreeIfNeeded()
         }
     }
 

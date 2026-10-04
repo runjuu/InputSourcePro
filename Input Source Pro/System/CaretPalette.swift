@@ -99,7 +99,7 @@ final class CaretPalette {
                   screens.contains(where: { $0.intersects(rect.insetBy(dx: -1, dy: 0)) })
             else { return nil }
             // IMK returns AppKit screen coordinates, already bottom-left based.
-            return CGPoint(x: rect.minX, y: rect.maxY + 6)
+            return CGPoint(x: rect.midX, y: rect.maxY + 6)
         }
     }
 
