@@ -18,9 +18,9 @@ final class CaretPalette {
     private var pendingConfirmation: Confirmation?
     private var focusConfirmation: Confirmation?
     private var focusID: String?
-    private var focusObserver: AXSwift.Observer?
+    private var focusObserver: CaretFocusObserver?
+    private var focusGeneration = 0
     private var focusApplication: NSRunningApplication?
-    private var focusedElement: UIElement?
     private var textFocus = TextFocus.unknown
     private var session: String?
     private var focusedAt = ProcessInfo.processInfo.systemUptime
@@ -159,9 +159,7 @@ final class CaretPalette {
     }
 
     private func watchTextFocus() {
-        focusObserver?.stop()
-        focusObserver = nil
-        focusedElement = nil
+        focusGeneration += 1
         textFocus = .unknown
         sample = nil
         pendingConfirmation = nil
@@ -171,38 +169,34 @@ final class CaretPalette {
         focusApplication = NSWorkspace.shared.frontmostApplication
         guard focusApplication?.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
             focusApplication = nil
+            focusObserver?.watch(pid: nil, generation: focusGeneration)
             textFocus = .nonInput
             updates.send(())
             return
         }
-        if let app = focusApplication, let application = Application(app) {
-            focusObserver = try? AXSwift.Observer(processID: app.processIdentifier) { [weak self] _, _, _ in
-                MainActor.assumeIsolated { self?.refreshTextFocus() }
+        if focusObserver == nil {
+            focusObserver = CaretFocusObserver { [weak self] update in
+                Task { @MainActor in self?.receiveFocus(update) }
             }
-            try? focusObserver?.addNotification(.focusedUIElementChanged, forElement: application)
-            try? focusObserver?.addNotification(.focusedWindowChanged, forElement: application)
-            refreshTextFocus()
         }
+        focusObserver?.watch(pid: focusApplication?.processIdentifier, generation: focusGeneration)
         updates.send(())
     }
 
-    private func refreshTextFocus() {
-        guard let app = focusApplication,
-              NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier,
-              let application = Application(app)
+    private func receiveFocus(_ update: CaretFocusObserver.Update) {
+        guard isEnabled, !suspension.isSuspended,
+              update.generation == focusGeneration,
+              focusApplication?.processIdentifier == update.pid,
+              NSWorkspace.shared.frontmostApplication?.processIdentifier == update.pid
         else { return }
-        let element: UIElement? = try? application.attribute(.focusedUIElement)
-        let state = TextFocus(role: try? element?.role())
-        guard element != focusedElement || state != textFocus else { return }
-        focusedElement = element
-        textFocus = state
-        focusedAt = ProcessInfo.processInfo.systemUptime
-        IndicatorDiagnostics.record("helper.focus pid=\(app.processIdentifier) kind=\(state) focusedAt=\(focusedAt)")
+        textFocus = update.state
+        focusedAt = update.uptime
+        IndicatorDiagnostics.record("helper.focus pid=\(update.pid) kind=\(textFocus) focusedAt=\(focusedAt)")
         sample = nil
         pendingConfirmation = nil
         // Wait for geometry belonging to this field, not an AX fallback or the old field.
-        focusConfirmation = state == .input ? Confirmation(pid: app.processIdentifier, uptime: focusedAt) : nil
-        focusID = state == .input ? UUID().uuidString : nil
+        focusConfirmation = textFocus == .input ? Confirmation(pid: update.pid, uptime: focusedAt) : nil
+        focusID = textFocus == .input ? UUID().uuidString : nil
         updates.send(())
         sendActivity()
     }
@@ -216,7 +210,12 @@ final class CaretPalette {
         session = nil
         focusedAt = ProcessInfo.processInfo.systemUptime
         updates.send(())
-        if !suspension.isSuspended { watchTextFocus() }
+        if suspension.isSuspended {
+            focusGeneration += 1
+            focusObserver?.watch(pid: nil, generation: focusGeneration)
+        } else {
+            watchTextFocus()
+        }
         // Wake/session activation can deselect auxiliary sources. Never switch the keyboard
         // or re-enable revoked permission, and wait until all suspension reasons have ended.
         if isEnabled, !suspension.isSuspended { resumeSource?() }
@@ -233,10 +232,9 @@ final class CaretPalette {
         pendingConfirmation = nil
         focusConfirmation = nil
         focusID = nil
-        focusObserver?.stop()
+        focusGeneration += 1
         focusObserver = nil
         focusApplication = nil
-        focusedElement = nil
         textFocus = .unknown
         session = nil
         suspension = Suspension()

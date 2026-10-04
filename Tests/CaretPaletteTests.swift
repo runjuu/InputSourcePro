@@ -26,6 +26,40 @@ final class CaretPaletteTests: XCTestCase {
         subscription.cancel()
     }
 
+    func testSlowFocusReadLeavesMainThreadResponsiveAndCleansUpOnWorker() async {
+        let reading = expectation(description: "Worker started reading focus")
+        let delivered = expectation(description: "Focus delivered")
+        let stopped = expectation(description: "Observer stopped on its worker")
+        let releaseRead = DispatchSemaphore(value: 0)
+        var observer: CaretFocusObserver? = CaretFocusObserver(connect: { pid, _ in
+            XCTAssertFalse(Thread.isMainThread)
+            XCTAssertEqual(pid, 42)
+            let owner = Thread.current
+            return CaretFocusObserver.Connection(read: {
+                XCTAssertTrue(Thread.current === owner)
+                reading.fulfill()
+                XCTAssertEqual(releaseRead.wait(timeout: .now() + 5), .success)
+                return CaretFocusObserver.Focus(element: nil, state: .input)
+            }, stop: {
+                XCTAssertTrue(Thread.current === owner)
+                stopped.fulfill()
+            })
+        }, onChange: { update in
+            XCTAssertEqual(update.pid, 42)
+            XCTAssertEqual(update.generation, 7)
+            XCTAssertEqual(update.state, .input)
+            delivered.fulfill()
+        })
+        observer?.watch(pid: 42, generation: 7)
+        await fulfillment(of: [reading], timeout: 2)
+        // This continuation must run while the worker is still blocked.
+        XCTAssertTrue(Thread.isMainThread)
+        releaseRead.signal()
+        await fulfillment(of: [delivered], timeout: 2)
+        observer = nil
+        await fulfillment(of: [stopped], timeout: 2)
+    }
+
     func testKnownNonInputFocusCannotDisplayCaret() {
         for role: Role in [.webArea, .button, .link, .staticText, .checkBox] {
             XCTAssertFalse(CaretPalette.TextFocus(role: role).permitsCaret)

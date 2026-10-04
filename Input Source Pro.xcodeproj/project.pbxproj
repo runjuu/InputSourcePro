@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D72000012F20000000000001 /* CaretFocusObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = D72000022F20000000000001 /* CaretFocusObserver.swift */; };
 		EAC100000000000000000002 /* UpdateChannelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAC100000000000000000001 /* UpdateChannelTests.swift */; };
 		25C5A6B52E678D86005AB80E /* PunctuationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25C5A6B42E678D86005AB80E /* PunctuationService.swift */; };
 		3D25B151766744F888171177 /* ShortcutTrigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18B53A0848947E3A2D4EFA8 /* ShortcutTrigger.swift */; };
@@ -226,6 +227,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		D72000022F20000000000001 /* CaretFocusObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaretFocusObserver.swift; sourceTree = "<group>"; };
 		EAC100000000000000000001 /* UpdateChannelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChannelTests.swift; sourceTree = "<group>"; };
 		25018ACF8C9046C29F0F3462 /* ModifierComboPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModifierComboPicker.swift; sourceTree = "<group>"; };
 		25C5A6B42E678D86005AB80E /* PunctuationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PunctuationService.swift; sourceTree = "<group>"; };
@@ -570,6 +572,7 @@
 			children = (
 				4A2A176D280BA7FA00E13249 /* AppDelegate.swift */,
 				D70000022F20000000000002 /* CaretPalette.swift */,
+				D72000022F20000000000001 /* CaretFocusObserver.swift */,
 				D71000022F20000000000001 /* CaretHelperManager.swift */,
 				D71000222F20000000000001 /* CaretInputSource.swift */,
 				D60000612F20000000000061 /* AppURLAction.swift */,
@@ -1061,6 +1064,7 @@
 				4A4167342814086E00CCC28C /* IndicatorPosition.swift in Sources */,
 				D60002222F20000000000222 /* SpotlightIndicatorPosition.swift in Sources */,
 				D70000012F20000000000001 /* CaretPalette.swift in Sources */,
+				D72000012F20000000000001 /* CaretFocusObserver.swift in Sources */,
 				D71000032F20000000000001 /* AdditionalCursorSupportView.swift in Sources */,
 				D71000012F20000000000001 /* CaretHelperManager.swift in Sources */,
 				D71000212F20000000000001 /* CaretInputSource.swift in Sources */,
