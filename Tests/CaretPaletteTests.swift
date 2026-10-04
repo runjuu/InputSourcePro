@@ -164,6 +164,78 @@ final class CaretPaletteTests: XCTestCase {
         XCTAssertFalse(update.isCurrent(generation: 3, pid: 42, since: 11))
     }
 
+    func testFailedFocusConnectionRetriesWithoutAnAccessibilityNotification() async {
+        let recovered = expectation(description: "Connection recovered after app startup")
+        var attempts = 0
+        var states: [CaretPalette.TextFocus] = []
+        let observer = CaretFocusObserver(connect: { _, _ in
+            attempts += 1
+            if attempts == 1 { throw AXError.cannotComplete }
+            return CaretFocusObserver.Connection(read: {
+                CaretFocusObserver.Focus(element: nil, state: .unknown)
+            }, stop: {})
+        }, onChange: { update in
+            states.append(update.state)
+            if update.state == .unknown {
+                XCTAssertEqual(states, [.unavailable, .unknown])
+                XCTAssertEqual(attempts, 2)
+                recovered.fulfill()
+            }
+        })
+        observer.watch(pid: 42, generation: 1)
+        await fulfillment(of: [recovered], timeout: 2)
+        withExtendedLifetime(observer) {}
+    }
+
+    func testFailedFocusReadRetriesWithoutAnAccessibilityNotification() async {
+        let recovered = expectation(description: "Focus recovered without another notification")
+        var states: [CaretPalette.TextFocus] = []
+        let observer = CaretFocusObserver(connect: { _, _ in
+            var reads = 0
+            return CaretFocusObserver.Connection(read: {
+                reads += 1
+                if reads == 1 { throw AXError.cannotComplete }
+                return CaretFocusObserver.Focus(element: nil, state: .input)
+            }, stop: {})
+        }, onChange: { update in
+            states.append(update.state)
+            if update.state == .input {
+                XCTAssertEqual(states, [.unavailable, .input])
+                recovered.fulfill()
+            }
+        })
+        observer.watch(pid: 42, generation: 1)
+        await fulfillment(of: [recovered], timeout: 2)
+        withExtendedLifetime(observer) {}
+    }
+
+    func testAppSwitchCancelsFailedFocusConnectionRetry() async {
+        let failed = expectation(description: "Old app connection failed")
+        let switched = expectation(description: "New app focus delivered")
+        let retriedOldApp = expectation(description: "Old app must not reconnect")
+        retriedOldApp.isInverted = true
+        var oldAttempts = 0
+        let observer = CaretFocusObserver(connect: { pid, _ in
+            if pid == 42 {
+                oldAttempts += 1
+                if oldAttempts > 1 { retriedOldApp.fulfill() }
+                throw AXError.cannotComplete
+            }
+            return CaretFocusObserver.Connection(read: {
+                CaretFocusObserver.Focus(element: nil, state: .input)
+            }, stop: {})
+        }, onChange: { update in
+            if update.pid == 42 { failed.fulfill() }
+            if update.pid == 43 { switched.fulfill() }
+        })
+        observer.watch(pid: 42, generation: 1)
+        await fulfillment(of: [failed], timeout: 2)
+        observer.watch(pid: 43, generation: 2)
+        await fulfillment(of: [switched], timeout: 2)
+        await fulfillment(of: [retriedOldApp], timeout: 0.6)
+        withExtendedLifetime(observer) {}
+    }
+
     func testKnownNonInputFocusCannotDisplayCaret() {
         for role: Role in [.webArea, .button, .link, .staticText, .checkBox] {
             XCTAssertFalse(CaretPalette.TextFocus(role: role).permitsCaret)

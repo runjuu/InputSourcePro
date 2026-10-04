@@ -102,6 +102,8 @@ final class CaretFocusObserver {
         private var focus: Focus?
         private var active: Request?
         private var scheduledRefresh: Request?
+        private var retryTimer: Timer?
+        private var retryDelay: TimeInterval = 0.25
 
         init(connect: @escaping Connect, onChange: @escaping (Update) -> Void) {
             self.connect = connect
@@ -157,6 +159,7 @@ final class CaretFocusObserver {
         }
 
         func disconnect() {
+            cancelRetry()
             connection?.stop()
             connection = nil
             focus = nil
@@ -170,16 +173,49 @@ final class CaretFocusObserver {
             watchScheduled = false
             lock.unlock()
             disconnect()
-            guard let pid = request.pid, isCurrent(request) else { return }
+            guard request.pid != nil, isCurrent(request) else { return }
             active = request
+            connect(for: request)
+        }
+
+        private func connect(for request: Request) {
+            guard isCurrent(request), active == request, let pid = request.pid else { return }
             do {
                 connection = try connect(pid) { [weak self] in self?.scheduleRefresh(for: request) }
                 guard isCurrent(request) else { disconnect(); return }
                 refresh(for: request)
             } catch {
-                NSLog("Could not watch cursor focus for %d: %@", pid, String(describing: error))
+                if focus?.state != .unavailable {
+                    NSLog("Could not watch cursor focus for %d: %@", pid, String(describing: error))
+                }
                 publishUnavailable(for: request)
+                scheduleRetry(for: request)
             }
+        }
+
+        private func cancelRetry() {
+            retryTimer?.invalidate()
+            retryTimer = nil
+            retryDelay = 0.25
+        }
+
+        private func scheduleRetry(for request: Request) {
+            guard isCurrent(request), active == request, retryTimer == nil else { return }
+            // A failed observer connection cannot send a notification to recover itself.
+            // Retry on the AX worker, backing off while the foreground app is unavailable.
+            let timer = Timer(timeInterval: retryDelay, repeats: false) { [weak self] _ in
+                guard let self = self else { return }
+                self.retryTimer = nil
+                guard self.isCurrent(request), self.active == request else { return }
+                if self.connection == nil {
+                    self.connect(for: request)
+                } else {
+                    self.refresh(for: request)
+                }
+            }
+            retryDelay = min(retryDelay * 2, 2)
+            retryTimer = timer
+            RunLoop.current.add(timer, forMode: .default)
         }
 
         private func scheduleRefresh(for request: Request) {
@@ -198,7 +234,9 @@ final class CaretFocusObserver {
             let startedAt = ProcessInfo.processInfo.systemUptime
             do {
                 let current = try connection.read()
-                guard isCurrent(request), current != focus else { return }
+                guard isCurrent(request) else { return }
+                cancelRetry()
+                guard current != focus else { return }
                 focus = current
                 onChange(Update(pid: pid, generation: request.generation, state: current.state,
                                 uptime: startedAt))
@@ -207,6 +245,7 @@ final class CaretFocusObserver {
                     NSLog("Could not read cursor focus for %d: %@", pid, String(describing: error))
                 }
                 publishUnavailable(for: request)
+                scheduleRetry(for: request)
             }
         }
 
