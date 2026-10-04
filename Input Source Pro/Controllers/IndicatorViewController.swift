@@ -3,6 +3,11 @@ import SnapKit
 
 @MainActor
 class IndicatorViewController: NSViewController {
+    enum DisplayMode {
+        case normal, alwaysOn
+    }
+
+    private var displayMode: DisplayMode = .normal
     let hoverableView = NSViewHoverable(frame: .zero)
 
     private(set) var config: IndicatorViewConfig? = nil {
@@ -82,15 +87,17 @@ class IndicatorViewController: NSViewController {
             alwaysOnView = nextAlwaysOnView
             self.nextAlwaysOnView = nil
         }
+        applyDisplayMode()
     }
 
     /// Keep the displayed content unchanged while an asynchronous position query
     /// runs, then commit its replacement and frame in the same AppKit transaction.
-    func refresh(at point: CGPoint) {
+    func refresh(at point: CGPoint, displayMode: DisplayMode = .normal) {
         guard let window = view.window, let size = fittingSize else { return }
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0
             context.allowsImplicitAnimation = false
+            self.displayMode = displayMode
             refresh()
             view.layoutSubtreeIfNeeded()
             window.setFrame(
@@ -101,22 +108,21 @@ class IndicatorViewController: NSViewController {
     }
 
     func showAlwaysOnView() {
-        IndicatorDiagnostics.record("view.mode alwaysOn badge=\(config?.badge != nil)")
-        // Status badges need their glyph and title to communicate the new mode.
-        // Keep them readable until the badge expires, even while pinned to a caret.
-        guard config?.badge == nil else {
-            showNormalView()
-            return
-        }
-
-        normalView?.animator().alphaValue = 0
-        alwaysOnView?.animator().alphaValue = 1
+        displayMode = .alwaysOn
+        applyDisplayMode()
     }
 
     func showNormalView() {
-        IndicatorDiagnostics.record("view.mode normal")
-        normalView?.animator().alphaValue = 1
-        alwaysOnView?.animator().alphaValue = 0
+        displayMode = .normal
+        applyDisplayMode()
+    }
+
+    private func applyDisplayMode() {
+        // Status badges retain their glyph and title even at the caret.
+        let showsAlwaysOn = displayMode == .alwaysOn && config?.badge == nil
+        IndicatorDiagnostics.record("view.mode requested=\(displayMode) compact=\(showsAlwaysOn)")
+        normalView?.alphaValue = showsAlwaysOn ? 0 : 1
+        alwaysOnView?.alphaValue = showsAlwaysOn ? 1 : 0
     }
 
     override func viewDidLayout() {

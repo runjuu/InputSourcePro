@@ -38,9 +38,12 @@ extension IndicatorWindowController {
         return .init(glyph: mode.badgeGlyph, title: mode.displayName)
     }
 
-    func moveIndicator(position: PreferencesVM.IndicatorPositionInfo) {
+    func moveIndicator(
+        position: PreferencesVM.IndicatorPositionInfo,
+        displayMode: IndicatorViewController.DisplayMode = .normal
+    ) {
         IndicatorDiagnostics.record("indicator.move kind=\(position.kind) point=\(position.point) before=\(String(describing: window?.frame)) fitting=\(String(describing: getAppSize()))")
-        indicatorVC.refresh(at: position.point)
+        indicatorVC.refresh(at: position.point, displayMode: displayMode)
         IndicatorDiagnostics.record("indicator.moved frame=\(String(describing: window?.frame))")
         alwaysOnIndicator.defaultIndicatorFrame = isActive ? window?.frame : nil
     }

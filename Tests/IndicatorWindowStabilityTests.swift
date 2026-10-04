@@ -118,11 +118,83 @@ final class IndicatorWindowLayoutTests: XCTestCase {
         }
     }
 
+    func testCaretAppearanceIsAppliedBeforeWindowIsDisplayedAtNewPosition() {
+        let controller = IndicatorViewController()
+        let window = PresentationObservingPanel(
+            contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered, defer: false
+        )
+        window.isReleasedWhenClosed = false
+        window.contentViewController = controller
+        defer { window.close() }
+        var config = config(title: "")
+        config.badge = nil
+        controller.prepare(config: config)
+        controller.refresh(at: CGPoint(x: 600, y: 200))
+
+        var displays = 0
+        window.onDisplay = {
+            displays += 1
+            XCTAssertEqual(controller.normalView?.alphaValue, 0)
+            XCTAssertEqual(controller.alwaysOnView?.alphaValue, 1)
+        }
+        controller.refresh(at: CGPoint(x: 200, y: 300), displayMode: .alwaysOn)
+        XCTAssertGreaterThan(displays, 0)
+
+        // A content refresh while pinned must not reintroduce the full label.
+        config.showsCapsLock = true
+        controller.prepare(config: config)
+        controller.refresh(at: CGPoint(x: 220, y: 300), displayMode: .alwaysOn)
+        XCTAssertEqual(controller.normalView?.alphaValue, 0)
+
+        window.onDisplay = {
+            XCTAssertEqual(controller.normalView?.alphaValue, 1)
+            XCTAssertEqual(controller.alwaysOnView?.alphaValue, 0)
+        }
+        controller.refresh(at: CGPoint(x: 600, y: 200), displayMode: .normal)
+    }
+
+    func testPinnedAppearanceSurvivesContentRefreshAndBadgeExpiry() {
+        let controller = IndicatorViewController()
+        var config = config(title: "")
+        config.badge = nil
+        controller.prepare(config: config)
+        controller.showAlwaysOnView()
+
+        config.showsCapsLock = true
+        controller.prepare(config: config)
+        controller.refresh()
+        XCTAssertEqual(controller.normalView?.alphaValue, 0)
+        XCTAssertEqual(controller.alwaysOnView?.alphaValue, 1)
+
+        config.badge = .init(glyph: .symbol("globe"), title: "Function Keys")
+        controller.prepare(config: config)
+        controller.refresh()
+        XCTAssertEqual(controller.normalView?.alphaValue, 1)
+        XCTAssertEqual(controller.alwaysOnView?.alphaValue, 0)
+
+        config.badge = nil
+        controller.prepare(config: config)
+        controller.refresh()
+        XCTAssertEqual(controller.normalView?.alphaValue, 0)
+        XCTAssertEqual(controller.alwaysOnView?.alphaValue, 1)
+    }
+
     private func config(title: String) -> IndicatorViewConfig {
         IndicatorViewConfig(
             inputSource: InputSource.getCurrentInputSource(), kind: .title, size: .medium,
             bgColor: .black, textColor: .white,
             badge: .init(glyph: .symbol("globe"), title: title)
         )
+    }
+}
+
+@MainActor
+private final class PresentationObservingPanel: NSPanel {
+    var onDisplay: (() -> Void)?
+
+    override func setFrame(_ frameRect: NSRect, display flag: Bool) {
+        if flag { onDisplay?() }
+        super.setFrame(frameRect, display: flag)
     }
 }

@@ -448,14 +448,12 @@ extension IndicatorWindowController {
         case let .caret(point):
             guard getAppSize() != nil else { return }
 
-            moveIndicator(position: (.inputCursor, point))
-            indicatorVC.showAlwaysOnView()
+            moveIndicator(position: (.inputCursor, point), displayMode: .alwaysOn)
 
             if !isActive {
                 isActive = true
             }
         case .mouse:
-            indicatorVC.showNormalView()
             moveNearMouse()
         }
     }
