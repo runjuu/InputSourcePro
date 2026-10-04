@@ -30,7 +30,7 @@ final class CaretPalette {
     private var suspension = Suspension()
 
     enum TextFocus {
-        case input, nonInput, unknown
+        case input, nonInput, unknown, unavailable
 
         init(role: Role?) {
             switch role {
@@ -45,7 +45,7 @@ final class CaretPalette {
             }
         }
 
-        var permitsCaret: Bool { self != .nonInput }
+        var permitsCaret: Bool { self == .input || self == .unknown }
     }
 
     struct Confirmation {
@@ -160,14 +160,15 @@ final class CaretPalette {
 
     private func watchTextFocus() {
         focusGeneration += 1
-        textFocus = .unknown
+        textFocus = .unavailable
         sample = nil
         pendingConfirmation = nil
         focusConfirmation = nil
         focusID = nil
         focusedAt = ProcessInfo.processInfo.systemUptime
         focusApplication = NSWorkspace.shared.frontmostApplication
-        guard focusApplication?.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
+        guard isEnabled, !suspension.isSuspended,
+              focusApplication?.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
             focusApplication = nil
             focusObserver?.watch(pid: nil, generation: focusGeneration)
             textFocus = .nonInput
@@ -185,8 +186,7 @@ final class CaretPalette {
 
     private func receiveFocus(_ update: CaretFocusObserver.Update) {
         guard isEnabled, !suspension.isSuspended,
-              update.generation == focusGeneration,
-              focusApplication?.processIdentifier == update.pid,
+              update.isCurrent(generation: focusGeneration, pid: focusApplication?.processIdentifier, since: focusedAt),
               NSWorkspace.shared.frontmostApplication?.processIdentifier == update.pid
         else { return }
         textFocus = update.state

@@ -60,6 +60,110 @@ final class CaretPaletteTests: XCTestCase {
         await fulfillment(of: [stopped], timeout: 2)
     }
 
+    func testAppSwitchDiscardsSlowResultAndSkipsIntermediateApps() async {
+        let reading = expectation(description: "Old app query started")
+        let latest = expectation(description: "Latest app focus delivered")
+        let stopped = expectation(description: "Both observers cleaned up")
+        stopped.expectedFulfillmentCount = 2
+        let releaseRead = DispatchSemaphore(value: 0)
+        var observer: CaretFocusObserver? = CaretFocusObserver(connect: { pid, _ in
+            XCTAssertNotEqual(pid, 43, "An obsolete app must not create an observer")
+            return CaretFocusObserver.Connection(read: {
+                if pid == 42 {
+                    reading.fulfill()
+                    XCTAssertEqual(releaseRead.wait(timeout: .now() + 5), .success)
+                }
+                return CaretFocusObserver.Focus(element: nil, state: .input)
+            }, stop: { stopped.fulfill() })
+        }, onChange: { update in
+            XCTAssertEqual(update.pid, 44)
+            XCTAssertEqual(update.generation, 3)
+            latest.fulfill()
+        })
+        observer?.watch(pid: 42, generation: 1)
+        await fulfillment(of: [reading], timeout: 2)
+        observer?.watch(pid: 43, generation: 2)
+        observer?.watch(pid: 44, generation: 3)
+        releaseRead.signal()
+        await fulfillment(of: [latest], timeout: 2)
+        observer = nil
+        await fulfillment(of: [stopped], timeout: 2)
+    }
+
+    func testStoppingFocusObservationDiscardsPendingRead() async {
+        let reading = expectation(description: "Query started")
+        let stopped = expectation(description: "Observation stopped")
+        let releaseRead = DispatchSemaphore(value: 0)
+        let observer = CaretFocusObserver(connect: { _, _ in
+            CaretFocusObserver.Connection(read: {
+                reading.fulfill()
+                XCTAssertEqual(releaseRead.wait(timeout: .now() + 5), .success)
+                return CaretFocusObserver.Focus(element: nil, state: .input)
+            }, stop: { stopped.fulfill() })
+        }, onChange: { _ in XCTFail("Stopped observation must not deliver focus") })
+        observer.watch(pid: 42, generation: 1)
+        await fulfillment(of: [reading], timeout: 2)
+        observer.watch(pid: nil, generation: 2)
+        releaseRead.signal()
+        await fulfillment(of: [stopped], timeout: 2)
+    }
+
+    func testFocusNotificationBurstUsesOneAdditionalRead() async {
+        let delivered = expectation(description: "Coalesced focus update")
+        let stopped = expectation(description: "Observation stopped")
+        var observer: CaretFocusObserver? = CaretFocusObserver(connect: { _, changed in
+            var reads = 0
+            return CaretFocusObserver.Connection(read: {
+                reads += 1
+                if reads == 1 {
+                    for _ in 0..<20 { changed() }
+                }
+                return CaretFocusObserver.Focus(element: nil, state: reads == 1 ? .input : .nonInput)
+            }, stop: {
+                XCTAssertEqual(reads, 2)
+                stopped.fulfill()
+            })
+        }, onChange: { update in
+            if update.state == .nonInput { delivered.fulfill() }
+        })
+        observer?.watch(pid: 42, generation: 1)
+        await fulfillment(of: [delivered], timeout: 2)
+        observer = nil
+        await fulfillment(of: [stopped], timeout: 2)
+    }
+
+    func testFailedFocusReadInvalidatesPreviousFieldAndCanRecover() async {
+        let recovered = expectation(description: "Focus recovered after timeout")
+        var states: [CaretPalette.TextFocus] = []
+        let observer = CaretFocusObserver(connect: { _, changed in
+            var reads = 0
+            return CaretFocusObserver.Connection(read: {
+                reads += 1
+                if reads < 3 { changed() }
+                if reads == 2 { throw AXError.cannotComplete }
+                return CaretFocusObserver.Focus(element: nil, state: .input)
+            }, stop: {})
+        }, onChange: { update in
+            states.append(update.state)
+            if states.count == 3 {
+                XCTAssertEqual(states, [.input, .unavailable, .input])
+                recovered.fulfill()
+            }
+        })
+        observer.watch(pid: 42, generation: 1)
+        await fulfillment(of: [recovered], timeout: 2)
+        XCTAssertFalse(CaretPalette.TextFocus.unavailable.permitsCaret)
+        withExtendedLifetime(observer) {}
+    }
+
+    func testFocusUpdateRejectsOldAppSessionAndOutOfOrderField() {
+        let update = CaretFocusObserver.Update(pid: 42, generation: 3, state: .input, uptime: 10)
+        XCTAssertTrue(update.isCurrent(generation: 3, pid: 42, since: 9))
+        XCTAssertFalse(update.isCurrent(generation: 4, pid: 42, since: 9))
+        XCTAssertFalse(update.isCurrent(generation: 3, pid: 43, since: 9))
+        XCTAssertFalse(update.isCurrent(generation: 3, pid: 42, since: 11))
+    }
+
     func testKnownNonInputFocusCannotDisplayCaret() {
         for role: Role in [.webArea, .button, .link, .staticText, .checkBox] {
             XCTAssertFalse(CaretPalette.TextFocus(role: role).permitsCaret)
