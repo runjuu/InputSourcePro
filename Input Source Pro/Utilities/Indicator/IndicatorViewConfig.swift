@@ -94,24 +94,22 @@ struct IndicatorViewConfig {
     /// identical across them — only the leading content view differs.
     private func renderLabeledPill(leading: NSView?, label: NSTextField) -> NSView {
         let containerView = getContainerView()
-        let stackView = NSStackView(views: [leading, label, capsLockMarker()].compactMap { $0 })
+        let stackView = NSStackView(views: withCapsLockPrefix([leading, label].compactMap { $0 }))
 
         switch size {
         case .small:
             containerView.layer?.cornerRadius = 3
-            stackView.spacing = 3
             label.font = .systemFont(ofSize: 10)
         case .medium:
             containerView.layer?.cornerRadius = 4
-            stackView.spacing = 5
             label.font = .systemFont(ofSize: 12.6)
         case .large:
             containerView.layer?.cornerRadius = 6
-            stackView.spacing = 8
             label.font = .systemFont(ofSize: 20)
         }
 
         label.textColor = textColor
+        stackView.spacing = contentSpacing
         stackView.alignment = .centerY
         containerView.addSubview(stackView)
 
@@ -131,7 +129,9 @@ struct IndicatorViewConfig {
 
     private func renderIconPill(leading: NSView) -> NSView {
         let containerView = getContainerView()
-        let stackView = NSStackView(views: [leading, capsLockMarker()].compactMap { $0 })
+        let stackView = NSStackView(views: withCapsLockPrefix([leading]))
+        stackView.spacing = contentSpacing
+        stackView.alignment = .centerY
 
         containerView.layer?.cornerRadius = 4
         containerView.addSubview(stackView)
@@ -141,6 +141,30 @@ struct IndicatorViewConfig {
         }
 
         return containerView
+    }
+
+    private var contentSpacing: CGFloat {
+        switch size {
+        case .small: return 3
+        case .medium: return 5
+        case .large: return 8
+        }
+    }
+
+    private func withCapsLockPrefix(_ content: [NSView]) -> [NSView] {
+        guard let marker = capsLockMarker() else { return content }
+
+        let divider = NSView()
+        divider.wantsLayer = true
+        divider.layer?.backgroundColor = textColor?.cgColor
+        divider.alphaValue = 0.15
+        divider.setAccessibilityElement(false)
+        divider.snp.makeConstraints {
+            $0.width.equalTo(0.5)
+            $0.height.equalTo(leadingIconWidth * 0.75)
+        }
+
+        return [marker, divider] + content
     }
 
     /// A filled dark mini-badge (foreground color) holding the glyph in the
