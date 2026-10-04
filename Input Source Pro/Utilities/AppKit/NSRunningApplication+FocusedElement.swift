@@ -19,6 +19,7 @@ extension NSRunningApplication {
     @MainActor
     func getApplication(preferencesVM: PreferencesVM?) -> Application? {
         if let preferencesVM = preferencesVM,
+           processIdentifier != ProcessInfo.processInfo.processIdentifier,
            preferencesVM.preferences.isEnhancedModeEnabled,
            !NSApplication.isFloatingApp(bundleIdentifier)
         {

@@ -9,6 +9,23 @@ import XCTest
 final class CaretPaletteTests: XCTestCase {
     private let screen = CGRect(x: -1440, y: -200, width: 1440, height: 900)
 
+    func testOwnSettingsNeverUsesAccessibilityFallback() {
+        let palette = CaretPalette()
+        XCTAssertTrue(palette.suppressesAccessibilityFallback(for: .current))
+        XCTAssertNil(palette.point(for: .current))
+    }
+
+    func testWatchingOwnSettingsCompletesWithoutRegisteringAccessibility() {
+        var completed = false
+        let subscription = NSRunningApplication.current
+            .watchAX([.focusedUIElementChanged], [.application])
+            .sink(receiveCompletion: { _ in completed = true }, receiveValue: { _ in
+                XCTFail("Our own process must not produce accessibility events")
+            })
+        XCTAssertTrue(completed)
+        subscription.cancel()
+    }
+
     func testKnownNonInputFocusCannotDisplayCaret() {
         for role: Role in [.webArea, .button, .link, .staticText, .checkBox] {
             XCTAssertFalse(CaretPalette.TextFocus(role: role).permitsCaret)

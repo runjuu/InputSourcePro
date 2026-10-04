@@ -43,6 +43,9 @@ extension NSRunningApplication {
         _ notifications: [AXNotification],
         _ validRoles: [Role]
     ) -> AnyPublisher<WatchAXOutput, Never> {
+        guard processIdentifier != ProcessInfo.processInfo.processIdentifier else {
+            return Empty().eraseToAnyPublisher()
+        }
         return Timer.delay(seconds: 0.5)
             .receive(on: DispatchQueue.main)
             .flatMapLatest { _ -> AnyPublisher<WatchAXOutput, Never> in

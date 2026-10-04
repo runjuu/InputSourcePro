@@ -146,7 +146,8 @@ final class CaretPalette {
 
     private func sendActivity() {
         guard isEnabled, !suspension.isSuspended,
-              let app = NSWorkspace.shared.frontmostApplication
+              let app = NSWorkspace.shared.frontmostApplication,
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier
         else { return }
         DistributedNotificationCenter.default().postNotificationName(
             Notification.Name("dev.inputsourcepro.caretPalette.activity"),
@@ -168,6 +169,12 @@ final class CaretPalette {
         focusID = nil
         focusedAt = ProcessInfo.processInfo.systemUptime
         focusApplication = NSWorkspace.shared.frontmostApplication
+        guard focusApplication?.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
+            focusApplication = nil
+            textFocus = .nonInput
+            updates.send(())
+            return
+        }
         if let app = focusApplication, let application = Application(app) {
             focusObserver = try? AXSwift.Observer(processID: app.processIdentifier) { [weak self] _, _, _ in
                 MainActor.assumeIsolated { self?.refreshTextFocus() }
@@ -307,6 +314,7 @@ final class CaretPalette {
     }
 
     func suppressesAccessibilityFallback(for app: NSRunningApplication) -> Bool {
+        if app.processIdentifier == ProcessInfo.processInfo.processIdentifier { return true }
         guard isEnabled, !suspension.isSuspended,
               NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier
         else { return false }
