@@ -234,6 +234,73 @@ final class CaretPaletteTests: XCTestCase {
         XCTAssertLessThan(CaretPollingSchedule.idleInterval, 0.75)
     }
 
+    func testDefaultLabelNeverGetsPlacedWhenPendingCaretBecomesAvailable() {
+        for isContainer in [false, true] {
+            let updates = PassthroughSubject<Void, Never>()
+            var position: PreferencesVM.CursorPosition?
+            var results: [PreferencesVM.IndicatorPositionInfo?] = []
+            let caret = PreferencesVM.caretPositionWhenReadyPublisher(
+                query: { Just(position).eraseToAnyPublisher() },
+                changes: updates.eraseToAnyPublisher(),
+                awaitingConfirmation: { position == nil },
+                deadline: { Empty(completeImmediately: false).eraseToAnyPublisher() }
+            )
+            let subscription = PreferencesVM.positionUnlessCaretAvailablePublisher(
+                caret: caret,
+                fallback: {
+                    XCTFail("The default label must never be placed, even before the always-on window updates")
+                    return Just((.nearMouse, CGPoint(x: 400, y: 400))).eraseToAnyPublisher()
+                }
+            ).sink { results.append($0) }
+
+            XCTAssertTrue(results.isEmpty)
+            updates.send(())
+            XCTAssertTrue(results.isEmpty, "A pending sample must not permit a temporary label")
+            position = (CGPoint(x: 100, y: 200), isContainer)
+            updates.send(())
+            XCTAssertEqual(results.count, 1)
+            XCTAssertNil(results[0])
+            subscription.cancel()
+        }
+    }
+
+    func testDefaultLabelWaitsForMissingCaretBeforeUsingFallback() {
+        let caret = PassthroughSubject<PreferencesVM.CursorPosition?, Never>()
+        var fallbackQueries = 0
+        var results: [PreferencesVM.IndicatorPositionInfo?] = []
+        let point = CGPoint(x: 400, y: 400)
+        let subscription = PreferencesVM.positionUnlessCaretAvailablePublisher(
+            caret: caret.eraseToAnyPublisher(),
+            fallback: {
+                fallbackQueries += 1
+                return Just((.nearMouse, point)).eraseToAnyPublisher()
+            }
+        ).sink { results.append($0) }
+
+        XCTAssertEqual(fallbackQueries, 0)
+        XCTAssertTrue(results.isEmpty)
+        caret.send(nil)
+        XCTAssertEqual(fallbackQueries, 1)
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results[0]?.point, point)
+        subscription.cancel()
+    }
+
+    func testCancelledCaretCheckCannotPlaceDefaultLabel() {
+        let caret = PassthroughSubject<PreferencesVM.CursorPosition?, Never>()
+        var cancelled = false
+        let subscription = PreferencesVM.positionUnlessCaretAvailablePublisher(
+            caret: caret.handleEvents(receiveCancel: { cancelled = true }).eraseToAnyPublisher(),
+            fallback: {
+                XCTFail("A superseded activation must not query a fallback position")
+                return Just(nil).eraseToAnyPublisher()
+            }
+        ).sink { _ in XCTFail("A superseded activation must not place an indicator") }
+        subscription.cancel()
+        caret.send(nil)
+        XCTAssertTrue(cancelled)
+    }
+
     func testDefaultIndicatorWaitsForInitialCaretConfirmation() {
         let updates = PassthroughSubject<Void, Never>()
         let timeout = PassthroughSubject<Void, Never>()

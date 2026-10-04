@@ -99,6 +99,47 @@ extension PreferencesVM {
         app: NSRunningApplication,
         traceID: String = UUID().uuidString
     ) -> AnyPublisher<IndicatorPositionInfo?, Never> {
+        let fallback = {
+            self.getDefaultIndicatorPositionPublisher(appSize: appSize, app: app, traceID: traceID)
+        }
+        guard preferences.isAlwaysOnIndicatorEnabled,
+              !preferences.tryToDisplayIndicatorNearCursor,
+              !preferences.isAlwaysDisplayIndicatorNearMouseEnabled,
+              isAbleToQueryLocation(app),
+              !NSApplication.isSpotlightLikeApp(app.bundleIdentifier)
+        else { return fallback() }
+
+        IndicatorDiagnostics.record("position.waitForAlwaysOn id=\(traceID) pid=\(app.processIdentifier)")
+        return Self.positionUnlessCaretAvailablePublisher(
+            caret: Self.caretPositionWhenReadyPublisher(
+                query: { self.getPositionAroundInputCursor(app: app, traceID: traceID) },
+                changes: CaretPalette.shared.changes,
+                awaitingConfirmation: { CaretPalette.shared.isAwaitingConfirmation(for: app) }
+            ),
+            fallback: fallback
+        )
+    }
+
+    static func positionUnlessCaretAvailablePublisher(
+        caret: AnyPublisher<CursorPosition?, Never>,
+        fallback: @escaping () -> AnyPublisher<IndicatorPositionInfo?, Never>
+    ) -> AnyPublisher<IndicatorPositionInfo?, Never> {
+        caret.first()
+            .flatMapLatest { position -> AnyPublisher<IndicatorPositionInfo?, Never> in
+                guard position == nil else {
+                    IndicatorDiagnostics.record("position.suppressed reason=always-on-caret-available")
+                    return Just(nil).eraseToAnyPublisher()
+                }
+                return fallback()
+            }
+            .eraseToAnyPublisher()
+    }
+
+    private func getDefaultIndicatorPositionPublisher(
+        appSize: CGSize,
+        app: NSRunningApplication,
+        traceID: String
+    ) -> AnyPublisher<IndicatorPositionInfo?, Never> {
         IndicatorDiagnostics.record("position.begin id=\(traceID) pid=\(app.processIdentifier) size=\(appSize) base=\(String(describing: preferences.indicatorPosition)) enhanced=\(preferences.isEnhancedModeEnabled) nearCursor=\(String(describing: preferences.tryToDisplayIndicatorNearCursor)) alwaysOn=\(preferences.isAlwaysOnIndicatorEnabled) alwaysNearMouse=\(preferences.isAlwaysDisplayIndicatorNearMouseEnabled)")
         return Just(preferences.indicatorPosition)
             .compactMap { $0 }
