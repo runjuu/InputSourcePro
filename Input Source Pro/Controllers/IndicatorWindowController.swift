@@ -16,9 +16,14 @@ class IndicatorWindowController: FloatWindowController {
     let indicatorVC = IndicatorViewController()
     let alwaysOnIndicator = AlwaysOnIndicatorWindowController()
 
-    var isActive = false {
-        didSet {
-            IndicatorDiagnostics.record("indicator.active old=\(oldValue) new=\(isActive) frame=\(String(describing: window?.frame))")
+    private var visibility = DefaultIndicatorVisibility()
+
+    var isActive: Bool {
+        get { visibility.isActive }
+        set {
+            let oldValue = visibility.isActive
+            visibility.setActive(newValue)
+            IndicatorDiagnostics.record("indicator.active old=\(oldValue) requested=\(newValue) new=\(isActive) suppressed=\(visibility.isSuppressed) frame=\(String(describing: window?.frame))")
             if isActive {
                 indicatorVC.view.animator().alphaValue = 1
                 window?.displayIfNeeded()
@@ -29,6 +34,16 @@ class IndicatorWindowController: FloatWindowController {
             }
 
             alwaysOnIndicator.defaultIndicatorFrame = isActive ? window?.frame : nil
+        }
+    }
+
+    func updateDefaultIndicatorSuppression(alwaysOnPosition: CGPoint?) {
+        visibility.update(
+            alwaysOnPosition: alwaysOnPosition,
+            preferCaret: preferencesVM.preferences.tryToDisplayIndicatorNearCursor
+        )
+        if visibility.isSuppressed {
+            isActive = false
         }
     }
 
@@ -115,6 +130,20 @@ class IndicatorWindowController: FloatWindowController {
 }
 
 extension IndicatorWindowController {
+    struct DefaultIndicatorVisibility {
+        private(set) var isActive = false
+        private(set) var isSuppressed = false
+
+        mutating func update(alwaysOnPosition: CGPoint?, preferCaret: Bool) {
+            isSuppressed = !preferCaret && alwaysOnPosition != nil
+            if isSuppressed { isActive = false }
+        }
+
+        mutating func setActive(_ active: Bool) {
+            isActive = active && !isSuppressed
+        }
+    }
+
     enum ActivationMode {
         case hide, autoHide, autoShow
     }

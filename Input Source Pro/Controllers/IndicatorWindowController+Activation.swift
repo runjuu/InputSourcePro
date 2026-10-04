@@ -174,7 +174,14 @@ extension IndicatorWindowController {
             }
         )
 
-        alwaysOnIndicator.observe(configs: configs, positions: positions)
+        let coordinatedPositions = positions
+            .handleEvents(receiveOutput: { [weak self] position in
+                // Clear the label before placing the dot, including when their frames overlap.
+                self?.updateDefaultIndicatorSuppression(alwaysOnPosition: position)
+            })
+            .eraseToAnyPublisher()
+
+        alwaysOnIndicator.observe(configs: configs, positions: coordinatedPositions)
 
         NSWorkspace.shared.notificationCenter
             .publisher(for: NSWorkspace.activeSpaceDidChangeNotification)

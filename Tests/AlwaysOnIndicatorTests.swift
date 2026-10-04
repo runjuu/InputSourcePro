@@ -5,6 +5,39 @@ import XCTest
 
 @MainActor
 final class AlwaysOnIndicatorTests: XCTestCase {
+    func testActiveCaretIndicatorHidesLabelAndBlocksSubsequentActivations() {
+        var visibility = IndicatorWindowController.DefaultIndicatorVisibility()
+        visibility.setActive(true)
+        XCTAssertTrue(visibility.isActive)
+
+        visibility.update(alwaysOnPosition: CGPoint(x: 100, y: 200), preferCaret: false)
+        XCTAssertFalse(visibility.isActive, "A late caret result must hide an already visible label")
+        visibility.setActive(true)
+        XCTAssertFalse(visibility.isActive, "Input switches must not restore the label while suppressed")
+
+        visibility.update(alwaysOnPosition: nil, preferCaret: false)
+        XCTAssertFalse(visibility.isActive, "Losing the caret must not replay an earlier activation")
+        visibility.setActive(true)
+        XCTAssertTrue(visibility.isActive, "New activations must work when the caret is unavailable")
+        visibility.setActive(false)
+        XCTAssertFalse(visibility.isActive)
+    }
+
+    func testDefaultLabelRemainsAvailableWhenBothCaretOptionsAreEnabled() {
+        var visibility = IndicatorWindowController.DefaultIndicatorVisibility()
+        let point = CGPoint(x: 100, y: 200)
+        visibility.update(alwaysOnPosition: point, preferCaret: true)
+        visibility.setActive(true)
+        XCTAssertTrue(visibility.isActive)
+
+        visibility.update(alwaysOnPosition: point, preferCaret: false)
+        XCTAssertFalse(visibility.isActive, "Disabling default caret placement must hide the active label")
+        visibility.update(alwaysOnPosition: point, preferCaret: true)
+        XCTAssertFalse(visibility.isActive, "Changing the preference must not replay an old activation")
+        visibility.setActive(true)
+        XCTAssertTrue(visibility.isActive)
+    }
+
     func testAlwaysOnIsIndependentOfCaretPreferenceAndDefaultTriggers() {
         withPreferences { preferences in
             preferences.isEnhancedModeEnabled = true

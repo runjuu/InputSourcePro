@@ -234,6 +234,114 @@ final class CaretPaletteTests: XCTestCase {
         XCTAssertLessThan(CaretPollingSchedule.idleInterval, 0.75)
     }
 
+    func testDefaultIndicatorWaitsForInitialCaretConfirmation() {
+        let updates = PassthroughSubject<Void, Never>()
+        let timeout = PassthroughSubject<Void, Never>()
+        var point: CGPoint?
+        var results: [PreferencesVM.CursorPosition?] = []
+        let subscription = PreferencesVM.caretPositionWhenReadyPublisher(
+            query: {
+                PreferencesVM.preferredCaretPositionPublisher(
+                    palette: { point },
+                    accessibility: { XCTFail("Pending helper must not use AX"); return Just(nil).eraseToAnyPublisher() },
+                    awaitingConfirmation: { point == nil }
+                )
+            },
+            changes: updates.eraseToAnyPublisher(),
+            awaitingConfirmation: { point == nil },
+            deadline: { timeout.eraseToAnyPublisher() }
+        ).sink { results.append($0) }
+
+        updates.send(())
+        XCTAssertTrue(results.isEmpty, "No relative fallback while focus is being confirmed")
+        point = CGPoint(x: 585, y: 114)
+        updates.send(())
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results.first??.point, point)
+        XCTAssertEqual(results.first??.isContainer, false)
+        timeout.send(())
+        updates.send(())
+        XCTAssertEqual(results.count, 1)
+        subscription.cancel()
+    }
+
+    func testDefaultIndicatorFallsBackOnceIfHelperNeverConfirms() {
+        let updates = PassthroughSubject<Void, Never>()
+        let timeout = PassthroughSubject<Void, Never>()
+        var point: PreferencesVM.CursorPosition?
+        var results: [PreferencesVM.CursorPosition?] = []
+        let subscription = PreferencesVM.caretPositionWhenReadyPublisher(
+            query: { Just(point).eraseToAnyPublisher() },
+            changes: updates.eraseToAnyPublisher(),
+            awaitingConfirmation: { true },
+            deadline: { timeout.eraseToAnyPublisher() }
+        ).sink { results.append($0) }
+
+        XCTAssertTrue(results.isEmpty)
+        timeout.send(())
+        XCTAssertEqual(results.count, 1)
+        XCTAssertNil(results[0])
+        point = (CGPoint(x: 100, y: 200), false)
+        updates.send(())
+        XCTAssertEqual(results.count, 1, "Do not jump to a late caret after choosing the fallback")
+        subscription.cancel()
+    }
+
+    func testReadyCaretAndKnownMissingCaretDoNotWait() {
+        for position: PreferencesVM.CursorPosition? in [nil, (CGPoint(x: 20, y: 30), false)] {
+            var results: [PreferencesVM.CursorPosition?] = []
+            let subscription = PreferencesVM.caretPositionWhenReadyPublisher(
+                query: { Just(position).eraseToAnyPublisher() },
+                changes: Empty().eraseToAnyPublisher(),
+                awaitingConfirmation: { false },
+                deadline: { XCTFail("No confirmation delay needed"); return Empty().eraseToAnyPublisher() }
+            ).sink { results.append($0) }
+            XCTAssertEqual(results.count, 1)
+            XCTAssertEqual(results[0]?.point, position?.point)
+            subscription.cancel()
+        }
+    }
+
+    func testLeavingInputFieldEndsPendingCaretWait() {
+        let updates = PassthroughSubject<Void, Never>()
+        var pending = true
+        var results: [PreferencesVM.CursorPosition?] = []
+        let subscription = PreferencesVM.caretPositionWhenReadyPublisher(
+            query: { Just(nil).eraseToAnyPublisher() },
+            changes: updates.eraseToAnyPublisher(),
+            awaitingConfirmation: { pending },
+            deadline: { Empty(completeImmediately: false).eraseToAnyPublisher() }
+        ).sink { results.append($0) }
+        XCTAssertTrue(results.isEmpty)
+        pending = false
+        updates.send(())
+        XCTAssertEqual(results.count, 1)
+        XCTAssertNil(results[0])
+        subscription.cancel()
+    }
+
+    func testCancelledActivationCannotDisplayLateCaretOrFallback() {
+        let updates = PassthroughSubject<Void, Never>()
+        let timeout = PassthroughSubject<Void, Never>()
+        var position: PreferencesVM.CursorPosition?
+        var results: [PreferencesVM.CursorPosition?] = []
+        var stoppedUpdates = false
+        var stoppedTimeout = false
+        let subscription = PreferencesVM.caretPositionWhenReadyPublisher(
+            query: { Just(position).eraseToAnyPublisher() },
+            changes: updates.handleEvents(receiveCancel: { stoppedUpdates = true }).eraseToAnyPublisher(),
+            awaitingConfirmation: { true },
+            deadline: { timeout.handleEvents(receiveCancel: { stoppedTimeout = true }).eraseToAnyPublisher() }
+        ).sink { results.append($0) }
+        subscription.cancel()
+        position = (CGPoint(x: 50, y: 60), false)
+        updates.send(())
+        timeout.send(())
+        XCTAssertTrue(results.isEmpty)
+        XCTAssertTrue(stoppedUpdates)
+        XCTAssertTrue(stoppedTimeout)
+    }
+
     func testHelperPositionWinsWithoutReadingAccessibility() {
         var queriedAccessibility = false
         var result: PreferencesVM.CursorPosition?

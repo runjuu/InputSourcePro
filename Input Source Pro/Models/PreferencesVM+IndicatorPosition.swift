@@ -59,6 +59,41 @@ extension PreferencesVM {
     }
 
 
+    static func caretPositionWhenReadyPublisher(
+        query: @escaping () -> AnyPublisher<CursorPosition?, Never>,
+        changes: AnyPublisher<Void, Never>,
+        awaitingConfirmation: @escaping () -> Bool,
+        deadline: @escaping () -> AnyPublisher<Void, Never> = {
+            Timer.delay(seconds: 0.75).mapToVoid().eraseToAnyPublisher()
+        }
+    ) -> AnyPublisher<CursorPosition?, Never> {
+        Deferred {
+            query().flatMapLatest { position -> AnyPublisher<CursorPosition?, Never> in
+                guard position == nil, awaitingConfirmation() else {
+                    return Just(position).eraseToAnyPublisher()
+                }
+
+                // A pending helper sample is not a missing caret. Keep the default
+                // indicator unplaced until confirmation resolves, without delaying
+                // apps that already have a position or are not in an input field.
+                let confirmed = changes
+                    .prepend(())
+                    .flatMapLatest { query() }
+                    .filter { $0 != nil || !awaitingConfirmation() }
+                    .eraseToAnyPublisher()
+
+                return Publishers.Merge(
+                    confirmed,
+                    deadline().map { _ -> CursorPosition? in nil }
+                )
+                .first()
+                .eraseToAnyPublisher()
+            }
+            .first()
+        }
+        .eraseToAnyPublisher()
+    }
+
     func getIndicatorPositionPublisher(
         appSize: CGSize,
         app: NSRunningApplication,
@@ -104,7 +139,11 @@ extension PreferencesVM {
                            self.preferences.tryToDisplayIndicatorNearCursor == true,
                            self.isAbleToQueryLocation(app)
                         {
-                            return self.getPositionAroundInputCursor(app: app, traceID: traceID)
+                            return Self.caretPositionWhenReadyPublisher(
+                                query: { self.getPositionAroundInputCursor(app: app, traceID: traceID) },
+                                changes: CaretPalette.shared.changes,
+                                awaitingConfirmation: { CaretPalette.shared.isAwaitingConfirmation(for: app) }
+                            )
                                 .map { cursorPosition -> AnyPublisher<IndicatorPositionInfo?, Never> in
                                     guard let cursorPosition = cursorPosition else { return DEFAULT }
 

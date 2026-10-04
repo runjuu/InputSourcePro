@@ -310,7 +310,13 @@ final class CaretPalette {
         guard isEnabled, !suspension.isSuspended,
               NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier
         else { return false }
-        if !textFocus.permitsCaret { return true }
+        return !textFocus.permitsCaret || isAwaitingConfirmation(for: app)
+    }
+
+    func isAwaitingConfirmation(for app: NSRunningApplication) -> Bool {
+        guard isEnabled, !suspension.isSuspended, textFocus.permitsCaret,
+              NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier
+        else { return false }
         let now = ProcessInfo.processInfo.systemUptime
         return focusConfirmation?.isCurrent(for: app.processIdentifier, now: now, focusedAt: focusedAt) == true || pendingConfirmation?.isCurrent(
             for: app.processIdentifier, now: now, focusedAt: focusedAt
