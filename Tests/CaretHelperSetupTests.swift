@@ -272,4 +272,111 @@ final class CaretHelperSetupTests: XCTestCase {
         XCTAssertTrue(manager.status.installed)
         XCTAssertNotNil(manager.error)
     }
+
+    @MainActor
+    func testConcurrentRefreshesShareStatusCheckAndKeepCachedStatusVisible() async throws {
+        let requested = expectation(description: "Refresh requested status")
+        let joined = expectation(description: "Second caller joined refresh")
+        var checks = 0
+        var response: CheckedContinuation<String, Never>?
+        let cached = #"{"installed":true,"registered":true,"enabled":false,"selected":false}"#
+        let missing = #"{"installed":false,"registered":false,"enabled":false,"selected":false}"#
+        let manager = try makeManager(command: { arguments in
+            XCTAssertEqual(arguments, ["status", "--json"])
+            checks += 1
+            if checks == 2 {
+                return await withCheckedContinuation {
+                    response = $0
+                    requested.fulfill()
+                }
+            }
+            return cached
+        })
+        await manager.refresh()
+        XCTAssertTrue(manager.status.installed)
+
+        let first = Task { await manager.refresh() }
+        await fulfillment(of: [requested], timeout: 2)
+        var secondCompleted = false
+        let second = Task {
+            joined.fulfill()
+            await manager.refresh()
+            secondCompleted = true
+        }
+        await fulfillment(of: [joined], timeout: 2)
+        XCTAssertEqual(checks, 2)
+        XCTAssertFalse(secondCompleted)
+        XCTAssertTrue(manager.status.installed)
+        XCTAssertFalse(manager.isBusy)
+        response?.resume(returning: missing)
+        await first.value
+        await second.value
+        XCTAssertFalse(manager.status.installed)
+        XCTAssertTrue(secondCompleted)
+
+        await manager.refresh()
+        XCTAssertEqual(checks, 3, "A later refresh must perform a new check")
+        XCTAssertTrue(manager.status.installed)
+    }
+
+    @MainActor
+    func testSharedRefreshFailureReleasesTaskForRetry() async throws {
+        let requested = expectation(description: "Status check started")
+        let joined = expectation(description: "Second refresh started")
+        var checks = 0
+        var response: CheckedContinuation<String, Error>?
+        let manager = try makeManager(command: { _ in
+            checks += 1
+            if checks == 1 {
+                return try await withCheckedThrowingContinuation {
+                    response = $0
+                    requested.fulfill()
+                }
+            }
+            return #"{"installed":true,"registered":true,"enabled":false,"selected":false}"#
+        })
+        let first = Task { await manager.refresh() }
+        await fulfillment(of: [requested], timeout: 2)
+        let second = Task {
+            joined.fulfill()
+            await manager.refresh()
+        }
+        await fulfillment(of: [joined], timeout: 2)
+        response?.resume(throwing: CocoaError(.fileReadUnknown))
+        await first.value
+        await second.value
+        XCTAssertEqual(checks, 1)
+        XCTAssertNotNil(manager.error)
+        await manager.refresh()
+        XCTAssertEqual(checks, 2)
+        XCTAssertTrue(manager.status.installed)
+    }
+
+    @MainActor
+    func testUninstallInvalidatesInFlightRefresh() async throws {
+        let requested = expectation(description: "Refresh is waiting for status")
+        var checks = 0
+        var response: CheckedContinuation<String, Never>?
+        var starts = 0
+        let manager = try makeManager(command: { arguments in
+            if arguments.first == "status" {
+                checks += 1
+                if checks == 1 {
+                    return await withCheckedContinuation {
+                        response = $0
+                        requested.fulfill()
+                    }
+                }
+            }
+            return #"{"installed":false,"registered":false,"enabled":false,"selected":false}"#
+        }, start: { starts += 1; return true })
+        let refresh = Task { await manager.refresh() }
+        await fulfillment(of: [requested], timeout: 2)
+        await manager.uninstall()
+        response?.resume(returning: #"{"installed":true,"registered":true,"enabled":true,"selected":true}"#)
+        await refresh.value
+        XCTAssertFalse(manager.status.installed)
+        XCTAssertFalse(manager.isActive)
+        XCTAssertEqual(starts, 0)
+    }
 }

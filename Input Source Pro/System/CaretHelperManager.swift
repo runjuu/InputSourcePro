@@ -36,6 +36,7 @@ final class CaretHelperManager: ObservableObject {
     private var subscriptions = Set<AnyCancellable>()
     private var configured = false
     private var runningProcess: Process?
+    private var refreshTask: Task<Void, Never>?
     private var setupCancelled = false
     private var revision = 0
     private let command: (([String]) async throws -> String)?
@@ -96,6 +97,18 @@ final class CaretHelperManager: ObservableObject {
     }
 
     func refresh() async {
+        if let refreshTask = refreshTask {
+            await refreshTask.value
+            return
+        }
+        guard !isBusy else { return }
+        let task = Task { await self.refreshStatus() }
+        refreshTask = task
+        await task.value
+        refreshTask = nil
+    }
+
+    private func refreshStatus() async {
         guard !isBusy else { return }
         let requestedRevision = revision
         do {
@@ -186,6 +199,7 @@ final class CaretHelperManager: ObservableObject {
 
     private func resume() async {
         guard canActivate, !isBusy else { return }
+        revision += 1
         operation = .activating
         defer { operation = nil }
         do {
