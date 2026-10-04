@@ -16,12 +16,12 @@ final class CaretPalette {
     private let sourceID = "dev.inputsourcepro.inputmethod.PaletteControl"
     private var sample: Sample?
     private var pendingConfirmation: Confirmation?
-    private var focusConfirmation: Confirmation?
+    private var focus = FocusReadiness()
     private var focusID: String?
     private var focusObserver: CaretFocusObserver?
     private var focusGeneration = 0
     private var focusApplication: NSRunningApplication?
-    private var textFocus = TextFocus.unknown
+    private var textFocus: TextFocus { focus.state }
     private var session: String?
     private var focusedAt = ProcessInfo.processInfo.systemUptime
     private var observers: [NSObjectProtocol] = []
@@ -30,7 +30,7 @@ final class CaretPalette {
     private var suspension = Suspension()
 
     enum TextFocus {
-        case input, nonInput, unknown, unavailable
+        case input, nonInput, unknown, pending, unavailable
 
         init(role: Role?) {
             switch role {
@@ -54,6 +54,26 @@ final class CaretPalette {
 
         func isCurrent(for pid: pid_t, now: TimeInterval, focusedAt: TimeInterval) -> Bool {
             self.pid == pid && uptime >= focusedAt && now >= uptime && now - uptime < 0.75
+        }
+    }
+
+    struct FocusReadiness {
+        private(set) var state: TextFocus = .unknown
+        var confirmation: Confirmation?
+
+        mutating func begin(pid: pid_t?, at uptime: TimeInterval) {
+            state = .pending
+            confirmation = pid.map { Confirmation(pid: $0, uptime: uptime) }
+        }
+
+        mutating func resolve(_ state: TextFocus, pid: pid_t?, at uptime: TimeInterval) {
+            self.state = state
+            confirmation = state.permitsCaret ? pid.map { Confirmation(pid: $0, uptime: uptime) } : nil
+        }
+
+        func isAwaitingConfirmation(for pid: pid_t, now: TimeInterval, focusedAt: TimeInterval) -> Bool {
+            (state == .pending || state.permitsCaret)
+                && confirmation?.isCurrent(for: pid, now: now, focusedAt: focusedAt) == true
         }
     }
 
@@ -160,18 +180,17 @@ final class CaretPalette {
 
     private func watchTextFocus() {
         focusGeneration += 1
-        textFocus = .unavailable
         sample = nil
         pendingConfirmation = nil
-        focusConfirmation = nil
         focusID = nil
         focusedAt = ProcessInfo.processInfo.systemUptime
         focusApplication = NSWorkspace.shared.frontmostApplication
+        focus.begin(pid: focusApplication?.processIdentifier, at: focusedAt)
         guard isEnabled, !suspension.isSuspended,
               focusApplication?.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
             focusApplication = nil
             focusObserver?.watch(pid: nil, generation: focusGeneration)
-            textFocus = .nonInput
+            focus.resolve(.nonInput, pid: nil, at: focusedAt)
             updates.send(())
             return
         }
@@ -189,13 +208,12 @@ final class CaretPalette {
               update.isCurrent(generation: focusGeneration, pid: focusApplication?.processIdentifier, since: focusedAt),
               NSWorkspace.shared.frontmostApplication?.processIdentifier == update.pid
         else { return }
-        textFocus = update.state
+        focus.resolve(update.state, pid: update.pid, at: update.uptime)
         focusedAt = update.uptime
         IndicatorDiagnostics.record("helper.focus pid=\(update.pid) kind=\(textFocus) focusedAt=\(focusedAt)")
         sample = nil
         pendingConfirmation = nil
         // Wait for geometry belonging to this field, not an AX fallback or the old field.
-        focusConfirmation = textFocus == .input ? Confirmation(pid: update.pid, uptime: focusedAt) : nil
         focusID = textFocus == .input ? UUID().uuidString : nil
         updates.send(())
         sendActivity()
@@ -205,7 +223,7 @@ final class CaretPalette {
         suspension.set(reason, suspended: suspended)
         sample = nil
         pendingConfirmation = nil
-        focusConfirmation = nil
+        focus.confirmation = nil
         focusID = nil
         session = nil
         focusedAt = ProcessInfo.processInfo.systemUptime
@@ -230,12 +248,11 @@ final class CaretPalette {
         timer = nil
         sample = nil
         pendingConfirmation = nil
-        focusConfirmation = nil
         focusID = nil
         focusGeneration += 1
         focusObserver = nil
         focusApplication = nil
-        textFocus = .unknown
+        focus = FocusReadiness()
         session = nil
         suspension = Suspension()
         if let source = source() { TISDeselectInputSource(source) }
@@ -271,7 +288,7 @@ final class CaretPalette {
                 sample = nil
                 pendingConfirmation = nil
                 if textFocus == .input, let app = focusApplication {
-                    focusConfirmation = Confirmation(pid: app.processIdentifier, uptime: uptime)
+                    focus.confirmation = Confirmation(pid: app.processIdentifier, uptime: uptime)
                 }
             }
         } else if textFocus.permitsCaret, let app = NSWorkspace.shared.frontmostApplication,
@@ -286,7 +303,7 @@ final class CaretPalette {
                 sample = Sample(rect: NSRectFromString(rectString), pid: app.processIdentifier, uptime: uptime)
                 if sample?.point(for: app.processIdentifier, now: uptime, focusedAt: focusedAt,
                                  screens: NSScreen.screens.map(\.frame)) != nil {
-                    focusConfirmation = nil
+                    focus.confirmation = nil
                 }
             }
         } else {
@@ -297,6 +314,7 @@ final class CaretPalette {
 
     func point(for app: NSRunningApplication) -> CGPoint? {
         guard isEnabled, !suspension.isSuspended, textFocus.permitsCaret,
+              focusApplication?.processIdentifier == app.processIdentifier,
               NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier
         else {
             IndicatorDiagnostics.record("helper.unavailable pid=\(app.processIdentifier) enabled=\(isEnabled) suspended=\(suspension.isSuspended) focus=\(textFocus) frontPID=\(NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0)")
@@ -316,15 +334,20 @@ final class CaretPalette {
         guard isEnabled, !suspension.isSuspended,
               NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier
         else { return false }
-        return !textFocus.permitsCaret || isAwaitingConfirmation(for: app)
+        return focusApplication?.processIdentifier != app.processIdentifier
+            || !textFocus.permitsCaret || isAwaitingConfirmation(for: app)
     }
 
     func isAwaitingConfirmation(for app: NSRunningApplication) -> Bool {
-        guard isEnabled, !suspension.isSuspended, textFocus.permitsCaret,
+        guard isEnabled, !suspension.isSuspended,
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
               NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier
         else { return false }
+        // The indicator's activation subscriber can run before our workspace observer.
+        if focusApplication?.processIdentifier != app.processIdentifier { return true }
         let now = ProcessInfo.processInfo.systemUptime
-        return focusConfirmation?.isCurrent(for: app.processIdentifier, now: now, focusedAt: focusedAt) == true || pendingConfirmation?.isCurrent(
+        if focus.isAwaitingConfirmation(for: app.processIdentifier, now: now, focusedAt: focusedAt) { return true }
+        return textFocus.permitsCaret && pendingConfirmation?.isCurrent(
             for: app.processIdentifier, now: now, focusedAt: focusedAt
         ) == true
     }

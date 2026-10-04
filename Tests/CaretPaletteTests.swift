@@ -487,6 +487,90 @@ final class CaretPaletteTests: XCTestCase {
         subscription.cancel()
     }
 
+    func testAppSwitchWaitsForBackgroundFocusQueryBeforeChoosingIndicatorPosition() {
+        let updates = PassthroughSubject<Void, Never>()
+        let deadline = PassthroughSubject<Void, Never>()
+        var focus = CaretPalette.FocusReadiness()
+        var now = 10.0
+        var point: CGPoint?
+        var placements: [PreferencesVM.IndicatorPositionInfo] = []
+        focus.begin(pid: 42, at: now)
+        let awaiting = { focus.isAwaitingConfirmation(for: 42, now: now, focusedAt: 10) }
+        let subscription = PreferencesVM.caretPositionWhenReadyPublisher(
+            query: {
+                PreferencesVM.preferredCaretPositionPublisher(
+                    palette: { point },
+                    accessibility: {
+                        XCTFail("A pending focus query must not start another accessibility query")
+                        return Just(nil).eraseToAnyPublisher()
+                    },
+                    awaitingConfirmation: { !focus.state.permitsCaret || awaiting() }
+                )
+            },
+            changes: updates.eraseToAnyPublisher(),
+            awaitingConfirmation: awaiting,
+            deadline: { deadline.eraseToAnyPublisher() }
+        ).sink { position in
+            placements.append(position.map { (.inputCursor, $0.point) }
+                              ?? (.windowCorner, CGPoint(x: 900, y: 50)))
+        }
+
+        XCTAssertTrue(placements.isEmpty, "Still querying focus must not mean no cursor")
+        now = 10.016
+        focus.resolve(.input, pid: 42, at: now)
+        updates.send(())
+        XCTAssertTrue(placements.isEmpty, "An input field still needs its first cursor sample")
+        now = 10.04
+        point = CGPoint(x: 585, y: 114)
+        updates.send(())
+        XCTAssertEqual(placements.count, 1)
+        XCTAssertEqual(placements.first?.kind, .inputCursor)
+        XCTAssertEqual(placements.first?.point, point)
+        deadline.send(())
+        XCTAssertEqual(placements.count, 1)
+        subscription.cancel()
+    }
+
+    func testPendingFocusWaitEndsWhenQueryFindsNoInputOrFails() {
+        for state: CaretPalette.TextFocus in [.nonInput, .unavailable] {
+            let updates = PassthroughSubject<Void, Never>()
+            var focus = CaretPalette.FocusReadiness()
+            var results: [PreferencesVM.CursorPosition?] = []
+            focus.begin(pid: 42, at: 10)
+            let subscription = PreferencesVM.caretPositionWhenReadyPublisher(
+                query: { Just(nil).eraseToAnyPublisher() },
+                changes: updates.eraseToAnyPublisher(),
+                awaitingConfirmation: { focus.isAwaitingConfirmation(for: 42, now: 10.1, focusedAt: 10) },
+                deadline: { Empty(completeImmediately: false).eraseToAnyPublisher() }
+            ).sink { results.append($0) }
+            XCTAssertTrue(results.isEmpty)
+            focus.resolve(state, pid: 42, at: 10.1)
+            updates.send(())
+            XCTAssertEqual(results.count, 1)
+            XCTAssertNil(results.first ?? nil)
+            subscription.cancel()
+        }
+    }
+
+    func testPendingFocusQueryExpiresAndRejectsOtherAppsOrFields() {
+        var focus = CaretPalette.FocusReadiness()
+        focus.begin(pid: 42, at: 10)
+        XCTAssertTrue(focus.isAwaitingConfirmation(for: 42, now: 10.74, focusedAt: 10))
+        XCTAssertFalse(focus.isAwaitingConfirmation(for: 42, now: 10.75, focusedAt: 10))
+        XCTAssertFalse(focus.isAwaitingConfirmation(for: 43, now: 10.1, focusedAt: 10))
+        XCTAssertFalse(focus.isAwaitingConfirmation(for: 42, now: 10.2, focusedAt: 10.1))
+    }
+
+    func testCustomEditorWaitsForFirstHelperSampleAfterFocusQuery() {
+        var focus = CaretPalette.FocusReadiness()
+        focus.begin(pid: 42, at: 10)
+        focus.resolve(.unknown, pid: 42, at: 10.02)
+        XCTAssertTrue(focus.state.permitsCaret)
+        XCTAssertTrue(focus.isAwaitingConfirmation(for: 42, now: 10.03, focusedAt: 10.02))
+        focus.confirmation = nil
+        XCTAssertFalse(focus.isAwaitingConfirmation(for: 42, now: 10.04, focusedAt: 10.02))
+    }
+
     func testDefaultIndicatorFallsBackOnceIfHelperNeverConfirms() {
         let updates = PassthroughSubject<Void, Never>()
         let timeout = PassthroughSubject<Void, Never>()
