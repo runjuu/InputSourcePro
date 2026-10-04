@@ -52,9 +52,28 @@ can be rerun to resume the draft. Completed releases are never overwritten.
 If a newer stable release overtakes an older build, the older draft is left
 unpublished and the run fails.
 
-Stable notes contain non-merge commit subjects since the preceding published
-stable tag, initially `2.12.0`. Beta tags do not reset that range. Commit text is
-escaped for both HTML and Markdown. Beta notes link to the repository.
+Stable releases use `docs/release-notes/<version>.md` when that file exists in
+the release commit. Both `2.13.0` and `v2.13.0` tags use `2.13.0.md`. The Markdown
+becomes the GitHub release body, and GitHub's Markdown API renders the same text
+as HTML for Sparkle. The existing workflow token and `gh` CLI handle rendering;
+no additional dependency is needed. Empty files and rendering failures stop the
+release rather than replacing custom notes with a commit list.
+
+To prepare custom notes:
+
+1. Review changes since the preceding published stable release and send a draft
+   changelog in chat. Include user-facing changes, verified contributor credits,
+   and relevant pull request links, following the 2.12.0 release style.
+2. Let the user review and approve the wording before saving the release notes,
+   updating the website changelog, or publishing the release.
+3. Save the approved Markdown in `docs/release-notes/<version>.md` and commit it
+   with the release changes before tagging. Uncommitted edits are not used.
+
+If the version's file is absent, stable notes contain non-merge commit subjects
+since the preceding published stable tag, initially `2.12.0`. Beta tags do not
+reset that range. Commit text is escaped for both HTML and Markdown. Beta notes
+always link to the repository, even when custom stable notes exist. Completed
+releases keep their original notes on reruns.
 
 The website selects the highest eligible build, not the most recently completed
 workflow. Beta accepts newer stable builds and prefers stable on a tie. Drafts

@@ -31,3 +31,8 @@
 - Commit messages follow conventional commits with optional scopes, e.g., `feat(UI): add indicator toggle` or `fix: handle nil input source`.
 - Branch names are descriptive and prefixed (e.g., `feature/add-xyz-support`, `fix/indicator-crash`).
 - PRs should include: purpose, linked issues (e.g., `Closes #123`), summary of changes, and testing notes. Add screenshots or screen recordings for UI changes.
+
+## Release Changelog Review
+- Before creating or updating release notes or publishing a release, send a draft changelog message in chat for the user to review. Wait for approval of the wording before saving it to release-note files, updating the website changelog, or publishing. Approval already given in the conversation counts; incorporate requested revisions and show the revised draft when approval is still pending.
+- Draft from changes since the preceding published stable release. Describe user-facing changes, verify contributor GitHub usernames, and credit each change with relevant pull request links, following the 2.12.0 release style.
+- After approval, save the changelog as `docs/release-notes/<version>.md` (for example, `2.13.0.md`, without a `v` prefix) and include it in the commit to be tagged. The release script uses it for GitHub and Sparkle notes. See `docs/releases.md` for the release workflow.

@@ -53,10 +53,22 @@ def release_build(release):
     return builds[0] if len(builds) == 1 else None
 
 
-def notes(channel, baseline, commit):
+def render_markdown(markdown):
+    return subprocess.check_output(
+        ['gh', 'api', '--method', 'POST', 'markdown', '--input', '-'],
+        input=json.dumps(dict(text=markdown, mode='gfm', context=REPOSITORY)), text=True)
+
+
+def notes(channel, baseline, commit, version):
     if channel == 'beta':
         return (f'Follow development on [GitHub]({REPO_URL}).\n',
                 f'<p>Follow development on <a href="{REPO_URL}">GitHub</a>.</p>')
+    path = f'docs/release-notes/{version}.md'
+    if git('ls-tree', '--name-only', commit, '--', path):
+        markdown = subprocess.check_output(['git', 'show', f'{commit}:{path}'], text=True)
+        if not markdown.strip():
+            raise ValueError(f'Release notes must not be empty: {path}')
+        return markdown, render_markdown(markdown)
     entries = git('log', '--reverse', '--no-merges', '--format=%H %s', f'{baseline}..{commit}').splitlines()
     markdown, items = [], []
     for entry in entries:
@@ -112,7 +124,7 @@ def prepare(args):
     Path('dist').mkdir(exist_ok=True)
     Path('dist/release.json').write_text(json.dumps(metadata, indent=2) + '\n')
     if not complete:
-        markdown, description = notes(channel, baseline, commit)
+        markdown, description = notes(channel, baseline, commit, version)
         Path('dist/notes.md').write_text(markdown)
         Path('dist/notes.html').write_text(description)
     with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
