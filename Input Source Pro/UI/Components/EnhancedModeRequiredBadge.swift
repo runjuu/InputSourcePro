@@ -2,14 +2,32 @@ import SwiftUI
 
 struct EnhancedModeRequiredBadge: View {
     @EnvironmentObject var preferencesVM: PreferencesVM
+    @EnvironmentObject var permissionsVM: PermissionsVM
+
+    @State private var isShowAccessibilityRequest = false
 
     var body: some View {
-        Button(action: {}) {
+        Button(action: enableEnhancedMode) {
             Text("Enhanced Mode Required".i18n())
         }
         .buttonStyle(EnhanceModeRequiredButtonStyle())
+        .disabled(preferencesVM.preferences.isEnhancedModeEnabled)
+        .accessibilityHidden(preferencesVM.preferences.isEnhancedModeEnabled)
         .opacity(preferencesVM.preferences.isEnhancedModeEnabled ? 0 : 1)
         .animation(.easeInOut, value: preferencesVM.preferences.isEnhancedModeEnabled)
+        .sheet(isPresented: $isShowAccessibilityRequest) {
+            AccessibilityPermissionRequestView(isPresented: $isShowAccessibilityRequest)
+        }
+    }
+
+    private func enableEnhancedMode() {
+        if permissionsVM.isAccessibilityEnabled {
+            preferencesVM.update {
+                $0.isEnhancedModeEnabled = true
+            }
+        } else {
+            isShowAccessibilityRequest = true
+        }
     }
 }
 
