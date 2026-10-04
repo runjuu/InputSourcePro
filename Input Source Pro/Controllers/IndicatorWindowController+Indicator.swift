@@ -45,6 +45,5 @@ extension IndicatorWindowController {
         IndicatorDiagnostics.record("indicator.move kind=\(position.kind) point=\(position.point) before=\(String(describing: window?.frame)) fitting=\(String(describing: getAppSize()))")
         indicatorVC.refresh(at: position.point, displayMode: displayMode)
         IndicatorDiagnostics.record("indicator.moved frame=\(String(describing: window?.frame))")
-        alwaysOnIndicator.defaultIndicatorFrame = isActive ? window?.frame : nil
     }
 }

@@ -25,15 +25,15 @@ class IndicatorWindowController: FloatWindowController {
             visibility.setActive(newValue)
             IndicatorDiagnostics.record("indicator.active old=\(oldValue) requested=\(newValue) new=\(isActive) suppressed=\(visibility.isSuppressed) frame=\(String(describing: window?.frame))")
             if isActive {
+                alwaysOnIndicator.isDefaultIndicatorVisible = true
                 indicatorVC.view.animator().alphaValue = 1
                 window?.displayIfNeeded()
                 active()
             } else {
                 indicatorVC.view.animator().alphaValue = 0
                 deactive()
+                alwaysOnIndicator.isDefaultIndicatorVisible = false
             }
-
-            alwaysOnIndicator.defaultIndicatorFrame = isActive ? window?.frame : nil
         }
     }
 

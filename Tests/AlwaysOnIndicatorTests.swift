@@ -78,43 +78,49 @@ final class AlwaysOnIndicatorTests: XCTestCase {
 
         controller.position = CGPoint(x: 100, y: 200)
         XCTAssertTrue(window.isVisible)
-        XCTAssertEqual(window.frame.origin, CGPoint(x: 100, y: 200))
+        XCTAssertEqual(window.frame.midX, 100)
+        XCTAssertEqual(window.frame.minY, 200)
         XCTAssertEqual(window.frame.size, CGSize(width: 8, height: 8))
 
         controller.position = nil
         XCTAssertFalse(window.isVisible)
     }
 
-    func testDefaultIndicatorAtAnotherPositionDoesNotHideTheDot() throws {
+    func testVisibleDefaultIndicatorHidesTheDotUntilDismissed() throws {
         let controller = AlwaysOnIndicatorWindowController()
         defer { controller.close() }
         controller.update(config: config(color: .red))
         controller.position = CGPoint(x: 100, y: 200)
-        controller.defaultIndicatorFrame = CGRect(x: 400, y: 400, width: 100, height: 30)
+        controller.isDefaultIndicatorVisible = true
 
         let window = try XCTUnwrap(controller.window)
+        XCTAssertFalse(window.isVisible)
+
+        controller.isDefaultIndicatorVisible = false
         XCTAssertTrue(window.isVisible)
-        XCTAssertEqual(window.frame.origin, CGPoint(x: 100, y: 200))
+        XCTAssertEqual(window.frame.midX, 100)
+        XCTAssertEqual(window.frame.minY, 200)
     }
 
-    func testOverlappingDefaultIndicatorTemporarilyHidesDot() throws {
+    func testCaretAndContentUpdatesDoNotRestoreDotWhileDefaultIndicatorIsVisible() throws {
         let controller = AlwaysOnIndicatorWindowController()
         defer { controller.close() }
         controller.update(config: config(color: .red))
         controller.position = CGPoint(x: 100, y: 200)
         let window = try XCTUnwrap(controller.window)
 
-        controller.defaultIndicatorFrame = CGRect(x: 100, y: 200, width: 100, height: 30)
+        controller.isDefaultIndicatorVisible = true
         XCTAssertFalse(window.isVisible)
 
-        controller.defaultIndicatorFrame = nil
+        controller.update(config: config(color: .blue))
+        controller.position = CGPoint(x: 200, y: 300)
+        XCTAssertFalse(window.isVisible)
+
+        controller.isDefaultIndicatorVisible = false
         XCTAssertTrue(window.isVisible)
         XCTAssertEqual(window.frame.size, CGSize(width: 8, height: 8))
-
-        controller.defaultIndicatorFrame = window.frame
-        XCTAssertFalse(window.isVisible)
-        controller.position = CGPoint(x: 200, y: 300)
-        XCTAssertTrue(window.isVisible)
+        XCTAssertEqual(window.frame.midX, 200)
+        XCTAssertEqual(window.frame.minY, 300)
     }
 
     func testContentUpdatesKeepTheDotAtTheCaretWithoutShowingDefaultContent() throws {
@@ -128,7 +134,8 @@ final class AlwaysOnIndicatorTests: XCTestCase {
         controller.update(config: config(color: .blue))
         XCTAssertFalse(window.contentView === oldView)
         XCTAssertTrue(window.isVisible)
-        XCTAssertEqual(window.frame.origin, CGPoint(x: 100, y: 200))
+        XCTAssertEqual(window.frame.midX, 100)
+        XCTAssertEqual(window.frame.minY, 200)
         XCTAssertEqual(window.frame.size, CGSize(width: 8, height: 8))
     }
 

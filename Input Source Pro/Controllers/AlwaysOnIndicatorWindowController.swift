@@ -9,7 +9,7 @@ final class AlwaysOnIndicatorWindowController: FloatWindowController {
         didSet { updateVisibility() }
     }
 
-    var defaultIndicatorFrame: CGRect? {
+    var isDefaultIndicatorVisible = false {
         didSet { updateVisibility() }
     }
 
@@ -49,7 +49,7 @@ final class AlwaysOnIndicatorWindowController: FloatWindowController {
     }
 
     private func updateVisibility() {
-        IndicatorDiagnostics.record("alwaysOn.visibility point=\(String(describing: position)) defaultFrame=\(String(describing: defaultIndicatorFrame)) frame=\(String(describing: window?.frame))")
+        IndicatorDiagnostics.record("alwaysOn.visibility point=\(String(describing: position)) defaultVisible=\(isDefaultIndicatorVisible) frame=\(String(describing: window?.frame))")
         guard let position = position,
               let window = window,
               window.contentView != nil
@@ -58,12 +58,10 @@ final class AlwaysOnIndicatorWindowController: FloatWindowController {
             return
         }
 
-        moveTo(point: position)
+        moveTo(point: CGPoint(x: position.x - window.frame.width / 2, y: position.y))
 
-        if let defaultIndicatorFrame = defaultIndicatorFrame,
-           defaultIndicatorFrame.intersects(window.frame)
-        {
-            IndicatorDiagnostics.record("alwaysOn.hidden reason=overlap")
+        if isDefaultIndicatorVisible {
+            IndicatorDiagnostics.record("alwaysOn.hidden reason=default-visible")
             deactive()
         } else if !window.isVisible {
             active()

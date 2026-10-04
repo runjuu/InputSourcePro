@@ -113,7 +113,8 @@ final class IndicatorWindowLayoutTests: XCTestCase {
             controller.update(config: config)
             window.contentView?.layoutSubtreeIfNeeded()
             window.displayIfNeeded()
-            XCTAssertEqual(window.frame.origin, CGPoint(x: 585, y: 114))
+            XCTAssertEqual(window.frame.midX, 585)
+            XCTAssertEqual(window.frame.minY, 114)
             XCTAssertEqual(window.frame.width, capsLock ? 22 : 8, accuracy: 1)
         }
     }
@@ -140,18 +141,22 @@ final class IndicatorWindowLayoutTests: XCTestCase {
         }
         controller.refresh(at: CGPoint(x: 200, y: 300), displayMode: .alwaysOn)
         XCTAssertGreaterThan(displays, 0)
+        XCTAssertEqual(window.frame.minX + (controller.alwaysOnView?.fittingSize.width ?? 0) / 2, 200)
+        XCTAssertEqual(window.frame.minY, 300)
 
         // A content refresh while pinned must not reintroduce the full label.
         config.showsCapsLock = true
         controller.prepare(config: config)
         controller.refresh(at: CGPoint(x: 220, y: 300), displayMode: .alwaysOn)
         XCTAssertEqual(controller.normalView?.alphaValue, 0)
+        XCTAssertEqual(window.frame.minX + (controller.alwaysOnView?.fittingSize.width ?? 0) / 2, 220)
 
         window.onDisplay = {
             XCTAssertEqual(controller.normalView?.alphaValue, 1)
             XCTAssertEqual(controller.alwaysOnView?.alphaValue, 0)
         }
         controller.refresh(at: CGPoint(x: 600, y: 200), displayMode: .normal)
+        XCTAssertEqual(window.frame.origin, CGPoint(x: 600, y: 200))
     }
 
     func testPinnedAppearanceSurvivesContentRefreshAndBadgeExpiry() {

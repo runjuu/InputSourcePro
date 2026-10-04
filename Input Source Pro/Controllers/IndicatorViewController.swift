@@ -100,8 +100,12 @@ class IndicatorViewController: NSViewController {
             self.displayMode = displayMode
             refresh()
             view.layoutSubtreeIfNeeded()
+            var origin = point
+            if displayMode == .alwaysOn, config?.badge == nil, let alwaysOnView = alwaysOnView {
+                origin.x -= alwaysOnView.fittingSize.width / 2
+            }
             window.setFrame(
-                CGRect(origin: point, size: CGSize(width: ceil(size.width), height: ceil(size.height))),
+                CGRect(origin: origin, size: CGSize(width: ceil(size.width), height: ceil(size.height))),
                 display: true
             )
         }
