@@ -899,6 +899,81 @@ final class CaretPaletteTests: XCTestCase {
         }
     }
 
+    func testJavaCursorUsesCurrentCharacterInsteadOfZeroLengthUnion() {
+        let point = JavaCursorGeometry.insertionPoint(at: 2735, characterCount: 2753) { range in
+            XCTAssertEqual(range.location, 2735)
+            XCTAssertEqual(range.length, 1)
+            return CGRect(x: 651, y: 461, width: 8, height: 18)
+        }
+        XCTAssertEqual(point, CGRect(x: 651, y: 461, width: 0, height: 18))
+    }
+
+    func testJavaCursorAtLineStartDoesNotIncludePreviousLine() {
+        let point = JavaCursorGeometry.insertionPoint(at: 2706, characterCount: 2753) { range in
+            XCTAssertEqual(range.location, 2706)
+            XCTAssertEqual(range.length, 1)
+            return CGRect(x: 605, y: 483, width: 8, height: 18)
+        }
+        XCTAssertEqual(point, CGRect(x: 605, y: 483, width: 0, height: 18))
+    }
+
+    func testJavaCursorRecoversNewlineAndBlankLineFromEndpointUnions() {
+        // Captured PyCharm geometry: text, newline, blank line, then another line.
+        let characters = [
+            CGRect(x: 1221, y: 527, width: 8, height: 18),
+            CGRect(x: 1229, y: 527, width: 0, height: 18),
+            CGRect(x: 605, y: 505, width: 0, height: 18),
+            CGRect(x: 605, y: 483, width: 8, height: 18),
+            CGRect(x: 613, y: 483, width: 8, height: 18),
+        ]
+        for location in [1, 2] {
+            let point = JavaCursorGeometry.insertionPoint(at: location, characterCount: characters.count) { range in
+                XCTAssertGreaterThan(range.length, 0)
+                let first = characters[range.location]
+                let last = characters[range.location + range.length - 1]
+                let union = CGRect(x: min(first.minX, last.minX), y: min(first.minY, last.minY),
+                                   width: max(first.maxX, last.maxX) - min(first.minX, last.minX),
+                                   height: max(first.maxY, last.maxY) - min(first.minY, last.minY))
+                // Java discards empty rectangles, even though a newline has a position.
+                return union.isEmpty ? .zero : union
+            }
+            XCTAssertEqual(point, characters[location])
+        }
+    }
+
+    func testJavaCursorAtDocumentEndUsesLastCharacterTrailingEdge() {
+        let point = JavaCursorGeometry.insertionPoint(at: 2753, characterCount: 2753) { range in
+            XCTAssertEqual(range.location, 2752)
+            XCTAssertEqual(range.length, 1)
+            return CGRect(x: 784, y: 461, width: 8, height: 18)
+        }
+        XCTAssertEqual(point, CGRect(x: 792, y: 461, width: 0, height: 18))
+    }
+
+    func testJavaCursorDoesNotCenterOnWideCharacterOrTab() {
+        let point = JavaCursorGeometry.insertionPoint(at: 1, characterCount: 4) { _ in
+            CGRect(x: -500, y: 100, width: 48, height: 18)
+        }
+        XCTAssertEqual(point, CGRect(x: -500, y: 100, width: 0, height: 18))
+    }
+
+    func testJavaCursorRejectsMissingGeometryAndInvalidOffsets() {
+        for (location, count) in [(-1, 5), (6, 5), (0, 0)] {
+            XCTAssertNil(JavaCursorGeometry.insertionPoint(at: location, characterCount: count) { _ in
+                XCTFail("Invalid offsets must not query accessibility")
+                return nil
+            })
+        }
+        var queries = 0
+        XCTAssertNil(JavaCursorGeometry.insertionPoint(at: 50, characterCount: 100) { range in
+            queries += 1
+            XCTAssertGreaterThan(range.length, 0)
+            return .zero
+        })
+        XCTAssertLessThanOrEqual(queries, 13)
+        XCTAssertNil(JavaCursorGeometry.insertionPoint(at: 100, characterCount: 100) { _ in nil })
+    }
+
     func testCharacterLineAndContainerWidthsKeepTheirLeadingEdge() {
         for width: CGFloat in [2, 12, 500] {
             let bounds = CGRect(x: -500, y: 100, width: width, height: 24)

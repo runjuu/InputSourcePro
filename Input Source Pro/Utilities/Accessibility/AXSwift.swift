@@ -52,6 +52,60 @@ struct CursorRectInfo {
     }
 }
 
+enum JavaCursorGeometry {
+    // See JetBrainsRuntime's CAccessibleText.getBoundsForRange.
+    // JetBrains Runtime unions the first and last characters of AXBoundsForRange.
+    // A zero-length range therefore includes the previous character, possibly on
+    // another line. Use nonempty ranges instead. Coordinates here are AppKit based.
+    static func insertionPoint(at location: Int, characterCount: Int, bounds: (CFRange) -> CGRect?) -> CGRect? {
+        guard location >= 0, location <= characterCount, characterCount > 0 else { return nil }
+
+        func validBounds(_ range: CFRange) -> CGRect? {
+            guard let rect = bounds(range),
+                  [rect.origin.x, rect.origin.y, rect.width, rect.height].allSatisfy(\.isFinite),
+                  rect.width > 0, rect.height > 0
+            else { return nil }
+            return rect
+        }
+
+        if location < characterCount,
+           let character = validBounds(CFRange(location: location, length: 1))
+        {
+            return CGRect(x: character.minX, y: character.minY, width: 0, height: character.height)
+        }
+
+        if location == characterCount {
+            guard let previous = validBounds(CFRange(location: location - 1, length: 1)) else { return nil }
+            return CGRect(x: previous.maxX, y: previous.minY, width: 0, height: previous.height)
+        }
+
+        // Newline characters have zero width, which Java reports as an empty rect.
+        // Union one with a nearby visible character to recover its endpoint. Only
+        // accept an x coordinate that extends beyond the reference character.
+        for distance in [1, 2, 4, 8, 16, 32] {
+            for referenceIndex in [location - distance, location + distance] {
+                guard referenceIndex >= 0, referenceIndex < characterCount,
+                      let reference = validBounds(CFRange(location: referenceIndex, length: 1)),
+                      let union = validBounds(CFRange(location: min(location, referenceIndex), length: distance + 1)),
+                      union.contains(reference)
+                else { continue }
+
+                let x: CGFloat
+                if union.minX < reference.minX {
+                    x = union.minX
+                } else if union.maxX > reference.maxX {
+                    x = union.maxX
+                } else {
+                    continue
+                }
+                let y = union.minY < reference.minY ? union.minY : union.maxY - reference.height
+                return CGRect(x: x, y: y, width: 0, height: reference.height)
+            }
+        }
+        return nil
+    }
+}
+
 extension UIElement {
     func getCursorRectInfo(traceID: String = UUID().uuidString) -> CursorRectInfo? {
         let focusedElement: UIElement
@@ -79,11 +133,16 @@ extension UIElement {
             return nil
         }
 
-        let cursorRect = Self.findCursorRect(focusedElement, traceID: traceID)
+        let usesJavaTextRanges = focusedElement.usesJavaTextRanges
+        let cursorRect = Self.findCursorRect(focusedElement, usesJavaTextRanges: usesJavaTextRanges, traceID: traceID)
         if let cursorRect = cursorRect, inputAreaRect.contains(cursorRect.rect) {
             IndicatorDiagnostics.record("AX.accepted id=\(traceID) cursor=\(cursorRect.rect) kind=\(cursorRect.kind) area=\(inputAreaRect)")
             return cursorRect
         } else {
+            if usesJavaTextRanges {
+                IndicatorDiagnostics.record("AX.rejected id=\(traceID) reason=java-caret-missing-or-outside-area")
+                return nil
+            }
             IndicatorDiagnostics.record("AX.containerFallback id=\(traceID) cursor=\(String(describing: cursorRect)) area=\(inputAreaRect) reason=missing-or-outside-area")
             return CursorRectInfo(rect: inputAreaRect, kind: .container)
         }
@@ -120,12 +179,20 @@ extension UIElement {
 }
 
 extension UIElement {
-    static func findCursorRect(_ focusedElement: UIElement, traceID: String = UUID().uuidString) -> CursorRectInfo? {
+    private var usesJavaTextRanges: Bool {
+        var pid: pid_t = 0
+        guard AXUIElementGetPid(element, &pid) == .success,
+              let bundleID = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier
+        else { return false }
+        return bundleID.hasPrefix("com.jetbrains.")
+    }
+
+    static func findCursorRect(_ focusedElement: UIElement, usesJavaTextRanges: Bool = false, traceID: String = UUID().uuidString) -> CursorRectInfo? {
         if let rect = findWebAreaCursor(focusedElement) {
             IndicatorDiagnostics.record("AX.cursor id=\(traceID) method=text-marker rect=\(rect.rect) kind=\(rect.kind)")
             return rect
         }
-        let rect = findNativeInputAreaCursor(focusedElement, traceID: traceID)
+        let rect = findNativeInputAreaCursor(focusedElement, usesJavaTextRanges: usesJavaTextRanges, traceID: traceID)
         IndicatorDiagnostics.record("AX.cursor id=\(traceID) method=native rect=\(String(describing: rect))")
         return rect
     }
@@ -141,9 +208,22 @@ extension UIElement {
         }
     }
 
-    static func findNativeInputAreaCursor(_ focusedElement: UIElement, traceID: String = UUID().uuidString) -> CursorRectInfo? {
+    static func findNativeInputAreaCursor(_ focusedElement: UIElement, usesJavaTextRanges: Bool = false, traceID: String = UUID().uuidString) -> CursorRectInfo? {
         guard let selectedRange: CFRange = try? focusedElement.attribute(.selectedTextRange)
         else { return nil }
+
+        if usesJavaTextRanges {
+            guard let characterCount: Int = try? focusedElement.attribute(.numberOfCharacters),
+                  let rect = JavaCursorGeometry.insertionPoint(at: selectedRange.location, characterCount: characterCount, bounds: { range in
+                      let bounds: CGRect? = try? focusedElement.parameterizedAttribute(
+                          kAXBoundsForRangeParameterizedAttribute, param: AXValue.range(range)
+                      )
+                      return bounds.flatMap(NSScreen.convertFromQuartz)
+                  })
+            else { return nil }
+            IndicatorDiagnostics.record("AX.javaInsertionPoint id=\(traceID) rect=\(rect)")
+            return CursorRectInfo.insertionPoint(rect: rect, zeroWidthCaretWidth: CursorRectInfo.fallbackCaretWidth(for: rect))
+        }
 
         // A zero-length range asks for the insertion point, including at the end of
         // text. Empty native fields can provide this even when AXValue is unavailable.
