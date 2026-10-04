@@ -899,6 +899,37 @@ final class CaretPaletteTests: XCTestCase {
         }
     }
 
+    func testActivityMonitorSearchCaretUsesCharacterBaselineAndKeepsInsertionX() {
+        let field = CGRect(x: 985, y: 859, width: 242, height: 38)
+        let lastCharacter = CGRect(x: 1044.0126953125, y: 870, width: 4.646484375, height: 16)
+        for x: CGFloat in [1018, 1021.1357421875, 1048.6591796875] {
+            let caret = CursorRectInfo(rect: CGRect(x: x, y: 886, width: 1, height: 16), kind: .caret)
+            XCTAssertFalse(field.contains(caret.rect))
+            let aligned = caret.alignedToSearchField(field, characterBounds: lastCharacter, isEmpty: false)
+            XCTAssertTrue(field.contains(aligned.rect))
+            XCTAssertEqual(aligned.indicatorPoint, CGPoint(x: x + 0.5, y: 892))
+        }
+    }
+
+    func testEmptySearchCaretUsesFieldVerticalCenterWithoutChangingTextInset() {
+        let field = CGRect(x: 985, y: 859, width: 242, height: 38)
+        let caret = CursorRectInfo(rect: CGRect(x: 1018, y: 886, width: 1, height: 16), kind: .caret)
+        let aligned = caret.alignedToSearchField(field, characterBounds: nil, isEmpty: true)
+        XCTAssertEqual(aligned.rect, CGRect(x: 1018, y: 870, width: 1, height: 16))
+        XCTAssertTrue(field.contains(aligned.rect))
+        XCTAssertEqual(aligned.alignedToSearchField(field, characterBounds: nil, isEmpty: true).rect, aligned.rect)
+    }
+
+    func testSearchCaretDoesNotTrustMissingOrOutsideCharacterGeometry() {
+        let field = CGRect(x: 985, y: 859, width: 242, height: 38)
+        let caret = CursorRectInfo(rect: CGRect(x: 1018, y: 886, width: 1, height: 16), kind: .caret)
+        for character: CGRect? in [nil, .zero, CGRect(x: 1000, y: 950, width: 8, height: 16)] {
+            XCTAssertEqual(caret.alignedToSearchField(field, characterBounds: character, isEmpty: false).rect, caret.rect)
+        }
+        let outside = CursorRectInfo(rect: CGRect(x: 900, y: 886, width: 1, height: 16), kind: .caret)
+        XCTAssertFalse(field.contains(outside.alignedToSearchField(field, characterBounds: nil, isEmpty: true).rect))
+    }
+
     func testJavaCursorUsesCurrentCharacterInsteadOfZeroLengthUnion() {
         let point = JavaCursorGeometry.insertionPoint(at: 2735, characterCount: 2753) { range in
             XCTAssertEqual(range.location, 2735)

@@ -32,6 +32,27 @@ struct CursorRectInfo {
         return nil
     }
 
+    func alignedToSearchField(_ field: CGRect, characterBounds: CGRect?, isEmpty: Bool) -> CursorRectInfo {
+        guard kind == .caret else { return self }
+
+        var aligned = rect
+        if let characterBounds,
+           [characterBounds.origin.x, characterBounds.origin.y, characterBounds.width, characterBounds.height].allSatisfy(\.isFinite),
+           characterBounds.height > 0, field.contains(characterBounds)
+        {
+            // Some NSSearchFields report insertion bounds one line above their text.
+            // Keep the insertion x, but use an actual character for the text baseline.
+            aligned.origin.y = characterBounds.minY
+            aligned.size.height = characterBounds.height
+        } else if isEmpty, !field.contains(rect),
+                  [field.origin.x, field.origin.y, field.width, field.height].allSatisfy(\.isFinite),
+                  field.height >= rect.height
+        {
+            aligned.origin.y = field.midY - rect.height / 2
+        }
+        return CursorRectInfo(rect: aligned, kind: kind)
+    }
+
     static func textMarker(rect: CGRect, length: Int?, emptyInputCaretWidth: CGFloat? = nil) -> CursorRectInfo {
         // Empty editors can report the whole line for an empty selection. Apply the
         // same caret bounds as the helper before using the rectangle's center.
@@ -236,6 +257,22 @@ extension UIElement {
            let caret = CursorRectInfo.insertionPoint(rect: rect, zeroWidthCaretWidth: CursorRectInfo.fallbackCaretWidth(for: rect))
         {
             IndicatorDiagnostics.record("AX.insertionPoint id=\(traceID) raw=\(rect) caret=\(caret.rect)")
+            if (try? focusedElement.subrole()) == .searchField,
+               let field = Self.findInputAreaRect(focusedElement),
+               let characterCount: Int = try? focusedElement.attribute(.numberOfCharacters)
+            {
+                var characterBounds: CGRect?
+                if characterCount > 0 {
+                    let range = CFRange(location: min(selectedRange.location, characterCount - 1), length: 1)
+                    let bounds: CGRect? = try? focusedElement.parameterizedAttribute(
+                        kAXBoundsForRangeParameterizedAttribute, param: AXValue.range(range)
+                    )
+                    characterBounds = bounds.flatMap(NSScreen.convertFromQuartz)
+                }
+                let aligned = caret.alignedToSearchField(field, characterBounds: characterBounds, isEmpty: characterCount == 0)
+                IndicatorDiagnostics.record("AX.searchFieldCaret id=\(traceID) rect=\(aligned.rect)")
+                return aligned
+            }
             return caret
         }
 
