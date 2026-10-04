@@ -48,10 +48,14 @@ extension ApplicationVM {
                 activeSpaceDidChangeNotification.eraseToAnyPublisher()
             ])
             .compactMap { [weak self] _ -> NSRunningApplication? in
+                let frontmost = NSWorkspace.shared.frontmostApplication
+                if frontmost?.processIdentifier == ProcessInfo.processInfo.processIdentifier {
+                    return frontmost
+                }
                 guard self?.preferencesVM.preferences.isEnhancedModeEnabled == true,
                       let elm: UIElement = try? systemWideElement.attribute(.focusedApplication),
                       let pid = try? elm.pid()
-                else { return NSWorkspace.shared.frontmostApplication }
+                else { return frontmost }
                 return NSRunningApplication(processIdentifier: pid)
             }
             .filter { app in

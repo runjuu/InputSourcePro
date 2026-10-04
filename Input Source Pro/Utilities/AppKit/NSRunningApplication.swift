@@ -122,7 +122,8 @@ extension NSRunningApplication {
     // Similarly, electron uses `AXManualAccessibility`:
     // https://electronjs.org/docs/tutorial/accessibility#assistive-technology
     func activateAccessibilities() {
-        guard bundleIdentifier?.starts(with: "com.apple.") != true else { return }
+        guard processIdentifier != ProcessInfo.processInfo.processIdentifier,
+              bundleIdentifier?.starts(with: "com.apple.") != true else { return }
 
         activateAccessibility(attribute: "AXEnhancedUserInterface")
         activateAccessibility(attribute: "AXManualAccessibility")
