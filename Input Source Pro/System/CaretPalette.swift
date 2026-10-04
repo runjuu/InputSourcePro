@@ -13,7 +13,7 @@ final class CaretPalette {
 
     var changes: AnyPublisher<Void, Never> { updates.eraseToAnyPublisher() }
 
-    private let sourceID = "dev.inputsourcepro.inputmethod.PaletteControl"
+    private let sourceID = "com.runjuu.Input-Source-Pro.inputmethod.PaletteControl"
     private var sample: Sample?
     private var pendingConfirmation: Confirmation?
     private var focus = FocusReadiness()
@@ -112,7 +112,7 @@ final class CaretPalette {
               ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
         else { return }
         observers.append(DistributedNotificationCenter.default().addObserver(
-            forName: Notification.Name("dev.inputsourcepro.caretPalette.position"),
+            forName: Notification.Name("com.runjuu.Input-Source-Pro.caretPalette.position"),
             object: sourceID, queue: .main
         ) { [weak self] notification in
             MainActor.assumeIsolated { self?.receive(notification) }
@@ -170,7 +170,7 @@ final class CaretPalette {
               app.processIdentifier != ProcessInfo.processInfo.processIdentifier
         else { return }
         DistributedNotificationCenter.default().postNotificationName(
-            Notification.Name("dev.inputsourcepro.caretPalette.activity"),
+            Notification.Name("com.runjuu.Input-Source-Pro.caretPalette.activity"),
             object: sourceID,
             userInfo: ["pid": Int(app.processIdentifier), "uptime": ProcessInfo.processInfo.systemUptime,
                        "focusID": focusID ?? ""],

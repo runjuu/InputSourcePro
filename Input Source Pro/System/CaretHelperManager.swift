@@ -10,9 +10,7 @@ final class CaretHelperManager: ObservableObject {
         var registered = false
         var enabled = false
         var selected = false
-        var legacyInstalled: Bool?
         var isReady: Bool { installed && registered && enabled }
-        var hasRemovableHelpers: Bool { installed || legacyInstalled == true }
     }
 
     enum Operation: Equatable {
@@ -238,7 +236,7 @@ final class CaretHelperManager: ObservableObject {
         do {
             _ = try await run(["uninstall"])
             status = try await readStatus()
-            guard !status.hasRemovableHelpers else { throw Failure("The helper could not be removed. Try again.") }
+            guard !status.installed else { throw Failure("The helper could not be removed. Try again.") }
         } catch {
             self.error = error.localizedDescription
             if let current = try? await readStatus() { status = current }

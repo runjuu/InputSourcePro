@@ -16,7 +16,7 @@ struct AdditionalCursorSupportView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 12)
-                if helper.status.hasRemovableHelpers {
+                if helper.status.installed {
                     Button("Uninstall…") { confirmUninstall = true }
                         .disabled(helper.isBusy)
                 }

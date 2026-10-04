@@ -7,7 +7,7 @@
 	<key>CFBundleExecutable</key>
 	<string>CaretControl</string>
 	<key>CFBundleIdentifier</key>
-	<string>dev.inputsourcepro.inputmethod.PaletteControl</string>
+	<string>com.runjuu.Input-Source-Pro.inputmethod.PaletteControl</string>
 	<key>CFBundleName</key>
 	<string>ISP Palette Control</string>
 	<key>CFBundlePackageType</key>
@@ -17,7 +17,7 @@
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>InputMethodConnectionName</key>
-	<string>dev_inputsourcepro_PaletteControl_Connection</string>
+	<string>com_runjuu_Input_Source_Pro_PaletteControl_Connection</string>
 	<key>InputMethodServerControllerClass</key>
 	<string>CaretProbeController</string>
 	<key>InputMethodType</key>
@@ -27,7 +27,7 @@
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>TISInputSourceID</key>
-	<string>dev.inputsourcepro.inputmethod.PaletteControl</string>
+	<string>com.runjuu.Input-Source-Pro.inputmethod.PaletteControl</string>
 	<key>TISIntendedLanguage</key>
 	<string>en</string>
 	<key>ComponentInvisibleInSystemUI</key>

@@ -2,7 +2,7 @@ import Cocoa
 import Carbon
 import Darwin
 
-private let sourceID = "dev.inputsourcepro.inputmethod.PaletteControl"
+private let sourceID = "com.runjuu.Input-Source-Pro.inputmethod.PaletteControl"
 private let appName = "ISP Palette Control.app"
 private let destination = FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent("Library/Input Methods/\(appName)")
@@ -12,12 +12,12 @@ private struct SetupError: LocalizedError {
     var errorDescription: String? { message }
 }
 
-private func source(_ identifier: String = sourceID) -> TISInputSource? {
-    CaretInputSource.find(identifier)
+private func source() -> TISInputSource? {
+    CaretInputSource.find(sourceID)
 }
 
-private func flag(_ key: CFString, identifier: String = sourceID) -> Bool {
-    guard let source = source(identifier) else { return false }
+private func flag(_ key: CFString) -> Bool {
+    guard let source = source() else { return false }
     return TISGetInputSourceProperty(source, key) == Unmanaged.passUnretained(kCFBooleanTrue).toOpaque()
 }
 
@@ -33,8 +33,7 @@ private func status(json: Bool = false) {
     if json {
         let values = ["installed": FileManager.default.fileExists(atPath: destination.path),
                       "registered": source() != nil, "enabled": flag(kTISPropertyInputSourceIsEnabled),
-                      "selected": flag(kTISPropertyInputSourceIsSelected),
-                      "legacyInstalled": CaretHelperFiles.hasLegacyHelpers(beside: destination)]
+                      "selected": flag(kTISPropertyInputSourceIsSelected)]
         let data = try! JSONSerialization.data(withJSONObject: values, options: [.sortedKeys])
         print(String(decoding: data, as: UTF8.self))
         return
@@ -43,7 +42,6 @@ private func status(json: Bool = false) {
     print("Registered: \(source() != nil)")
     print("Enabled: \(flag(kTISPropertyInputSourceIsEnabled))")
     print("Selected: \(flag(kTISPropertyInputSourceIsSelected))")
-    print("Older helpers installed: \(CaretHelperFiles.hasLegacyHelpers(beside: destination))")
 }
 
 private func verify(_ app: URL) throws {
@@ -68,10 +66,6 @@ private func install(_ builtApp: URL) throws {
             throw SetupError(message: "A different app occupies \(destination.path); it was not replaced.")
         }
     }
-    let visibilityKey = kComponentBundleInvisibleInSystemUIKey as String
-    let hidesExistingMenuEntry = manager.fileExists(atPath: destination.path)
-        && Bundle(url: destination)?.object(forInfoDictionaryKey: visibilityKey) as? Bool != true
-        && Bundle(url: builtApp)?.object(forInfoDictionaryKey: visibilityKey) as? Bool == true
     let stage = parent.appendingPathComponent(".isp-caret-install-\(UUID().uuidString).app")
     try manager.copyItem(at: builtApp, to: stage)
     defer { try? manager.removeItem(at: stage) }
@@ -105,7 +99,6 @@ private func install(_ builtApp: URL) throws {
         }
     }
     if let backup = backup { print("Previous helper saved at \(backup.path)") }
-    if hidesExistingMenuEntry { refreshInputMenu() }
     print("Installed \(destination.path)")
 }
 
@@ -114,18 +107,15 @@ private func uninstall() throws {
     let backups = manager.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Application Support/InputSourcePro/CaretPaletteBackups")
     let bundles = try CaretHelperFiles.removalCandidates(destination: destination, backups: backups)
-    let identifiers = [sourceID] + CaretHelperFiles.legacyHelpers.map(\.identifier)
-    for identifier in identifiers {
-        if let source = source(identifier) {
-            if flag(kTISPropertyInputSourceIsSelected, identifier: identifier) { try check(TISDeselectInputSource(source), "Deselect") }
-            if flag(kTISPropertyInputSourceIsEnabled, identifier: identifier) { try check(TISDisableInputSource(source), "Disable") }
-        }
-        for app in NSRunningApplication.runningApplications(withBundleIdentifier: identifier) {
-            guard app.terminate() else { throw SetupError(message: "The cursor helper could not quit. Try again.") }
-            let deadline = Date().addingTimeInterval(3)
-            while !app.isTerminated && Date() < deadline { wait(0.1) }
-            guard app.isTerminated else { throw SetupError(message: "The cursor helper is still running. Try again.") }
-        }
+    if let source = source() {
+        if flag(kTISPropertyInputSourceIsSelected) { try check(TISDeselectInputSource(source), "Deselect") }
+        if flag(kTISPropertyInputSourceIsEnabled) { try check(TISDisableInputSource(source), "Disable") }
+    }
+    for app in NSRunningApplication.runningApplications(withBundleIdentifier: sourceID) {
+        guard app.terminate() else { throw SetupError(message: "The cursor helper could not quit. Try again.") }
+        let deadline = Date().addingTimeInterval(3)
+        while !app.isTerminated && Date() < deadline { wait(0.1) }
+        guard app.isTerminated else { throw SetupError(message: "The cursor helper is still running. Try again.") }
     }
     for bundle in bundles {
         try manager.removeItem(at: bundle)
@@ -137,8 +127,7 @@ private func uninstall() throws {
         }
     }
     guard !manager.fileExists(atPath: destination.path),
-          !CaretHelperFiles.hasLegacyHelpers(beside: destination),
-          identifiers.allSatisfy({ NSRunningApplication.runningApplications(withBundleIdentifier: $0).isEmpty }) else {
+          NSRunningApplication.runningApplications(withBundleIdentifier: sourceID).isEmpty else {
         throw SetupError(message: "The helper could not be fully removed. Try again.")
     }
     refreshInputMenu()

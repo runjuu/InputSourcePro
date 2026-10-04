@@ -2,8 +2,8 @@ import Cocoa
 import Carbon
 import InputMethodKit
 
-let sourceID = "dev.inputsourcepro.inputmethod.PaletteControl"
-let notificationName = Notification.Name("dev.inputsourcepro.caretPalette.position")
+let sourceID = "com.runjuu.Input-Source-Pro.inputmethod.PaletteControl"
+let notificationName = Notification.Name("com.runjuu.Input-Source-Pro.caretPalette.position")
 
 @objc(CaretProbeController)
 final class CaretProbeController: IMKInputController {
@@ -29,7 +29,7 @@ final class CaretProbeController: IMKInputController {
         geometryFilter = CaretGeometryFilter()
         if activityObserver == nil {
             activityObserver = DistributedNotificationCenter.default().addObserver(
-                forName: Notification.Name("dev.inputsourcepro.caretPalette.activity"),
+                forName: Notification.Name("com.runjuu.Input-Source-Pro.caretPalette.activity"),
                 object: sourceID, queue: .main
             ) { [weak self] notification in
                 let now = ProcessInfo.processInfo.systemUptime
@@ -168,7 +168,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var server: IMKServer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        server = IMKServer(name: "dev_inputsourcepro_PaletteControl_Connection", bundleIdentifier: sourceID)
+        server = IMKServer(name: "com_runjuu_Input_Source_Pro_PaletteControl_Connection", bundleIdentifier: sourceID)
     }
 }
 

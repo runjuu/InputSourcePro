@@ -56,35 +56,7 @@ final class CaretHelperSetupTests: XCTestCase {
     }
 
     func testMissingInputSourceReturnsNilInsteadOfCrashing() {
-        XCTAssertNil(CaretInputSource.find("dev.inputsourcepro.tests.missing.\(UUID().uuidString)"))
-    }
-
-    func testUninstallAlsoFindsVerifiedLegacyHelpersWithoutCurrentInstallation() throws {
-        var expected: [String] = []
-        for helper in CaretHelperFiles.legacyHelpers {
-            let url = destination.deletingLastPathComponent().appendingPathComponent(helper.name)
-            try bundle(at: url, id: helper.identifier)
-            expected.append(url.resolvingSymlinksInPath().path)
-        }
-        XCTAssertTrue(CaretHelperFiles.hasLegacyHelpers(beside: destination))
-        let result = try CaretHelperFiles.removalCandidates(destination: destination, backups: backups)
-        XCTAssertEqual(Set(result.map { $0.resolvingSymlinksInPath().path }), Set(expected))
-    }
-
-    func testLegacyNameDoesNotPermitDeletingAnUnrelatedBundle() throws {
-        let url = destination.deletingLastPathComponent().appendingPathComponent(CaretHelperFiles.legacyHelpers[0].name)
-        try bundle(at: url, id: "example.unrelated")
-        XCTAssertThrowsError(try CaretHelperFiles.removalCandidates(destination: destination, backups: backups))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
-    }
-
-    @MainActor
-    func testLegacyHelpersRemainManageableAfterCurrentHelperIsUninstalled() throws {
-        let status = try JSONDecoder().decode(CaretHelperManager.Status.self, from: Data(
-            #"{"installed":false,"registered":false,"enabled":false,"selected":false,"legacyInstalled":true}"#.utf8
-        ))
-        XCTAssertFalse(status.isReady)
-        XCTAssertTrue(status.hasRemovableHelpers)
+        XCTAssertNil(CaretInputSource.find("com.runjuu.Input-Source-Pro.Tests.missing.\(UUID().uuidString)"))
     }
 
     func testRegistrationFailureRestoresPreviousHelper() throws {
@@ -98,13 +70,14 @@ final class CaretHelperSetupTests: XCTestCase {
             if registrations == 1 { throw CocoaError(.fileReadUnknown) }
         })
         let info = NSDictionary(contentsOf: destination.appendingPathComponent("Contents/Info.plist"))
+        XCTAssertEqual(info?["CFBundleIdentifier"] as? String, CaretHelperFiles.sourceID)
         XCTAssertEqual(info?["ISPCaretBuild"] as? String, "old")
         XCTAssertEqual(registrations, 2)
         XCTAssertTrue(FileManager.default.fileExists(atPath: backup.path))
     }
 
     @MainActor
-    func testOldPrototypeWithoutBuildFingerprintRequiresUpdate() throws {
+    func testMissingBuildFingerprintRequiresUpdate() throws {
         let bundled = root.appendingPathComponent("Bundled.app")
         try bundle(at: bundled, version: "new")
         try bundle(at: destination)
