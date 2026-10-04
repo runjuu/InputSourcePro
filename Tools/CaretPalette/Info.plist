@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>ISP Palette Control</string>
+	<string>Cursor Helper</string>
 	<key>CFBundleExecutable</key>
 	<string>CaretControl</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.runjuu.Input-Source-Pro.inputmethod.PaletteControl</string>
 	<key>CFBundleName</key>
-	<string>ISP Palette Control</string>
+	<string>Cursor Helper</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

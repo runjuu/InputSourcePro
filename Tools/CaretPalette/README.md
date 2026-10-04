@@ -33,7 +33,7 @@ If Settings opens without a permission dialog, explicitly retry with:
 /tmp/isp-zed-palette-build/setup authorize --reopen-settings
 ```
 
-That option gracefully closes Settings first, then sends the request to a fresh instance. It stops if Settings refuses to close. `authorize --check-request` validates the private descriptor round trip without opening Settings or changing permission. Unsupported private symbols and timeouts are reported as failures.
+That option gracefully closes Settings first, then sends the request to a fresh instance. It stops if Settings refuses to close. `authorize --check-request` checks the native descriptor round trip and verifies the outgoing descriptor against the installed bundle without opening Settings or changing permission. Unsupported private symbols and timeouts are reported as failures.
 
 Use **Set up… → Install and continue** in Position settings. The sheet installs the helper, requests native permission, and checks selection before reporting success. Closing a pending permission request prevents late approval from activating tracking. Once setup succeeds, tracking is used automatically. **Uninstall…** removes the helper after confirmation; there is no separate toggle or Manage sheet. The indicator uses existing appearance and visibility settings.
 
@@ -73,6 +73,8 @@ Apple's [QA1810](https://developer.apple.com/library/archive/qa/qa1810/_index.ht
 On this test system, the public `TISEnableInputSource` opened Settings but did not enable the palette. Calling private `TISEnableInputSourceWithOptions(source, 2)` from the diagnostic process changed local state but did not persist consent. Calling it directly is not the solution.
 
 The working experiment used `_CreateFlattenedInputSource` to obtain the real input-source descriptor, then sent System Settings an XML property list with `tabID = com.apple.IntlKeyboard`, `inputSourceToBeEnabled = <descriptor>`, and `localizedSenderName`. A Launch Services parameter list contained a `pref` descriptor naming `com.apple.Keyboard-Settings.extension` and a `ptru` descriptor containing that plist. Settings showed its native Allow dialog and persisted permission after user-authorized approval. An already-open Settings instance sometimes ignored this request; relaunching Settings made the experiment work. This is an undocumented, OS-dependent path requiring more investigation before an installer is built.
+
+On 2026-10-04, setup reproduced a missing Allow dialog even after relaunching Settings. After the helper's identifier changed, TIS returned the current input-source ID but the old bundle ID in both `kTISPropertyBundleID` and the flattened descriptor. That descriptor still round-tripped in the requesting process, but Keyboard Settings rejected it with `Invalid value on inputSourceToBeEnabled`. Replacing the descriptor's `Bundle ID` with the verified installed bundle identity displayed the native Allow dialog; the user also confirmed seeing it. Setup now reads that identity directly from the installed `Info.plist`, checks it belongs to this helper, and preserves the rest of the native palette descriptor. A local round trip alone does not verify that Settings can resolve the same descriptor.
 
 ## Other applications
 

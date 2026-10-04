@@ -3,6 +3,21 @@ import Foundation
 enum CaretHelperFiles {
     static let sourceID = "com.runjuu.Input-Source-Pro.inputmethod.PaletteControl"
 
+    static func permissionDescriptor(_ flattened: CFDictionary, installedBundle: URL) throws -> CFDictionary {
+        let plist = installedBundle.appendingPathComponent("Contents/Info.plist")
+        let info = try PropertyListSerialization.propertyList(from: Data(contentsOf: plist), format: nil) as? [String: Any]
+        guard let identifier = info?["CFBundleIdentifier"] as? String,
+              identifier == sourceID,
+              var descriptor = flattened as? [String: Any],
+              descriptor["InputSourceKind"] as? String == "Non Keyboard Input Method" else {
+            throw CocoaError(.fileReadCorruptFile, userInfo: [NSFilePathErrorKey: plist.path])
+        }
+        // TIS can retain the old bundle ID after a helper is replaced at the same path.
+        // Settings resolves the installed identity instead of that process's cached identity.
+        descriptor["Bundle ID"] = identifier
+        return descriptor as CFDictionary
+    }
+
     static func install(staged: URL, destination: URL, backup: URL?, register: (URL) throws -> Void) throws {
         let manager = FileManager.default
         if let backup = backup {

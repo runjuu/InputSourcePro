@@ -69,7 +69,9 @@ private struct CaretHelperSheet: View {
             if helper.isActive {
                 Label("Additional cursor support is on.", systemImage: "checkmark.circle")
             } else {
-                Text("Install a small helper to get the text cursor’s position. macOS may ask you to allow it. The helper does not read or record what you type.")
+                Text("Install Cursor Helper to keep the indicator next to the text cursor in more apps.")
+                Text("macOS treats the helper as an input method, so its permission dialog warns about access to what you type. Cursor Helper uses the cursor’s position and does not read or record your text.")
+                    .foregroundColor(.secondary)
             }
 
             if let operation = helper.operation {
@@ -79,7 +81,7 @@ private struct CaretHelperSheet: View {
                 }
                 .accessibilityElement(children: .combine)
                 if operation == .permission {
-                    Text("Choose Allow in the macOS dialog. This can take up to 30 seconds.")
+                    Text("In System Settings, choose Allow to enable Cursor Helper.")
                         .foregroundColor(.secondary)
                 }
             } else if let error = helper.error {

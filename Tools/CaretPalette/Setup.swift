@@ -161,7 +161,8 @@ private func authorize(reopenSettings: Bool, checkOnly: Bool) throws {
     guard flatten(source, &result), let result = result else {
         throw SetupError(message: "macOS could not create the input-source permission descriptor.")
     }
-    let descriptor = result.takeRetainedValue()
+    let flattenedDescriptor = result.takeRetainedValue()
+    let descriptor = try CaretHelperFiles.permissionDescriptor(flattenedDescriptor, installedBundle: destination)
     let payload: [String: Any] = [
         "tabID": "com.apple.IntlKeyboard",
         "inputSourceToBeEnabled": descriptor,
@@ -174,11 +175,12 @@ private func authorize(reopenSettings: Bool, checkOnly: Bool) throws {
         }
         typealias Unflatten = @convention(c) (CFDictionary) -> Unmanaged<TISInputSource>?
         let unflatten = unsafeBitCast(unflattenSymbol, to: Unflatten.self)
-        guard let roundTrip = unflatten(descriptor)?.takeRetainedValue(),
+        // The local cache may only resolve the old bundle ID; Settings has its own cache.
+        guard let roundTrip = unflatten(flattenedDescriptor)?.takeRetainedValue(),
               let idPointer = TISGetInputSourceProperty(roundTrip, kTISPropertyInputSourceID),
               Unmanaged<CFString>.fromOpaque(idPointer).takeUnretainedValue() as String == sourceID
         else { throw SetupError(message: "The consent descriptor did not round-trip to this helper.") }
-        print("Permission descriptor validated; no Settings changes made.")
+        print("Permission descriptor checked against the installed helper; no Settings changes made.")
         return
     }
     if reopenSettings {

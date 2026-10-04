@@ -59,6 +59,32 @@ final class CaretHelperSetupTests: XCTestCase {
         XCTAssertNil(CaretInputSource.find("com.runjuu.Input-Source-Pro.Tests.missing.\(UUID().uuidString)"))
     }
 
+    func testPermissionRequestUsesInstalledIdentityWhenTISCachesAnOldBundleID() throws {
+        try bundle(at: destination)
+        let cached: NSDictionary = ["Bundle ID": "dev.inputsourcepro.inputmethod.PaletteControl",
+                                    "InputSourceKind": "Non Keyboard Input Method"]
+        let descriptor = try CaretHelperFiles.permissionDescriptor(cached as CFDictionary, installedBundle: destination)
+        let data = try PropertyListSerialization.data(fromPropertyList: descriptor, format: .xml, options: 0)
+        let request = try XCTUnwrap(PropertyListSerialization.propertyList(from: data, format: nil) as? [String: String])
+        XCTAssertEqual(request, ["Bundle ID": CaretHelperFiles.sourceID,
+                                 "InputSourceKind": "Non Keyboard Input Method"])
+        XCTAssertEqual(cached["Bundle ID"] as? String, "dev.inputsourcepro.inputmethod.PaletteControl")
+    }
+
+    func testPermissionRequestRefusesAnUnrelatedInstalledBundle() throws {
+        try bundle(at: destination, id: "example.unrelated")
+        let descriptor = ["Bundle ID": CaretHelperFiles.sourceID,
+                          "InputSourceKind": "Non Keyboard Input Method"] as CFDictionary
+        XCTAssertThrowsError(try CaretHelperFiles.permissionDescriptor(descriptor, installedBundle: destination))
+    }
+
+    func testPermissionRequestRefusesAnUnexpectedDescriptorKind() throws {
+        try bundle(at: destination)
+        let descriptor = ["Bundle ID": CaretHelperFiles.sourceID,
+                          "InputSourceKind": "Keyboard Layout"] as CFDictionary
+        XCTAssertThrowsError(try CaretHelperFiles.permissionDescriptor(descriptor, installedBundle: destination))
+    }
+
     func testRegistrationFailureRestoresPreviousHelper() throws {
         try bundle(at: destination, version: "old")
         let staged = root.appendingPathComponent("Staged.app")
