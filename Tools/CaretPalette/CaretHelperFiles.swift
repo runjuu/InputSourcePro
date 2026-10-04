@@ -2,6 +2,44 @@ import Foundation
 
 enum CaretHelperFiles {
     static let sourceID = "com.runjuu.Input-Source-Pro.inputmethod.PaletteControl"
+    static let installedAppName = "Cursor Helper.app"
+    static let legacyAppName = "ISP Palette Control.app"
+    static let legacySourceID = "dev.inputsourcepro.inputmethod.PaletteControl"
+
+    static func legacyInstallation(nextTo destination: URL) throws -> URL? {
+        let legacy = destination.deletingLastPathComponent().appendingPathComponent(legacyAppName)
+        guard legacy != destination, FileManager.default.fileExists(atPath: legacy.path) else { return nil }
+        try validate(legacy, identifiers: [sourceID, legacySourceID])
+        return legacy
+    }
+
+    private static func validate(_ url: URL, identifiers: Set<String>) throws {
+        guard try url.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else {
+            throw CocoaError(.fileWriteNoPermission, userInfo: [NSFilePathErrorKey: url.path])
+        }
+        let info = try PropertyListSerialization.propertyList(
+            from: Data(contentsOf: url.appendingPathComponent("Contents/Info.plist")), format: nil) as? [String: Any]
+        guard let identifier = info?["CFBundleIdentifier"] as? String, identifiers.contains(identifier) else {
+            throw CocoaError(.fileWriteNoPermission, userInfo: [NSFilePathErrorKey: url.path])
+        }
+    }
+
+    static func migrateLegacy(_ legacy: URL?, backup: URL, install: () throws -> Void,
+                              register: (URL) throws -> Void) throws {
+        guard let legacy = legacy else { try install(); return }
+        try validate(legacy, identifiers: [sourceID, legacySourceID])
+        let manager = FileManager.default
+        try manager.createDirectory(at: backup.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try manager.copyItem(at: legacy, to: backup)
+        try manager.removeItem(at: legacy)
+        do { try install() }
+        catch {
+            let installError = error
+            try manager.copyItem(at: backup, to: legacy)
+            try register(legacy)
+            throw installError
+        }
+    }
 
     static func permissionDescriptor(_ flattened: CFDictionary, installedBundle: URL) throws -> CFDictionary {
         let plist = installedBundle.appendingPathComponent("Contents/Info.plist")
@@ -49,24 +87,23 @@ enum CaretHelperFiles {
                 throw CocoaError(.fileWriteNoPermission, userInfo: [NSFilePathErrorKey: url.path])
             }
         }
-        func appendBundle(_ url: URL) throws {
+        func appendBundle(_ url: URL, identifiers: Set<String> = [sourceID]) throws {
             guard manager.fileExists(atPath: url.path) else { return }
             try rejectSymlink(url)
-            let plist = url.appendingPathComponent("Contents/Info.plist")
-            let data = try Data(contentsOf: plist)
-            let info = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
-            guard info?["CFBundleIdentifier"] as? String == sourceID else {
-                throw CocoaError(.fileWriteNoPermission, userInfo: [NSFilePathErrorKey: url.path])
-            }
+            try validate(url, identifiers: identifiers)
             result.append(url)
         }
         try appendBundle(destination)
+        if let legacy = try legacyInstallation(nextTo: destination) { result.append(legacy) }
         if manager.fileExists(atPath: backups.path) {
             try rejectSymlink(backups)
             for directory in try manager.contentsOfDirectory(at: backups, includingPropertiesForKeys: [.isSymbolicLinkKey]) {
                 guard UUID(uuidString: directory.lastPathComponent) != nil else { continue }
                 try rejectSymlink(directory)
                 try appendBundle(directory.appendingPathComponent(destination.lastPathComponent))
+                if destination.lastPathComponent != legacyAppName {
+                    try appendBundle(directory.appendingPathComponent(legacyAppName), identifiers: [sourceID, legacySourceID])
+                }
             }
         }
         return result

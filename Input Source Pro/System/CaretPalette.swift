@@ -9,6 +9,7 @@ final class CaretPalette {
     static let shared = CaretPalette()
     private let updates = PassthroughSubject<Void, Never>()
     private(set) var isEnabled = false
+    private(set) var isConnected = false
     var resumeSource: (() -> Void)?
 
     var changes: AnyPublisher<Void, Never> { updates.eraseToAnyPublisher() }
@@ -27,12 +28,15 @@ final class CaretPalette {
     private var observers: [NSObjectProtocol] = []
     private var timer: Timer?
     private var activitySubscription: AnyCancellable?
+    private var channel: CaretChannel?
+    private var channelGeneration = UUID()
     private var suspension = Suspension()
 
     enum TextFocus {
         case input, nonInput, unknown, pending, unavailable
 
-        init(role: Role?) {
+        init(role: Role?, subrole: String? = nil) {
+            if subrole == "AXSecureTextField" { self = .nonInput; return }
             switch role {
             case .textArea, .textField, .comboBox:
                 self = .input
@@ -104,19 +108,46 @@ final class CaretPalette {
     }
 
     private func source() -> TISInputSource? {
-        CaretInputSource.find(sourceID)
+        CaretInputSource.find(sourceID, bundleIdentifier: sourceID)
     }
 
     func start() {
         guard !isEnabled,
               ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
         else { return }
-        observers.append(DistributedNotificationCenter.default().addObserver(
-            forName: Notification.Name("com.runjuu.Input-Source-Pro.caretPalette.position"),
-            object: sourceID, queue: .main
-        ) { [weak self] notification in
-            MainActor.assumeIsolated { self?.receive(notification) }
-        })
+        let generation = UUID()
+        channelGeneration = generation
+        do {
+            let channel = try CaretChannel(role: .application, onMessage: { [weak self] message in
+                MainActor.assumeIsolated {
+                    guard let self = self, self.channelGeneration == generation else { return }
+                    switch message {
+                    case .ready:
+                        self.isConnected = true
+                        self.sendActivity(isInputEvent: false)
+                        self.updates.send(())
+                    case let .position(position):
+                        self.receive(position)
+                    case .activity: break
+                    }
+                }
+            }, onConnectionChange: { [weak self] connected in
+                MainActor.assumeIsolated {
+                    guard let self = self, self.channelGeneration == generation else { return }
+                    self.sample = nil
+                    self.pendingConfirmation = nil
+                    self.session = nil
+                    if !connected { self.isConnected = false }
+                    if connected { self.sendActivity(isInputEvent: false) }
+                    self.updates.send(())
+                }
+            })
+            try channel.start()
+            self.channel = channel
+        } catch {
+            NSLog("Could not start the private cursor-helper connection: %@", String(describing: error))
+            return
+        }
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
         ) { [weak self] _ in
@@ -150,7 +181,10 @@ final class CaretPalette {
         watchTextFocus()
         timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
             // Expire a stale sample even if the helper stops sending.
-            MainActor.assumeIsolated { self?.updates.send(()) }
+            MainActor.assumeIsolated {
+                self?.sendActivity(isInputEvent: false)
+                self?.updates.send(())
+            }
         }
         let activityEvents: NSEvent.EventTypeMask = [
             .keyDown, .flagsChanged, .leftMouseDown, .leftMouseUp,
@@ -164,18 +198,28 @@ final class CaretPalette {
             .sink { [weak self] _ in self?.sendActivity() }
     }
 
-    private func sendActivity() {
-        guard isEnabled, !suspension.isSuspended,
-              let app = NSWorkspace.shared.frontmostApplication,
-              app.processIdentifier != ProcessInfo.processInfo.processIdentifier
-        else { return }
-        DistributedNotificationCenter.default().postNotificationName(
-            Notification.Name("com.runjuu.Input-Source-Pro.caretPalette.activity"),
-            object: sourceID,
-            userInfo: ["pid": Int(app.processIdentifier), "uptime": ProcessInfo.processInfo.systemUptime,
-                       "focusID": focusID ?? ""],
-            deliverImmediately: true
-        )
+    func startAndWaitForConnection() async -> Bool {
+        start()
+        let generation = channelGeneration
+        let deadline = ProcessInfo.processInfo.systemUptime + 5
+        while isEnabled, generation == channelGeneration {
+            if isConnected { return true }
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+            do { try await Task.sleep(nanoseconds: 50_000_000) }
+            catch { return false }
+        }
+        return false
+    }
+
+    private func sendActivity(isInputEvent: Bool = true) {
+        guard isEnabled else { return }
+        let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
+        let permitsTracking = !suspension.isSuspended && !IsSecureEventInputEnabled()
+            && pid != ProcessInfo.processInfo.processIdentifier && pid == focusApplication?.processIdentifier
+            && textFocus.permitsCaret
+        channel?.send(.activity(CaretActivity(pid: pid, uptime: ProcessInfo.processInfo.systemUptime,
+                                             focusID: focusID ?? "", permitsTracking: permitsTracking,
+                                             isInputEvent: isInputEvent)))
     }
 
     private func watchTextFocus() {
@@ -194,6 +238,7 @@ final class CaretPalette {
             updates.send(())
             return
         }
+        sendActivity(isInputEvent: false)
         if focusObserver == nil {
             focusObserver = CaretFocusObserver { [weak self] update in
                 Task { @MainActor in self?.receiveFocus(update) }
@@ -234,6 +279,7 @@ final class CaretPalette {
         } else {
             watchTextFocus()
         }
+        sendActivity(isInputEvent: false)
         // Wake/session activation can deselect auxiliary sources. Never switch the keyboard
         // or re-enable revoked permission, and wait until all suspension reasons have ended.
         if isEnabled, !suspension.isSuspended { resumeSource?() }
@@ -242,6 +288,10 @@ final class CaretPalette {
     func stop() {
         guard isEnabled else { return }
         isEnabled = false
+        isConnected = false
+        channelGeneration = UUID()
+        channel?.stop()
+        channel = nil
         activitySubscription?.cancel()
         activitySubscription = nil
         timer?.invalidate()
@@ -257,7 +307,6 @@ final class CaretPalette {
         suspension = Suspension()
         if let source = source() { TISDeselectInputSource(source) }
         for observer in observers {
-            DistributedNotificationCenter.default().removeObserver(observer)
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
             NotificationCenter.default.removeObserver(observer)
         }
@@ -265,17 +314,16 @@ final class CaretPalette {
         updates.send(())
     }
 
-    private func receive(_ notification: Notification) {
-        guard isEnabled, !suspension.isSuspended, let values = notification.userInfo,
-              let session = values["session"] as? String,
-              let rectString = values["rect"] as? String,
-              let pid = values["pid"] as? Int,
-              let uptime = values["uptime"] as? Double
-        else { return }
-        let pending = values["pending"] as? Bool == true
+    private func receive(_ position: CaretPosition) {
+        guard isEnabled, !suspension.isSuspended, !IsSecureEventInputEnabled() else { return }
+        let session = position.session
+        let rectString = position.rect
+        let pid = Int(position.pid)
+        let uptime = position.uptime
+        let pending = position.pending
         IndicatorDiagnostics.record("helper.receive pid=\(pid) rect=\(NSRectFromString(rectString)) empty=\(rectString.isEmpty) pending=\(pending) sampleUptime=\(uptime) focus=\(textFocus) focusedAt=\(focusedAt) sessionMatches=\(self.session == session)")
         let lastUptime = max(sample?.uptime ?? 0, pendingConfirmation?.uptime ?? 0)
-        if let focusID = focusID, values["focusID"] as? String != focusID {
+        if let focusID = focusID, position.focusID != focusID {
             IndicatorDiagnostics.record("helper.rejected reason=focus-token-mismatch pid=\(pid)")
             // The helper may have activated after the focus notification was sent.
             if Int(NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0) == pid {
@@ -313,7 +361,7 @@ final class CaretPalette {
     }
 
     func point(for app: NSRunningApplication) -> CGPoint? {
-        guard isEnabled, !suspension.isSuspended, textFocus.permitsCaret,
+        guard isEnabled, !suspension.isSuspended, !IsSecureEventInputEnabled(), textFocus.permitsCaret,
               focusApplication?.processIdentifier == app.processIdentifier,
               NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier
         else {
@@ -330,6 +378,7 @@ final class CaretPalette {
     }
 
     func suppressesAccessibilityFallback(for app: NSRunningApplication) -> Bool {
+        if isEnabled && IsSecureEventInputEnabled() { return true }
         if app.processIdentifier == ProcessInfo.processInfo.processIdentifier { return true }
         guard isEnabled, !suspension.isSuspended,
               NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier

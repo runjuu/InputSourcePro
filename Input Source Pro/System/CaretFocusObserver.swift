@@ -79,7 +79,11 @@ final class CaretFocusObserver {
             } catch AXError.noValue {
                 role = nil
             }
-            return Focus(element: element, state: CaretPalette.TextFocus(role: role))
+            let subrole: String?
+            do { subrole = try element?.attribute(.subrole) }
+            catch AXError.attributeUnsupported { subrole = nil }
+            catch AXError.noValue { subrole = nil }
+            return Focus(element: element, state: CaretPalette.TextFocus(role: role, subrole: subrole))
         }, stop: { observer.stop() })
     }
 

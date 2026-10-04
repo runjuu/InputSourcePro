@@ -38,6 +38,11 @@ struct AdditionalCursorSupportView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Button("Review setup…") { showSetup = true }
                     .disabled(!helper.canActivate)
+            } else if helper.status.installed && !helper.status.enabled {
+                Label("Permission required. Choose Set up to enable Cursor Helper.", systemImage: "exclamationmark.circle")
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(.horizontal)
@@ -99,7 +104,7 @@ private struct CaretHelperSheet: View {
                 .keyboardShortcut(.cancelAction)
                 .disabled(helper.isBusy && helper.operation != .permission)
                 if !helper.isActive {
-                    Button(attemptedSetup ? "Try again" : "Install and continue") {
+                    Button(attemptedSetup ? "Try again" : (helper.status.installed ? "Continue setup" : "Install and continue")) {
                         attemptedSetup = true
                         Task { await helper.setup() }
                     }

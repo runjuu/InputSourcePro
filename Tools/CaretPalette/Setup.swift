@@ -3,7 +3,7 @@ import Carbon
 import Darwin
 
 private let sourceID = "com.runjuu.Input-Source-Pro.inputmethod.PaletteControl"
-private let appName = "ISP Palette Control.app"
+private let appName = CaretHelperFiles.installedAppName
 private let destination = FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent("Library/Input Methods/\(appName)")
 
@@ -13,7 +13,7 @@ private struct SetupError: LocalizedError {
 }
 
 private func source() -> TISInputSource? {
-    CaretInputSource.find(sourceID)
+    CaretInputSource.find(sourceID, bundleIdentifier: sourceID)
 }
 
 private func flag(_ key: CFString) -> Bool {
@@ -60,6 +60,7 @@ private func install(_ builtApp: URL) throws {
     try verify(builtApp)
     let manager = FileManager.default
     let parent = destination.deletingLastPathComponent()
+    let legacy = try CaretHelperFiles.legacyInstallation(nextTo: destination)
     try manager.createDirectory(at: parent, withIntermediateDirectories: true)
     if manager.fileExists(atPath: destination.path) {
         guard Bundle(url: destination)?.bundleIdentifier == sourceID else {
@@ -78,7 +79,7 @@ private func install(_ builtApp: URL) throws {
             if result != noErr { fputs("Could not reselect the palette (\(result)). Run setup start.\n", stderr) }
         }
     }
-    for app in NSRunningApplication.runningApplications(withBundleIdentifier: sourceID) {
+    for app in [sourceID, CaretHelperFiles.legacySourceID].flatMap(NSRunningApplication.runningApplications(withBundleIdentifier:)) {
         guard app.terminate() else { throw SetupError(message: "Quit ISP Palette Control before installing.") }
         let deadline = Date().addingTimeInterval(3)
         while !app.isTerminated && Date() < deadline { wait(0.1) }
@@ -92,12 +93,16 @@ private func install(_ builtApp: URL) throws {
     } else {
         backup = nil
     }
-    try CaretHelperFiles.install(staged: stage, destination: destination, backup: backup) { url in
-        try check(TISRegisterInputSource(url as CFURL), "Registration")
-        guard source() != nil else {
-            throw SetupError(message: "macOS has not registered the cursor helper. Sign out and back in, then try again.")
+    let legacyBackup = manager.homeDirectoryForCurrentUser.appendingPathComponent(
+        "Library/Application Support/InputSourcePro/CaretPaletteBackups/\(UUID().uuidString)/\(CaretHelperFiles.legacyAppName)")
+    try CaretHelperFiles.migrateLegacy(legacy, backup: legacyBackup, install: {
+        try CaretHelperFiles.install(staged: stage, destination: destination, backup: backup) { url in
+            try check(TISRegisterInputSource(url as CFURL), "Registration")
+            guard source() != nil else {
+                throw SetupError(message: "macOS has not registered the cursor helper. Sign out and back in, then try again.")
+            }
         }
-    }
+    }, register: { try check(TISRegisterInputSource($0 as CFURL), "Restore registration") })
     if let backup = backup { print("Previous helper saved at \(backup.path)") }
     print("Installed \(destination.path)")
 }
@@ -107,11 +112,18 @@ private func uninstall() throws {
     let backups = manager.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Application Support/InputSourcePro/CaretPaletteBackups")
     let bundles = try CaretHelperFiles.removalCandidates(destination: destination, backups: backups)
-    if let source = source() {
-        if flag(kTISPropertyInputSourceIsSelected) { try check(TISDeselectInputSource(source), "Deselect") }
-        if flag(kTISPropertyInputSourceIsEnabled) { try check(TISDisableInputSource(source), "Disable") }
+    for identifier in [sourceID, CaretHelperFiles.legacySourceID] {
+        if let source = CaretInputSource.find(sourceID, bundleIdentifier: identifier)
+            ?? CaretInputSource.find(identifier, bundleIdentifier: identifier) {
+            if TISGetInputSourceProperty(source, kTISPropertyInputSourceIsSelected) == Unmanaged.passUnretained(kCFBooleanTrue).toOpaque() {
+                try check(TISDeselectInputSource(source), "Deselect")
+            }
+            if TISGetInputSourceProperty(source, kTISPropertyInputSourceIsEnabled) == Unmanaged.passUnretained(kCFBooleanTrue).toOpaque() {
+                try check(TISDisableInputSource(source), "Disable")
+            }
+        }
     }
-    for app in NSRunningApplication.runningApplications(withBundleIdentifier: sourceID) {
+    for app in [sourceID, CaretHelperFiles.legacySourceID].flatMap(NSRunningApplication.runningApplications(withBundleIdentifier:)) {
         guard app.terminate() else { throw SetupError(message: "The cursor helper could not quit. Try again.") }
         let deadline = Date().addingTimeInterval(3)
         while !app.isTerminated && Date() < deadline { wait(0.1) }
@@ -146,9 +158,27 @@ private func refreshInputMenu() {
     }
 }
 
-private func authorize(reopenSettings: Bool, checkOnly: Bool) throws {
+private func launchHelper() throws {
+    let configuration = NSWorkspace.OpenConfiguration()
+    configuration.activates = false
+    configuration.addsToRecentItems = false
+    var result: Result<Void, Error>?
+    NSWorkspace.shared.openApplication(at: destination, configuration: configuration) { app, error in
+        DispatchQueue.main.async {
+            if let error = error { result = .failure(error) }
+            else if app != nil { result = .success(()) }
+            else { result = .failure(SetupError(message: "Cursor Helper did not launch.")) }
+        }
+    }
+    let deadline = Date().addingTimeInterval(5)
+    while result == nil && Date() < deadline { wait(0.05) }
+    guard let result = result else { throw SetupError(message: "Cursor Helper took too long to launch.") }
+    try result.get()
+}
+
+private func authorize(reopenSettings: Bool, checkOnly: Bool, afterInstall: Bool) throws {
     guard let source = source() else { throw SetupError(message: "Install the helper first.") }
-    if !checkOnly && flag(kTISPropertyInputSourceIsEnabled) {
+    if !checkOnly && !afterInstall && flag(kTISPropertyInputSourceIsEnabled) {
         print("Already enabled; no permission request needed.")
         return
     }
@@ -229,16 +259,20 @@ enum CaretSetupCommand {
                 try install(URL(fileURLWithPath: arguments[1]).standardizedFileURL)
                 status()
             case "authorize":
-                guard arguments.count == 1 || arguments == ["authorize", "--reopen-settings"] || arguments == ["authorize", "--check-request"] else {
-                    throw SetupError(message: "Usage: setup authorize [--reopen-settings | --check-request]")
+                let options = Set(arguments.dropFirst())
+                guard options.isSubset(of: ["--reopen-settings", "--check-request", "--after-install"]),
+                      !options.contains("--check-request") || options.count == 1 else {
+                    throw SetupError(message: "Usage: setup authorize [--reopen-settings] [--after-install] | authorize --check-request")
                 }
-                try authorize(reopenSettings: arguments.contains("--reopen-settings"), checkOnly: arguments.contains("--check-request"))
+                try authorize(reopenSettings: options.contains("--reopen-settings"),
+                              checkOnly: options.contains("--check-request"), afterInstall: options.contains("--after-install"))
             case "status": status(json: arguments.contains("--json"))
             case "uninstall": try uninstall()
             case "start":
                 guard let source = source(), flag(kTISPropertyInputSourceIsEnabled) else {
                     throw SetupError(message: "Run setup authorize first.")
                 }
+                try launchHelper()
                 try check(TISSelectInputSource(source), "Select")
                 guard flag(kTISPropertyInputSourceIsSelected) else { throw SetupError(message: "macOS did not select the palette.") }
                 status()

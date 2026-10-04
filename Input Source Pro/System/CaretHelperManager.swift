@@ -40,7 +40,8 @@ final class CaretHelperManager: ObservableObject {
     private let command: (([String]) async throws -> String)?
     private let helperURL: URL?
     private let installedURL: URL?
-    private let startTracking: @MainActor () -> Bool
+    private let startTracking: @MainActor () async -> Bool
+    private let isTrackingConnected: @MainActor () -> Bool
     private let stopTracking: @MainActor () -> Void
 
     var isBusy: Bool { operation != nil }
@@ -48,12 +49,14 @@ final class CaretHelperManager: ObservableObject {
 
     init(command: (([String]) async throws -> String)? = nil,
          helperURL: URL? = nil, installedURL: URL? = nil,
-         startTracking: @escaping @MainActor () -> Bool = { CaretPalette.shared.start(); return CaretPalette.shared.isEnabled },
+         startTracking: @escaping @MainActor () async -> Bool = { await CaretPalette.shared.startAndWaitForConnection() },
+         isTrackingConnected: @escaping @MainActor () -> Bool = { CaretPalette.shared.isConnected },
          stopTracking: @escaping @MainActor () -> Void = { CaretPalette.shared.stop() }) {
         self.command = command
         self.helperURL = helperURL
         self.installedURL = installedURL
         self.startTracking = startTracking
+        self.isTrackingConnected = isTrackingConnected
         self.stopTracking = stopTracking
     }
 
@@ -77,6 +80,14 @@ final class CaretHelperManager: ObservableObject {
             .store(in: &subscriptions)
         NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)
             .sink { [weak self] _ in self?.stopSourceOnExit() }
+            .store(in: &subscriptions)
+        CaretPalette.shared.changes
+            .sink { [weak self] in
+                guard let self = self, self.isActive, self.canActivate, !self.isBusy,
+                      !CaretPalette.shared.isConnected else { return }
+                self.isActive = false
+                self.error = "Cursor Helper disconnected. Choose Set up to reconnect it."
+            }
             .store(in: &subscriptions)
     }
 
@@ -125,8 +136,8 @@ final class CaretHelperManager: ObservableObject {
         }
     }
 
-    func setup(reopenSettings: Bool = false) async {
-        await activate(allowPermission: true, reopenSettings: reopenSettings)
+    func setup() async {
+        await activate(allowPermission: true, reopenSettings: true)
     }
 
     func cancelPermissionRequest() {
@@ -148,9 +159,10 @@ final class CaretHelperManager: ObservableObject {
         defer { operation = nil }
         do {
             status = try await readStatus()
+            let needsInitialPermission = !status.installed
             let helper = try bundledHelper()
             let installed = installedURL ?? FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent("Library/Input Methods/ISP Palette Control.app")
+                .appendingPathComponent("Library/Input Methods/Cursor Helper.app")
             if !status.installed || !Self.sameVersion(helper, installed) {
                 // Automatic activation must never reinstall a removed helper.
                 guard status.installed || allowPermission else {
@@ -162,12 +174,15 @@ final class CaretHelperManager: ObservableObject {
                 _ = try await run(["install", helper.path])
                 status = try await readStatus()
             }
-            if !status.enabled {
+            if needsInitialPermission || !status.enabled {
                 guard allowPermission else {
                     throw Failure("Cursor support needs permission. Choose Set up to allow the helper.")
                 }
                 operation = .permission
-                _ = try await run(reopenSettings ? ["authorize", "--reopen-settings"] : ["authorize"])
+                var arguments = ["authorize"]
+                if reopenSettings { arguments.append("--reopen-settings") }
+                if needsInitialPermission { arguments.append("--after-install") }
+                _ = try await run(arguments)
                 guard !setupCancelled else { return }
                 status = try await readStatus()
             }
@@ -180,8 +195,12 @@ final class CaretHelperManager: ObservableObject {
             guard canActivate, status.isReady, status.selected else {
                 throw Failure("The cursor helper could not start. Try again.")
             }
-            let started = startTracking()
-            guard canActivate, started, status.selected else {
+            let started = await startTracking()
+            guard started else {
+                throw Failure("Cursor Helper did not connect. Choose Try again to restart cursor support.")
+            }
+            status = try await readStatus()
+            guard canActivate, status.isReady, status.selected, isTrackingConnected() else {
                 throw Failure("The cursor helper could not start. Try again.")
             }
             isActive = true
@@ -205,8 +224,12 @@ final class CaretHelperManager: ObservableObject {
             guard status.isReady else { throw Failure("Cursor support needs permission. Choose Set up to allow the helper.") }
             if !status.selected { _ = try await run(["start"]) }
             status = try await readStatus()
-            isActive = status.selected && canActivate
-            if !isActive { stopTracking() }
+            let connected = await startTracking()
+            status = try await readStatus()
+            isActive = status.isReady && status.selected && canActivate && connected && isTrackingConnected()
+            if !isActive {
+                throw Failure("Cursor Helper could not reconnect. Choose Set up to try again.")
+            }
         } catch {
             stopTracking()
             isActive = false

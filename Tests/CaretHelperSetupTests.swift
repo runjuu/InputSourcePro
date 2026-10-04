@@ -3,7 +3,7 @@ import XCTest
 
 final class CaretHelperSetupTests: XCTestCase {
     private var root: URL!
-    private var destination: URL { root.appendingPathComponent("Input Methods/ISP Palette Control.app") }
+    private var destination: URL { root.appendingPathComponent("Input Methods/\(CaretHelperFiles.installedAppName)") }
     private var backups: URL { root.appendingPathComponent("Backups") }
 
     override func setUpWithError() throws {
@@ -38,6 +38,44 @@ final class CaretHelperSetupTests: XCTestCase {
         try bundle(at: destination, id: "example.unrelated")
         XCTAssertThrowsError(try CaretHelperFiles.removalCandidates(destination: destination, backups: backups))
         XCTAssertTrue(FileManager.default.fileExists(atPath: destination.path))
+    }
+
+    func testMigrationRemovesLegacyPathBeforeRegistrationAndKeepsBackup() throws {
+        let legacy = destination.deletingLastPathComponent().appendingPathComponent(CaretHelperFiles.legacyAppName)
+        let backup = backups.appendingPathComponent(UUID().uuidString).appendingPathComponent(CaretHelperFiles.legacyAppName)
+        try bundle(at: legacy, id: CaretHelperFiles.legacySourceID)
+        XCTAssertEqual(try CaretHelperFiles.legacyInstallation(nextTo: destination)?.path, legacy.path)
+        try CaretHelperFiles.migrateLegacy(legacy, backup: backup, install: {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path))
+            try self.bundle(at: self.destination)
+        }, register: { _ in XCTFail("Successful migration does not restore the old helper") })
+        XCTAssertTrue(FileManager.default.fileExists(atPath: backup.path))
+        let candidates = try CaretHelperFiles.removalCandidates(destination: destination, backups: backups)
+        XCTAssertEqual(Set(candidates.map { $0.resolvingSymlinksInPath().path }),
+                       Set([destination, backup].map { $0.resolvingSymlinksInPath().path }))
+    }
+
+    func testMigrationRestoresLegacyInstallationAfterFailure() throws {
+        let legacy = destination.deletingLastPathComponent().appendingPathComponent(CaretHelperFiles.legacyAppName)
+        let backup = backups.appendingPathComponent(UUID().uuidString).appendingPathComponent(CaretHelperFiles.legacyAppName)
+        try bundle(at: legacy, id: CaretHelperFiles.legacySourceID)
+        var restored = false
+        XCTAssertThrowsError(try CaretHelperFiles.migrateLegacy(legacy, backup: backup, install: {
+            throw CocoaError(.fileWriteUnknown)
+        }, register: { url in
+            XCTAssertEqual(url, legacy)
+            XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+            restored = true
+        }))
+        XCTAssertTrue(restored)
+    }
+
+    func testLegacyCleanupRefusesUnrelatedBundles() throws {
+        let legacy = destination.deletingLastPathComponent().appendingPathComponent(CaretHelperFiles.legacyAppName)
+        try bundle(at: legacy, id: "example.unrelated")
+        XCTAssertThrowsError(try CaretHelperFiles.legacyInstallation(nextTo: destination))
+        XCTAssertThrowsError(try CaretHelperFiles.removalCandidates(destination: destination, backups: backups))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: legacy.path))
     }
 
     func testUninstallRefusesBackupSymlinkAndPreservesInstalledHelper() throws {
@@ -127,11 +165,12 @@ final class CaretHelperSetupTests: XCTestCase {
 
     @MainActor
     private func makeManager(command: @escaping ([String]) async throws -> String,
-                             start: @escaping () -> Bool = { true }) throws -> CaretHelperManager {
+                             start: @escaping () async -> Bool = { true },
+                             connected: @escaping () -> Bool = { true }) throws -> CaretHelperManager {
         try bundle(at: destination, version: "current")
         let manager = CaretHelperManager(command: command,
                                          helperURL: destination, installedURL: destination,
-                                         startTracking: start, stopTracking: {})
+                                         startTracking: start, isTrackingConnected: connected, stopTracking: {})
         manager.updateAvailability(enhanced: true, allowed: true)
         return manager
     }
@@ -151,6 +190,47 @@ final class CaretHelperSetupTests: XCTestCase {
     }
 
     @MainActor
+    func testPermissionRequestReopensSettingsOnInitialSetupAndRetry() async throws {
+        var requests: [[String]] = []
+        var starts = 0
+        let manager = try makeManager(command: { arguments in
+            if arguments.first == "authorize" {
+                requests.append(arguments)
+                throw CocoaError(.userCancelled)
+            }
+            return #"{"installed":true,"registered":true,"enabled":false,"selected":false}"#
+        }, start: { starts += 1; return true })
+        await manager.setup()
+        await manager.setup()
+        XCTAssertEqual(requests, [["authorize", "--reopen-settings"], ["authorize", "--reopen-settings"]])
+        XCTAssertFalse(manager.isActive)
+        XCTAssertEqual(starts, 0)
+    }
+
+    @MainActor
+    func testFreshInstallRequestsConsentDespiteTransientEnabledStatus() async throws {
+        var installed = false
+        var requests: [[String]] = []
+        var starts = 0
+        let manager = try makeManager(command: { arguments in
+            switch arguments.first {
+            case "install": installed = true
+            case "authorize":
+                requests.append(arguments)
+                throw CocoaError(.userCancelled)
+            case "start": XCTFail("Must not select the helper without permission")
+            default: break
+            }
+            return "{\"installed\":\(installed),\"registered\":\(installed),\"enabled\":\(installed),\"selected\":\(installed)}"
+        }, start: { starts += 1; return true })
+        await manager.setup()
+        XCTAssertEqual(requests, [["authorize", "--reopen-settings", "--after-install"]])
+        XCTAssertEqual(starts, 0)
+        XCTAssertFalse(manager.isActive)
+        XCTAssertNotNil(manager.error)
+    }
+
+    @MainActor
     func testSuccessfulSetupStartsTrackingOnlyAfterSelectionIsVerified() async throws {
         var selected = false
         var beganTracking = false
@@ -166,6 +246,51 @@ final class CaretHelperSetupTests: XCTestCase {
         XCTAssertTrue(beganTracking)
         XCTAssertTrue(manager.isActive)
         XCTAssertNil(manager.error)
+    }
+
+    @MainActor
+    func testSelectedHelperWithoutConnectionDoesNotReportSuccess() async throws {
+        var manager: CaretHelperManager!
+        var stopped = false
+        manager = try makeManager(command: { arguments in
+            if arguments.first == "stop" { stopped = true }
+            return #"{"installed":true,"registered":true,"enabled":true,"selected":true}"#
+        }, start: {
+            XCTAssertFalse(manager.isActive)
+            XCTAssertEqual(manager.operation, .activating)
+            await Task.yield()
+            return false
+        })
+        await manager.setup()
+        XCTAssertFalse(manager.isActive)
+        XCTAssertFalse(manager.isBusy)
+        XCTAssertTrue(stopped)
+        XCTAssertTrue(manager.error?.contains("did not connect") == true)
+        manager = nil
+    }
+
+    @MainActor
+    func testPermissionRevokedWhileConnectingDoesNotReportSuccess() async throws {
+        var connected = false
+        let manager = try makeManager(command: { _ in
+            "{\"installed\":true,\"registered\":true,\"enabled\":\(!connected),\"selected\":true}"
+        }, start: { connected = true; return true })
+        await manager.setup()
+        XCTAssertFalse(manager.isActive)
+        XCTAssertNotNil(manager.error)
+    }
+
+    @MainActor
+    func testDisconnectedHelperDuringFinalStatusCheckDoesNotReportSuccess() async throws {
+        var didConnect = false
+        var isConnected = false
+        let manager = try makeManager(command: { arguments in
+            if didConnect && arguments.first == "status" { isConnected = false }
+            return #"{"installed":true,"registered":true,"enabled":true,"selected":true}"#
+        }, start: { didConnect = true; isConnected = true; return true }, connected: { isConnected })
+        await manager.setup()
+        XCTAssertFalse(manager.isActive)
+        XCTAssertNotNil(manager.error)
     }
 
     @MainActor

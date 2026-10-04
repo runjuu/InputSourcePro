@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D73000012F20000000000001 /* CaretChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D73000022F20000000000001 /* CaretChannel.swift */; };
+		D73000032F20000000000001 /* CaretChannelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D73000042F20000000000001 /* CaretChannelTests.swift */; };
 		D72000012F20000000000001 /* CaretFocusObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = D72000022F20000000000001 /* CaretFocusObserver.swift */; };
 		EAC100000000000000000002 /* UpdateChannelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAC100000000000000000001 /* UpdateChannelTests.swift */; };
 		25C5A6B52E678D86005AB80E /* PunctuationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25C5A6B42E678D86005AB80E /* PunctuationService.swift */; };
@@ -227,6 +229,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		D73000022F20000000000001 /* CaretChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tools/CaretPalette/CaretChannel.swift; sourceTree = SOURCE_ROOT; };
+		D73000042F20000000000001 /* CaretChannelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaretChannelTests.swift; sourceTree = "<group>"; };
 		D72000022F20000000000001 /* CaretFocusObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaretFocusObserver.swift; sourceTree = "<group>"; };
 		EAC100000000000000000001 /* UpdateChannelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChannelTests.swift; sourceTree = "<group>"; };
 		25018ACF8C9046C29F0F3462 /* ModifierComboPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModifierComboPicker.swift; sourceTree = "<group>"; };
@@ -575,6 +579,7 @@
 				D72000022F20000000000001 /* CaretFocusObserver.swift */,
 				D71000022F20000000000001 /* CaretHelperManager.swift */,
 				D71000222F20000000000001 /* CaretInputSource.swift */,
+				D73000022F20000000000001 /* CaretChannel.swift */,
 				D60000612F20000000000061 /* AppURLAction.swift */,
 				4A2A176E280BA7FA00E13249 /* main.swift */,
 				4A2A176F280BA7FA00E13249 /* AppMenu.swift */,
@@ -813,6 +818,7 @@
 				D60002112F20000000000211 /* AlwaysNearMousePlacementTests.swift */,
 				D70000042F20000000000004 /* CaretPaletteTests.swift */,
 				D71000082F20000000000001 /* CaretHelperSetupTests.swift */,
+				D73000042F20000000000001 /* CaretChannelTests.swift */,
 				D71000062F20000000000001 /* Tools/CaretPalette/CaretHelperFiles.swift */,
 				D70000062F20000000000006 /* CaretPollingSchedule.swift */,
 				D70000082F20000000000008 /* CaretGeometryFilter.swift */,
@@ -1068,6 +1074,7 @@
 				D71000032F20000000000001 /* AdditionalCursorSupportView.swift in Sources */,
 				D71000012F20000000000001 /* CaretHelperManager.swift in Sources */,
 				D71000212F20000000000001 /* CaretInputSource.swift in Sources */,
+				D73000012F20000000000001 /* CaretChannel.swift in Sources */,
 				4A881A802888559200B76498 /* NSString.swift in Sources */,
 				4A2A1790280BA7FA00E13249 /* Color.swift in Sources */,
 				D579258C2A1AB0A4003B83EA /* NSRunningApplication+WindowInfo.swift in Sources */,
@@ -1173,6 +1180,7 @@
 				D60002122F20000000000212 /* AlwaysNearMousePlacementTests.swift in Sources */,
 				D70000032F20000000000003 /* CaretPaletteTests.swift in Sources */,
 				D71000072F20000000000001 /* CaretHelperSetupTests.swift in Sources */,
+				D73000032F20000000000001 /* CaretChannelTests.swift in Sources */,
 				D71000052F20000000000001 /* Tools/CaretPalette/CaretHelperFiles.swift in Sources */,
 				D70000052F20000000000005 /* CaretPollingSchedule.swift in Sources */,
 				D70000072F20000000000007 /* CaretGeometryFilter.swift in Sources */,
