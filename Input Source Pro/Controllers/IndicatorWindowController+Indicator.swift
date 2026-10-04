@@ -3,11 +3,12 @@ import Foundation
 
 extension IndicatorWindowController {
     func getAppSize() -> CGSize? {
-        return indicatorVC.fittingSize
+        return indicatorVC.fittingSize.map { CGSize(width: ceil($0.width), height: ceil($0.height)) }
     }
 
     func updateIndicator(event: IndicatorVM.ActivateEvent, inputSource: InputSource) {
         let preferences = preferencesVM.preferences
+        IndicatorDiagnostics.record("indicator.content event=\(event.diagnosticDescription) source=\(inputSource.persistentIdentifier) kind=\(preferences.indicatorKind) capsLock=\(indicatorVM.isCapsLockOn) showCapsLock=\(preferences.isShowCapsLockStatus) active=\(isActive)")
 
         if let badge = Self.statusBadge(for: event) {
             indicatorVC.prepare(config: IndicatorViewConfig(
@@ -18,10 +19,6 @@ extension IndicatorWindowController {
                 textColor: preferencesVM.defaultIndicatorTextNSColor,
                 badge: badge
             ))
-
-            if isActive {
-                indicatorVC.refresh()
-            }
 
             return
         }
@@ -34,10 +31,6 @@ extension IndicatorWindowController {
             textColor: preferencesVM.getTextNSColor(inputSource),
             showsCapsLock: preferences.isShowCapsLockStatus && indicatorVM.isCapsLockOn
         ))
-
-        if isActive {
-            indicatorVC.refresh()
-        }
     }
 
     static func statusBadge(for event: IndicatorVM.ActivateEvent) -> IndicatorViewConfig.Badge? {
@@ -46,8 +39,9 @@ extension IndicatorWindowController {
     }
 
     func moveIndicator(position: PreferencesVM.IndicatorPositionInfo) {
-        indicatorVC.refresh()
-        moveTo(point: position.point)
+        IndicatorDiagnostics.record("indicator.move kind=\(position.kind) point=\(position.point) before=\(String(describing: window?.frame)) fitting=\(String(describing: getAppSize()))")
+        indicatorVC.refresh(at: position.point)
+        IndicatorDiagnostics.record("indicator.moved frame=\(String(describing: window?.frame))")
         alwaysOnIndicator.defaultIndicatorFrame = isActive ? window?.frame : nil
     }
 }

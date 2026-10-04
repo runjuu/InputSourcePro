@@ -2,17 +2,38 @@ import AXSwift
 import Cocoa
 
 extension UIElement {
-    func getCursorRectInfo() -> (rect: CGRect, isContainer: Bool)? {
-        guard let focusedElement: UIElement = try? attribute(.focusedUIElement),
-              Self.isInputContainer(focusedElement),
-              let inputAreaRect = Self.findInputAreaRect(focusedElement)
-        else { return nil }
+    func getCursorRectInfo(traceID: String = UUID().uuidString) -> (rect: CGRect, isContainer: Bool)? {
+        let focusedElement: UIElement
+        do {
+            guard let element: UIElement = try attribute(.focusedUIElement) else {
+                IndicatorDiagnostics.record("AX.focusMissing id=\(traceID) reason=nil")
+                return nil
+            }
+            focusedElement = element
+        } catch {
+            IndicatorDiagnostics.record("AX.focusMissing id=\(traceID) error=\(error)")
+            return nil
+        }
+        if IndicatorDiagnostics.isEnabled {
+            var pid: pid_t = 0
+            let result = AXUIElementGetPid(focusedElement.element, &pid)
+            IndicatorDiagnostics.record("AX.focus id=\(traceID) actualPID=\(pid) pidStatus=\(result.rawValue)")
+        }
+        guard Self.isInputContainer(focusedElement) else {
+            IndicatorDiagnostics.record("AX.rejected id=\(traceID) reason=non-input-focus")
+            return nil
+        }
+        guard let inputAreaRect = Self.findInputAreaRect(focusedElement) else {
+            IndicatorDiagnostics.record("AX.rejected id=\(traceID) reason=no-input-area")
+            return nil
+        }
 
-        if let cursorRect = Self.findCursorRect(focusedElement),
-           inputAreaRect.contains(cursorRect)
-        {
+        let cursorRect = Self.findCursorRect(focusedElement, traceID: traceID)
+        if let cursorRect = cursorRect, inputAreaRect.contains(cursorRect) {
+            IndicatorDiagnostics.record("AX.accepted id=\(traceID) cursor=\(cursorRect) area=\(inputAreaRect)")
             return (rect: cursorRect, isContainer: false)
         } else {
+            IndicatorDiagnostics.record("AX.containerFallback id=\(traceID) cursor=\(String(describing: cursorRect)) area=\(inputAreaRect) reason=missing-or-outside-area")
             return (rect: inputAreaRect, isContainer: true)
         }
     }
@@ -48,8 +69,14 @@ extension UIElement {
 }
 
 extension UIElement {
-    static func findCursorRect(_ focusedElement: UIElement) -> CGRect? {
-        return findWebAreaCursor(focusedElement) ?? findNativeInputAreaCursor(focusedElement)
+    static func findCursorRect(_ focusedElement: UIElement, traceID: String = UUID().uuidString) -> CGRect? {
+        if let rect = findWebAreaCursor(focusedElement) {
+            IndicatorDiagnostics.record("AX.cursor id=\(traceID) method=text-marker rect=\(rect)")
+            return rect
+        }
+        let rect = findNativeInputAreaCursor(focusedElement, traceID: traceID)
+        IndicatorDiagnostics.record("AX.cursor id=\(traceID) method=native rect=\(String(describing: rect))")
+        return rect
     }
 
     static func findWebAreaCursor(_ focusedElement: UIElement) -> CGRect? {
@@ -60,7 +87,7 @@ extension UIElement {
         return NSScreen.convertFromQuartz(bounds)
     }
 
-    static func findNativeInputAreaCursor(_ focusedElement: UIElement) -> CGRect? {
+    static func findNativeInputAreaCursor(_ focusedElement: UIElement, traceID: String = UUID().uuidString) -> CGRect? {
         guard let selectedRange: CFRange = try? focusedElement.attribute(.selectedTextRange),
               let visibleRange: CFRange = try? focusedElement.attribute(.visibleCharacterRange),
               let rawValue: AnyObject = try? focusedElement.attribute(.value),
@@ -125,7 +152,10 @@ extension UIElement {
             return NSScreen.convertFromQuartz(bounds)
         }
 
-        return getCursorBounds() ?? getLineBounds()
+        if let bounds = getCursorBounds() { return bounds }
+        let bounds = getLineBounds()
+        IndicatorDiagnostics.record("AX.lineFallback id=\(traceID) rect=\(String(describing: bounds))")
+        return bounds
     }
 }
 

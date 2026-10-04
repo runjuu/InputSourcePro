@@ -198,6 +198,7 @@
 		D71000052F20000000000001 /* Tools/CaretPalette/CaretHelperFiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71000062F20000000000001 /* Tools/CaretPalette/CaretHelperFiles.swift */; };
 		D71000072F20000000000001 /* CaretHelperSetupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71000082F20000000000001 /* CaretHelperSetupTests.swift */; };
 		D71000212F20000000000001 /* CaretInputSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71000222F20000000000001 /* CaretInputSource.swift */; };
+		C32000000000000000000002 /* IndicatorWindowStabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C32000000000000000000001 /* IndicatorWindowStabilityTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -412,6 +413,7 @@
 		D71000062F20000000000001 /* Tools/CaretPalette/CaretHelperFiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tools/CaretPalette/CaretHelperFiles.swift; sourceTree = SOURCE_ROOT; };
 		D71000082F20000000000001 /* CaretHelperSetupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaretHelperSetupTests.swift; sourceTree = "<group>"; };
 		D71000222F20000000000001 /* CaretInputSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CaretInputSource.swift; path = Tools/CaretPalette/CaretInputSource.swift; sourceTree = SOURCE_ROOT; };
+		C32000000000000000000001 /* IndicatorWindowStabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndicatorWindowStabilityTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -811,6 +813,7 @@
 				B60003100000000000000001 /* AlwaysOnIndicatorTests.swift */,
 				D60002412F20000000000241 /* SpotlightCompatibilityTests.swift */,
 				D60002312F20000000000231 /* SpotlightIndicatorPositionTests.swift */,
+				C32000000000000000000001 /* IndicatorWindowStabilityTests.swift */,
 				D60003032F20000000000303 /* ShortcutConflictTests.swift */,
 				D60003132F20000000000313 /* ModifierComboTriggerTests.swift */,
 			);
@@ -1168,6 +1171,7 @@
 				B60003100000000000000002 /* AlwaysOnIndicatorTests.swift in Sources */,
 				D60002422F20000000000242 /* SpotlightCompatibilityTests.swift in Sources */,
 				D60002322F20000000000232 /* SpotlightIndicatorPositionTests.swift in Sources */,
+				C32000000000000000000002 /* IndicatorWindowStabilityTests.swift in Sources */,
 				D60003042F20000000000304 /* ShortcutConflictTests.swift in Sources */,
 				D60003142F20000000000314 /* ModifierComboTriggerTests.swift in Sources */,
 			);

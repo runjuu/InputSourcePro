@@ -5,6 +5,125 @@ import XCTest
 
 @MainActor
 final class CapsLockStateTests: XCTestCase {
+    func testSwitchingPulsesNeverReachCapsLockStateOrFeedback() {
+        let raw = PassthroughSubject<Bool, Never>()
+        let confirmed = CurrentValueSubject<Bool, Never>(false)
+        var timers: [PassthroughSubject<Void, Never>] = []
+        var states: [Bool] = []
+        var feedback: [Bool] = []
+        let feedbackSubscription = IndicatorVM.capsLockChangesPublisher(
+            states: confirmed.eraseToAnyPublisher(),
+            enabled: Just(true).eraseToAnyPublisher()
+        ).sink { event in
+            if case let .capsLockChanges(isOn) = event { feedback.append(isOn) }
+        }
+        let subscription = IndicatorVM.confirmedCapsLockPublisher(
+            states: raw.eraseToAnyPublisher(), initialState: false,
+            confirmation: {
+                let timer = PassthroughSubject<Void, Never>()
+                timers.append(timer)
+                return timer.eraseToAnyPublisher()
+            }
+        ).sink {
+            states.append($0)
+            confirmed.send($0)
+        }
+
+        for _ in 0..<24 {
+            raw.send(true)
+            raw.send(false)
+            timers.last?.send(())
+        }
+        XCTAssertEqual(timers.count, 24)
+        XCTAssertEqual(states, [false])
+        XCTAssertEqual(feedback, [])
+        subscription.cancel()
+        feedbackSubscription.cancel()
+    }
+
+    func testSustainedCapsLockConfirmsOnceAndTurnsOffImmediately() {
+        let raw = PassthroughSubject<Bool, Never>()
+        let timer = PassthroughSubject<Void, Never>()
+        var confirmations = 0
+        var states: [Bool] = []
+        let subscription = IndicatorVM.confirmedCapsLockPublisher(
+            states: raw.eraseToAnyPublisher(), initialState: false,
+            confirmation: {
+                confirmations += 1
+                return timer.eraseToAnyPublisher()
+            }
+        ).sink { states.append($0) }
+
+        raw.send(true)
+        raw.send(true) // Other modifier changes must not restart confirmation.
+        XCTAssertEqual(confirmations, 1)
+        XCTAssertEqual(states, [false])
+        timer.send(())
+        timer.send(())
+        XCTAssertEqual(states, [false, true])
+        raw.send(false)
+        XCTAssertEqual(states, [false, true, false])
+        subscription.cancel()
+    }
+
+    func testInitialCapsLockStateIsAvailableWithoutWaiting() {
+        let raw = PassthroughSubject<Bool, Never>()
+        var states: [Bool] = []
+        let subscription = IndicatorVM.confirmedCapsLockPublisher(
+            states: raw.eraseToAnyPublisher(), initialState: true,
+            confirmation: { Empty().eraseToAnyPublisher() }
+        ).sink { states.append($0) }
+
+        XCTAssertEqual(states, [true])
+        raw.send(false)
+        XCTAssertEqual(states, [true, false])
+        subscription.cancel()
+    }
+
+    func testOldConfirmationCannotActivateANewerPendingPulse() {
+        let raw = PassthroughSubject<Bool, Never>()
+        var timers: [PassthroughSubject<Void, Never>] = []
+        var states: [Bool] = []
+        let subscription = IndicatorVM.confirmedCapsLockPublisher(
+            states: raw.eraseToAnyPublisher(), initialState: false,
+            confirmation: {
+                let timer = PassthroughSubject<Void, Never>()
+                timers.append(timer)
+                return timer.eraseToAnyPublisher()
+            }
+        ).sink { states.append($0) }
+
+        raw.send(true)
+        raw.send(false)
+        raw.send(true)
+        timers[0].send(())
+        XCTAssertEqual(states, [false])
+        timers[1].send(())
+        XCTAssertEqual(states, [false, true])
+        raw.send(false)
+        raw.send(true)
+        subscription.cancel()
+        timers[2].send(())
+        XCTAssertEqual(states, [false, true, false])
+    }
+
+    func testSustainedCapsLockUsesProductionConfirmationTimer() {
+        let raw = PassthroughSubject<Bool, Never>()
+        let activated = expectation(description: "Caps Lock confirmed")
+        var states: [Bool] = []
+        let subscription = IndicatorVM.confirmedCapsLockPublisher(
+            states: raw.eraseToAnyPublisher(), initialState: false
+        ).sink {
+            states.append($0)
+            if $0 { activated.fulfill() }
+        }
+        raw.send(true)
+        XCTAssertEqual(states, [false])
+        wait(for: [activated], timeout: 2)
+        XCTAssertEqual(states, [false, true])
+        subscription.cancel()
+    }
+
     func testOnlyChangesProduceFeedbackAndDisabledChangesAreNotReplayed() {
         let states = CurrentValueSubject<Bool, Never>(true)
         let enabled = CurrentValueSubject<Bool, Never>(true)

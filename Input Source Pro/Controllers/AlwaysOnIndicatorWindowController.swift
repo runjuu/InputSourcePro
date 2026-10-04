@@ -29,11 +29,16 @@ final class AlwaysOnIndicatorWindowController: FloatWindowController {
     }
 
     func update(config: IndicatorViewConfig) {
+        IndicatorDiagnostics.record("alwaysOn.content source=\(config.inputSource.persistentIdentifier) capsLock=\(config.showsCapsLock)")
         guard let view = config.renderAlwaysOn() else { return }
 
-        window?.contentView = view
-        window?.setContentSize(view.fittingSize)
-        updateVisibility()
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0
+            context.allowsImplicitAnimation = false
+            window?.contentView = view
+            window?.setContentSize(view.fittingSize)
+            updateVisibility()
+        }
     }
 
     func reorderOnActiveSpace() {
@@ -44,6 +49,7 @@ final class AlwaysOnIndicatorWindowController: FloatWindowController {
     }
 
     private func updateVisibility() {
+        IndicatorDiagnostics.record("alwaysOn.visibility point=\(String(describing: position)) defaultFrame=\(String(describing: defaultIndicatorFrame)) frame=\(String(describing: window?.frame))")
         guard let position = position,
               let window = window,
               window.contentView != nil
@@ -57,6 +63,7 @@ final class AlwaysOnIndicatorWindowController: FloatWindowController {
         if let defaultIndicatorFrame = defaultIndicatorFrame,
            defaultIndicatorFrame.intersects(window.frame)
         {
+            IndicatorDiagnostics.record("alwaysOn.hidden reason=overlap")
             deactive()
         } else if !window.isVisible {
             active()

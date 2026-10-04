@@ -191,3 +191,28 @@ extension IndicatorVM.ActivateEvent: @preconcurrency CustomStringConvertible {
         }
     }
 }
+
+extension IndicatorVM.ActivateEvent {
+    // AppKind's description can include a browser URL; log only process identity.
+    var diagnosticDescription: String {
+        switch self {
+        case let .appChanges(current, previous, changed):
+            return "appChanges(pid=\(current?.getApp().processIdentifier ?? 0),previousPID=\(previous?.getApp().processIdentifier ?? 0),sourceChanged=\(changed))"
+        case let .inputSourceChanges(source, reason):
+            return "inputSourceChanges(source=\(source.persistentIdentifier),reason=\(reason.diagnosticDescription))"
+        default:
+            return description
+        }
+    }
+}
+
+extension IndicatorVM.InputSourceChangeReason {
+    var diagnosticDescription: String {
+        switch self {
+        case .noChanges: return "noChanges"
+        case .system: return "system"
+        case .shortcut: return "shortcut"
+        case .appSpecified: return "appSpecified"
+        }
+    }
+}

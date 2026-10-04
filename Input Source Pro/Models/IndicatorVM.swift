@@ -41,6 +41,7 @@ final class IndicatorVM: ObservableObject {
         functionKeyModeChangesPublisher(),
         capsLockChangesPublisher(),
     ])
+    .handleEvents(receiveOutput: { IndicatorDiagnostics.record("activation.emitted event=\($0.diagnosticDescription)") })
     .share()
 
     private(set) lazy var indicatorIsSuspendedPublisher = Self.indicatorSuspensionPublisher(
@@ -122,10 +123,36 @@ final class IndicatorVM: ObservableObject {
         .receive(on: DispatchQueue.main)
         .map { NSEvent.modifierFlags }
 
-        Publishers.Merge(flags, resumed)
-            .map { $0.contains(.capsLock) }
+        Self.confirmedCapsLockPublisher(
+            states: Publishers.Merge(flags, resumed)
+                .map { $0.contains(.capsLock) }
+                .eraseToAnyPublisher(),
+            initialState: isCapsLockOn
+        )
+        .handleEvents(receiveOutput: { IndicatorDiagnostics.record("capsLock.state on=\($0)") })
+        .assign(to: &$isCapsLockOn)
+    }
+
+    static func confirmedCapsLockPublisher(
+        states: AnyPublisher<Bool, Never>,
+        initialState: Bool,
+        confirmation: @escaping () -> AnyPublisher<Void, Never> = {
+            Timer.delay(seconds: 0.1).mapToVoid().eraseToAnyPublisher()
+        }
+    ) -> AnyPublisher<Bool, Never> {
+        states
             .removeDuplicates()
-            .assign(to: &$isCapsLockOn)
+            .handleEvents(receiveOutput: { IndicatorDiagnostics.record("capsLock.raw on=\($0)") })
+            .flatMapLatest { isOn -> AnyPublisher<Bool, Never> in
+                // Input-source switching can briefly set the Caps Lock flag.
+                // Confirm activation before publishing to either indicator; an off
+                // event cancels the pending confirmation and clears the state now.
+                isOn ? confirmation().first().mapTo(true).eraseToAnyPublisher()
+                    : Just(false).eraseToAnyPublisher()
+            }
+            .prepend(initialState)
+            .removeDuplicates()
+            .eraseToAnyPublisher()
     }
 
     private func clearAppKeyboardCacheIfNeed() {
@@ -324,6 +351,9 @@ extension IndicatorVM {
                 }
             }
             .removeDuplicates(by: { $0.isSame(with: $1) })
+            .handleEvents(receiveOutput: {
+                IndicatorDiagnostics.record("state.published source=\($0.inputSource.persistentIdentifier) reason=\($0.inputSourceChangeReason.diagnosticDescription) pid=\($0.appKind?.getApp().processIdentifier ?? 0)")
+            })
             .assign(to: &$state)
 
         applicationVM.$appKind

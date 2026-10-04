@@ -165,6 +165,7 @@ enum InputSourceSwitcher {
         tisTarget: TISInputSource,
         cJKVFixStrategy: CJKVFixStrategy?
     ) {
+        IndicatorDiagnostics.record("switch.target source=\(target.sourceID) mode=\(target.inputModeID ?? "nil") strategy=\(String(describing: cJKVFixStrategy))")
         guard target.isCJKV,
               let cJKVFixStrategy
         else {
@@ -228,6 +229,7 @@ enum InputSourceSwitcher {
     @discardableResult
     private static func selectInputSource(_ source: TISInputSource, reason: String) -> OSStatus {
         let status = TISSelectInputSource(source)
+        IndicatorDiagnostics.record("switch.TISSelect source=\(source.id) reason=\(reason) status=\(status)")
         if status != noErr {
             logger.debug { "TISSelectInputSource failed (\(reason)) with status \(status)" }
         }
@@ -345,6 +347,7 @@ enum InputSourceSwitcher {
         temporaryInputWindow = window
         suppressTemporaryInputWindowActivation()
         isShowingTemporaryInputWindow = true
+        IndicatorDiagnostics.record("switch.temporaryWindow show previousPID=\(temporaryInputWindowPreviousApplication?.processIdentifier ?? 0) frame=\(window.frame)")
 
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -362,6 +365,7 @@ enum InputSourceSwitcher {
             return
         }
 
+        IndicatorDiagnostics.record("switch.temporaryWindow close restore=\(restorePreviousApplication) previousPID=\(temporaryInputWindowPreviousApplication?.processIdentifier ?? 0)")
         temporaryInputWindow = nil
         window.orderOut(nil)
         window.close()

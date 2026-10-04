@@ -11,27 +11,36 @@ extension IndicatorWindowController {
         inputSource: InputSource,
         appKind: AppKind
     ) -> AnyPublisher<Void, Never> {
+        let traceID = UUID().uuidString
+        IndicatorDiagnostics.record("show.begin id=\(traceID) event=\(event.diagnosticDescription) source=\(inputSource.persistentIdentifier) pid=\(appKind.getApp().processIdentifier)")
         return Just(event)
             .tap { [weak self] in self?.updateIndicator(event: $0, inputSource: inputSource) }
             .flatMapLatest { [weak self] _ -> AnyPublisher<Void, Never> in
                 guard let self = self,
                       let appSize = self.getAppSize()
-                else { return Empty().eraseToAnyPublisher() }
+                else {
+                    IndicatorDiagnostics.record("show.skipped id=\(traceID) reason=missing-controller-or-size")
+                    return Empty().eraseToAnyPublisher()
+                }
 
                 return self.preferencesVM
-                    .getIndicatorPositionPublisher(appSize: appSize, app: appKind.getApp())
+                    .getIndicatorPositionPublisher(appSize: appSize, app: appKind.getApp(), traceID: traceID)
                     .compactMap { $0 }
                     .first()
-                    .tap { self.moveIndicator(position: $0) }
+                    .tap {
+                        IndicatorDiagnostics.record("show.position id=\(traceID) kind=\($0.kind) point=\($0.point)")
+                        self.moveIndicator(position: $0)
+                    }
                     .flatMapLatest { _ -> AnyPublisher<Bool, Never> in
                         Publishers.Merge(
-                            Timer.delay(seconds: 1).mapToVoid(),
+                            Timer.delay(seconds: 1).handleEvents(receiveOutput: { _ in IndicatorDiagnostics.record("show.hide id=\(traceID) reason=timeout") }).mapToVoid(),
                             // hover event
                             self.indicatorVC.hoverableView.hoverdPublisher
                                 .filter { $0 }
                                 .first()
                                 .flatMapLatest { _ in
                                     Timer.delay(seconds: 0.15)
+                                        .handleEvents(receiveOutput: { _ in IndicatorDiagnostics.record("show.hide id=\(traceID) reason=hover") })
                                 }
                                 .mapToVoid()
                         )
@@ -39,6 +48,7 @@ extension IndicatorWindowController {
                         .mapTo(false)
                         .prepend(true)
                         .tap { isActive in
+                            IndicatorDiagnostics.record("show.visibility id=\(traceID) active=\(isActive)")
                             self.isActive = isActive
                         }
                         .eraseToAnyPublisher()
@@ -47,6 +57,10 @@ extension IndicatorWindowController {
                     .eraseToAnyPublisher()
             }
             .mapToVoid()
+            .handleEvents(
+                receiveCompletion: { _ in IndicatorDiagnostics.record("show.complete id=\(traceID)") },
+                receiveCancel: { IndicatorDiagnostics.record("show.cancel id=\(traceID)") }
+            )
             .eraseToAnyPublisher()
     }
 }
@@ -68,6 +82,7 @@ extension IndicatorWindowController {
             isInputFocused: UIElement.isInputContainer(app.focuedUIElement(application: application))
         )
 
+        IndicatorDiagnostics.record("focus.watch pid=\(app.processIdentifier) activateInitially=\(needActivateAtFirstTime)")
         if !needActivateAtFirstTime, isActive {
             isActive = false
         }
@@ -77,6 +92,7 @@ extension IndicatorWindowController {
             .compactMap { _ in app.focuedUIElement(application: application) }
             .removeDuplicates()
             .filter { UIElement.isInputContainer($0) }
+            .handleEvents(receiveOutput: { _ in IndicatorDiagnostics.record("focus.inputChanged pid=\(app.processIdentifier)") })
             .mapToVoid()
             .eraseToAnyPublisher()
 
@@ -198,9 +214,12 @@ extension IndicatorWindowController {
             [.selectedTextChanged, .focusedUIElementChanged],
             [.application, .window] + Role.validInputElms
         )
+        .handleEvents(receiveOutput: { _ in IndicatorDiagnostics.record("caret.trigger pid=\(app.processIdentifier) reason=AX") })
         .mapToVoid()
-        .merge(with: Timer.interval(seconds: 1).mapToVoid())
-        .merge(with: CaretPalette.shared.changes)
+        .merge(with: Timer.interval(seconds: 1)
+            .handleEvents(receiveOutput: { _ in IndicatorDiagnostics.record("caret.trigger pid=\(app.processIdentifier) reason=poll") }).mapToVoid())
+        .merge(with: CaretPalette.shared.changes
+            .handleEvents(receiveOutput: { IndicatorDiagnostics.record("caret.trigger pid=\(app.processIdentifier) reason=helper-or-expiry") }))
 
         let isScrolling = NSEvent.watch(matching: [.scrollWheel])
             .flatMapLatest { _ in
@@ -422,6 +441,7 @@ extension IndicatorWindowController {
     }
 
     private func apply(placement: AlwaysNearMouse.Placement) {
+        IndicatorDiagnostics.record("nearMouse.placement value=\(placement)")
         switch placement {
         case .hidden:
             isActive = false

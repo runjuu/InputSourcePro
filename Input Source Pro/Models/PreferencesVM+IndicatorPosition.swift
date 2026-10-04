@@ -29,20 +29,29 @@ extension PreferencesVM {
     static func preferredCaretPositionPublisher(
         palette: @escaping () -> CGPoint?,
         accessibility: @escaping () -> AnyPublisher<CursorPosition?, Never>,
-        awaitingConfirmation: @escaping () -> Bool = { false }
+        awaitingConfirmation: @escaping () -> Bool = { false },
+        traceID: String = UUID().uuidString
     ) -> AnyPublisher<CursorPosition?, Never> {
         Deferred {
             if let point = palette() {
+                IndicatorDiagnostics.record("caret.chosen id=\(traceID) provider=helper point=\(point)")
                 return Just<CursorPosition?>((point, false)).eraseToAnyPublisher()
             }
             if awaitingConfirmation() {
+                IndicatorDiagnostics.record("caret.chosen id=\(traceID) provider=none reason=helper-suppresses-AX")
                 return Just<CursorPosition?>(nil).eraseToAnyPublisher()
             }
+            IndicatorDiagnostics.record("caret.query id=\(traceID) provider=AX")
             return accessibility()
                 .map { position in
                     // The helper may have connected while the Accessibility query was running.
-                    if let point = palette() { return (point: point, isContainer: false) }
-                    return awaitingConfirmation() ? nil : position
+                    if let point = palette() {
+                        IndicatorDiagnostics.record("caret.chosen id=\(traceID) provider=helper-after-AX point=\(point)")
+                        return (point: point, isContainer: false)
+                    }
+                    let suppressed = awaitingConfirmation()
+                    IndicatorDiagnostics.record("caret.chosen id=\(traceID) provider=AX suppressed=\(suppressed) result=\(String(describing: position))")
+                    return suppressed ? nil : position
                 }
                 .eraseToAnyPublisher()
         }
@@ -52,16 +61,20 @@ extension PreferencesVM {
 
     func getIndicatorPositionPublisher(
         appSize: CGSize,
-        app: NSRunningApplication
+        app: NSRunningApplication,
+        traceID: String = UUID().uuidString
     ) -> AnyPublisher<IndicatorPositionInfo?, Never> {
-        Just(preferences.indicatorPosition)
+        IndicatorDiagnostics.record("position.begin id=\(traceID) pid=\(app.processIdentifier) size=\(appSize) base=\(String(describing: preferences.indicatorPosition)) enhanced=\(preferences.isEnhancedModeEnabled) nearCursor=\(String(describing: preferences.tryToDisplayIndicatorNearCursor)) alwaysOn=\(preferences.isAlwaysOnIndicatorEnabled) alwaysNearMouse=\(preferences.isAlwaysDisplayIndicatorNearMouseEnabled)")
+        return Just(preferences.indicatorPosition)
             .compactMap { $0 }
             .flatMapLatest { [weak self] position -> AnyPublisher<IndicatorPositionInfo?, Never> in
                 let DEFAULT = self?.getIndicatorBasePosition(
                     appSize: appSize,
                     app: app,
                     position: position
-                ) ?? Empty(completeImmediately: true).eraseToAnyPublisher()
+                ).handleEvents(receiveOutput: {
+                    IndicatorDiagnostics.record("position.fallback id=\(traceID) result=\(String(describing: $0))")
+                }).eraseToAnyPublisher() ?? Empty(completeImmediately: true).eraseToAnyPublisher()
 
                 guard let self = self
                 else { return DEFAULT }
@@ -91,7 +104,7 @@ extension PreferencesVM {
                            self.preferences.tryToDisplayIndicatorNearCursor == true,
                            self.isAbleToQueryLocation(app)
                         {
-                            return self.getPositionAroundInputCursor(app: app)
+                            return self.getPositionAroundInputCursor(app: app, traceID: traceID)
                                 .map { cursorPosition -> AnyPublisher<IndicatorPositionInfo?, Never> in
                                     guard let cursorPosition = cursorPosition else { return DEFAULT }
 
@@ -117,7 +130,9 @@ extension PreferencesVM {
               !NSApplication.isSpotlightLikeApp(app.bundleIdentifier)
         else { return Just(nil).eraseToAnyPublisher() }
 
-        return getPositionAroundInputCursor(app: app)
+        let traceID = UUID().uuidString
+        IndicatorDiagnostics.record("position.alwaysOn id=\(traceID) pid=\(app.processIdentifier)")
+        return getPositionAroundInputCursor(app: app, traceID: traceID)
             .map { position in
                 position.map { ($0.isContainer ? .inputRect : .inputCursor, $0.point) }
             }
@@ -186,20 +201,28 @@ private extension PreferencesVM {
         .eraseToAnyPublisher()
     }
 
-    func getPositionAroundInputCursor(app: NSRunningApplication) -> AnyPublisher<(point: CGPoint, isContainer: Bool)?, Never> {
+    func getPositionAroundInputCursor(app: NSRunningApplication, traceID: String) -> AnyPublisher<(point: CGPoint, isContainer: Bool)?, Never> {
         Self.preferredCaretPositionPublisher(
             palette: { CaretPalette.shared.point(for: app) },
             accessibility: {
                 Future<(point: CGPoint, isContainer: Bool)?, Never> { promise in
                     DispatchQueue.global().async {
-                        guard let rectInfo = systemWideElement.getCursorRectInfo(),
+                        let started = ProcessInfo.processInfo.systemUptime
+                        IndicatorDiagnostics.record("AX.begin id=\(traceID) expectedPID=\(app.processIdentifier)")
+                        defer { IndicatorDiagnostics.record("AX.end id=\(traceID) elapsedMs=\((ProcessInfo.processInfo.systemUptime - started) * 1000)") }
+                        guard let rectInfo = systemWideElement.getCursorRectInfo(traceID: traceID),
                               let screen = NSScreen.getScreenInclude(rect: rectInfo.rect)
-                        else { return promise(.success(nil)) }
+                        else {
+                            IndicatorDiagnostics.record("AX.missing id=\(traceID) reason=no-rect-or-screen")
+                            return promise(.success(nil))
+                        }
+                        IndicatorDiagnostics.record("AX.geometry id=\(traceID) rect=\(rectInfo.rect) container=\(rectInfo.isContainer) screen=\(screen.frame)")
 
                         if rectInfo.isContainer,
                            rectInfo.rect.width / screen.frame.width > 0.7 &&
                            rectInfo.rect.height / screen.frame.height > 0.7
                         {
+                            IndicatorDiagnostics.record("AX.rejected id=\(traceID) reason=oversized-container")
                             return promise(.success(nil))
                         }
 
@@ -214,8 +237,14 @@ private extension PreferencesVM {
                 .receive(on: DispatchQueue.main)
                 .eraseToAnyPublisher()
             },
-            awaitingConfirmation: { CaretPalette.shared.suppressesAccessibilityFallback(for: app) }
+            awaitingConfirmation: { CaretPalette.shared.suppressesAccessibilityFallback(for: app) },
+            traceID: traceID
         )
+        .handleEvents(
+            receiveOutput: { IndicatorDiagnostics.record("caret.delivered id=\(traceID) result=\(String(describing: $0)) frontPID=\(NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0)") },
+            receiveCancel: { IndicatorDiagnostics.record("caret.cancel id=\(traceID)") }
+        )
+        .eraseToAnyPublisher()
     }
 
     func getPositionNearMouse(size: CGSize) -> AnyPublisher<CGPoint?, Never> {

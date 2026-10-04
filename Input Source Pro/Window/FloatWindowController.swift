@@ -24,11 +24,21 @@ class FloatWindowController: NSWindowController, NSWindowDelegate {
 
 extension FloatWindowController {
     func active() {
+        IndicatorDiagnostics.record("window.orderFront owner=\(type(of: self)) frame=\(String(describing: window?.frame))")
         window?.orderFront(nil)
     }
 
     func deactive() {
+        IndicatorDiagnostics.record("window.orderOut owner=\(type(of: self)) frame=\(String(describing: window?.frame))")
         window?.orderOut(nil)
+    }
+
+    func windowDidMove(_ notification: Notification) {
+        IndicatorDiagnostics.record("window.didMove owner=\(type(of: self)) frame=\(String(describing: window?.frame)) visible=\(window?.isVisible ?? false)")
+    }
+
+    func windowDidResize(_ notification: Notification) {
+        IndicatorDiagnostics.record("window.didResize owner=\(type(of: self)) frame=\(String(describing: window?.frame)) visible=\(window?.isVisible ?? false)")
     }
 
     func moveTo(point: CGPoint) {

@@ -100,3 +100,41 @@ By contributing, you agree that your contributions will be licensed under the [G
 ---
 
 Thank you again for your interest in contributing!
+
+## Diagnosing indicator movement
+
+Debug builds write indicator diagnostics automatically. Run the app from Xcode,
+reproduce the jumps, wait a second for queued writes, then quit the app normally.
+Collect `indicator.log` and `indicator-previous.log` (if present) from
+`~/Library/Logs/Input Source Pro/`. Note the approximate reproduction time and
+which app was focused. Only run one copy of Input Source Pro while recording.
+
+The log records input-source and Caps Lock changes, display requests and
+cancellations, caret-helper sample ages, Accessibility geometry and fallbacks,
+content sizes, and both indicator windows' visibility and frames. It excludes
+editor text, keystrokes, browser URLs, and window titles. Timestamps are system
+uptime in seconds; each session header maps uptime to a wall-clock date.
+Request IDs connect `show`, `position`, `caret`, and `AX` entries. An AX query
+may finish after cancellation; `caret.delivered` and `show.position` distinguish
+results that reached the UI. `first()` also cancels upstream after accepting a
+position, so a cancellation alone does not mean a result was discarded.
+
+Writes run on a serial background queue. The current file rotates at 5 MiB and
+keeps one previous segment (about 10 MiB total). Copy logs soon after reproducing.
+Release builds leave diagnostics off unless explicitly enabled. To override
+either build type, set `ISP_INDICATOR_DIAGNOSTICS=1` (on) or `0` (off) in the
+Xcode scheme's environment, or use this preference and relaunch:
+
+```sh
+defaults write com.runjuu.Input-Source-Pro IndicatorDiagnosticsEnabled -bool true
+```
+
+Use `-bool false` to disable logging, or delete the preference to restore the
+build default:
+
+```sh
+defaults delete com.runjuu.Input-Source-Pro IndicatorDiagnosticsEnabled
+```
+
+The environment setting takes precedence over the preference. Diagnostics are
+disabled in XCTest runs.

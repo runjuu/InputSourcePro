@@ -66,10 +66,13 @@ class IndicatorViewController: NSViewController {
     }
 
     func prepare(config: IndicatorViewConfig) {
+        IndicatorDiagnostics.record("view.prepare source=\(config.inputSource.persistentIdentifier) capsLock=\(config.showsCapsLock) badge=\(config.badge != nil) before=\(view.frame)")
         self.config = config
+        IndicatorDiagnostics.record("view.prepared fitting=\(String(describing: fittingSize))")
     }
 
     func refresh() {
+        IndicatorDiagnostics.record("view.refresh normalPending=\(nextNormalView != nil) alwaysOnPending=\(nextAlwaysOnView != nil) frame=\(view.frame)")
         if let nextNormalView = nextNormalView {
             normalView = nextNormalView
             self.nextNormalView = nil
@@ -81,7 +84,24 @@ class IndicatorViewController: NSViewController {
         }
     }
 
+    /// Keep the displayed content unchanged while an asynchronous position query
+    /// runs, then commit its replacement and frame in the same AppKit transaction.
+    func refresh(at point: CGPoint) {
+        guard let window = view.window, let size = fittingSize else { return }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0
+            context.allowsImplicitAnimation = false
+            refresh()
+            view.layoutSubtreeIfNeeded()
+            window.setFrame(
+                CGRect(origin: point, size: CGSize(width: ceil(size.width), height: ceil(size.height))),
+                display: true
+            )
+        }
+    }
+
     func showAlwaysOnView() {
+        IndicatorDiagnostics.record("view.mode alwaysOn badge=\(config?.badge != nil)")
         // Status badges need their glyph and title to communicate the new mode.
         // Keep them readable until the badge expires, even while pinned to a caret.
         guard config?.badge == nil else {
@@ -94,8 +114,14 @@ class IndicatorViewController: NSViewController {
     }
 
     func showNormalView() {
+        IndicatorDiagnostics.record("view.mode normal")
         normalView?.animator().alphaValue = 1
         alwaysOnView?.animator().alphaValue = 0
+    }
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        IndicatorDiagnostics.record("view.layout frame=\(view.frame) window=\(String(describing: view.window?.frame)) normal=\(String(describing: normalView?.frame)) normalAlpha=\(normalView?.alphaValue ?? -1) alwaysOn=\(String(describing: alwaysOnView?.frame)) alwaysOnAlpha=\(alwaysOnView?.alphaValue ?? -1)")
     }
 
     override func loadView() {

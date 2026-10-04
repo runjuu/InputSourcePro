@@ -190,6 +190,7 @@ final class CaretPalette {
         focusedElement = element
         textFocus = state
         focusedAt = ProcessInfo.processInfo.systemUptime
+        IndicatorDiagnostics.record("helper.focus pid=\(app.processIdentifier) kind=\(state) focusedAt=\(focusedAt)")
         sample = nil
         pendingConfirmation = nil
         // Wait for geometry belonging to this field, not an AX fallback or the old field.
@@ -250,8 +251,10 @@ final class CaretPalette {
               let uptime = values["uptime"] as? Double
         else { return }
         let pending = values["pending"] as? Bool == true
+        IndicatorDiagnostics.record("helper.receive pid=\(pid) rect=\(NSRectFromString(rectString)) empty=\(rectString.isEmpty) pending=\(pending) sampleUptime=\(uptime) focus=\(textFocus) focusedAt=\(focusedAt) sessionMatches=\(self.session == session)")
         let lastUptime = max(sample?.uptime ?? 0, pendingConfirmation?.uptime ?? 0)
         if let focusID = focusID, values["focusID"] as? String != focusID {
+            IndicatorDiagnostics.record("helper.rejected reason=focus-token-mismatch pid=\(pid)")
             // The helper may have activated after the focus notification was sent.
             if Int(NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0) == pid {
                 sendActivity()
@@ -281,6 +284,8 @@ final class CaretPalette {
                     focusConfirmation = nil
                 }
             }
+        } else {
+            IndicatorDiagnostics.record("helper.rejected reason=focus-pid-or-time pid=\(pid) lastUptime=\(lastUptime) frontPID=\(NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0)")
         }
         updates.send(())
     }
@@ -288,11 +293,17 @@ final class CaretPalette {
     func point(for app: NSRunningApplication) -> CGPoint? {
         guard isEnabled, !suspension.isSuspended, textFocus.permitsCaret,
               NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier
-        else { return nil }
-        return sample?.point(
-            for: app.processIdentifier, now: ProcessInfo.processInfo.systemUptime,
+        else {
+            IndicatorDiagnostics.record("helper.unavailable pid=\(app.processIdentifier) enabled=\(isEnabled) suspended=\(suspension.isSuspended) focus=\(textFocus) frontPID=\(NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0)")
+            return nil
+        }
+        let now = ProcessInfo.processInfo.systemUptime
+        let point = sample?.point(
+            for: app.processIdentifier, now: now,
             focusedAt: focusedAt, screens: NSScreen.screens.map(\.frame)
         )
+        IndicatorDiagnostics.record("helper.lookup pid=\(app.processIdentifier) point=\(String(describing: point)) samplePID=\(sample?.pid ?? 0) ageMs=\(sample.map { (now - $0.uptime) * 1000 } ?? -1) sampleRect=\(String(describing: sample?.rect)) focusedAt=\(focusedAt)")
+        return point
     }
 
     func suppressesAccessibilityFallback(for app: NSRunningApplication) -> Bool {

@@ -27,6 +27,7 @@ class InputSourceVM: ObservableObject {
         
         inputSourceChangesPublisher = inputSourceChangesSubject
             .map { _ in InputSource.getCurrentInputSource() }
+            .handleEvents(receiveOutput: { IndicatorDiagnostics.record("inputSource.observed source=\($0.persistentIdentifier)") })
             .removeDuplicates()
             .eraseToAnyPublisher()
 
@@ -44,12 +45,14 @@ class InputSourceVM: ObservableObject {
                     .eraseToAnyPublisher()
             })
             .sink { [weak self] _ in
+                IndicatorDiagnostics.record("inputSource.trigger reason=poll")
                 self?.inputSourceChangesSubject.send(())
             }
             .store(in: cancelBag)
     }
 
     func select(inputSource: InputSource, app: NSRunningApplication? = nil) {
+        IndicatorDiagnostics.record("inputSource.select source=\(inputSource.persistentIdentifier) pid=\(app?.processIdentifier ?? 0)")
         selectInputSourceSubject.send(SelectionRequest(inputSource: inputSource, app: app))
     }
 
@@ -57,7 +60,9 @@ class InputSourceVM: ObservableObject {
         DistributedNotificationCenter.default()
             .publisher(for: Notification.Name(rawValue: kTISNotifySelectedKeyboardInputSourceChanged as String))
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.inputSourceChangesSubject.send(())
+            .sink { [weak self] _ in
+                IndicatorDiagnostics.record("inputSource.trigger reason=TIS-notification")
+                self?.inputSourceChangesSubject.send(())
             }
             .store(in: cancelBag)
     }
