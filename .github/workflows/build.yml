@@ -31,6 +31,11 @@ jobs:
       - name: Prepare release
         id: release
         run: python3 scripts/release.py prepare
+      - name: Set up Node.js for DMG packaging
+        if: steps.release.outputs.complete != 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
       - name: Test release scripts
         if: steps.release.outputs.complete != 'true'
         run: python3 -m unittest discover -s scripts -p 'test_*.py'
@@ -85,9 +90,9 @@ jobs:
           codesign --verify --deep --strict 'dist/export/Input Source Pro.app'
           python3 scripts/release.py check-bundle
           mkdir -p dist/dmg dist/updates
-          ditto 'dist/export/Input Source Pro.app' 'dist/dmg/Input Source Pro.app'
-          ln -s /Applications dist/dmg/Applications
-          hdiutil create -volname 'Input Source Pro' -srcfolder dist/dmg -ov -format UDZO "dist/updates/$ASSET"
+          npx --yes create-dmg@8.1.0 --overwrite --no-version-in-filename \
+            --identity='Developer ID Application' 'dist/export/Input Source Pro.app' dist/dmg
+          mv 'dist/dmg/Input Source Pro.dmg' "dist/updates/$ASSET"
       - name: Notarize and staple
         if: steps.release.outputs.complete != 'true'
         env:
