@@ -46,8 +46,6 @@ jobs:
           EXPORT_OPTIONS_PLIST_B64: ${{ secrets.EXPORT_OPTIONS_PLIST_B64 }}
           DEVELOPER_ID_APPLICATION: ${{ secrets.DEVELOPER_ID_APPLICATION }}
           DEVELOPER_ID_APPLICATION_PSW: ${{ secrets.DEVELOPER_ID_APPLICATION_PSW }}
-          APPLE_DEVELOPMENT: ${{ secrets.APPLE_DEVELOPMENT }}
-          APPLE_DEVELOPMENT_PSW: ${{ secrets.APPLE_DEVELOPMENT_PSW }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
@@ -56,7 +54,6 @@ jobs:
           mkdir -p "$RUN_SIGNING_DIR"
           security list-keychains -d user > "$RUN_SIGNING_DIR/keychains.txt"
           printf '%s' "$EXPORT_OPTIONS_PLIST_B64" | base64 --decode > "$RUN_SIGNING_DIR/ExportOptions.plist"
-          printf '%s' "$APPLE_DEVELOPMENT" | base64 --decode > "$RUN_SIGNING_DIR/development.p12"
           printf '%s' "$DEVELOPER_ID_APPLICATION" | base64 --decode > "$RUN_SIGNING_DIR/distribution.p12"
           test -n "$SPARKLE_PRIVATE_KEY"
           printf '%s' "$SPARKLE_PRIVATE_KEY" > "$RUN_SIGNING_DIR/sparkle.key"
@@ -64,7 +61,6 @@ jobs:
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
           security set-keychain-settings -lut 21600 "$keychain"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
-          security import "$RUN_SIGNING_DIR/development.p12" -P "$APPLE_DEVELOPMENT_PSW" -A -t cert -f pkcs12 -k "$keychain"
           security import "$RUN_SIGNING_DIR/distribution.p12" -P "$DEVELOPER_ID_APPLICATION_PSW" -A -t cert -f pkcs12 -k "$keychain"
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain"
           security list-keychains -d user -s "$keychain"
@@ -82,7 +78,8 @@ jobs:
             -configuration Release -destination 'generic/platform=macOS' \
             -derivedDataPath "$RUNNER_TEMP/release-derived-${GITHUB_RUN_ID}" \
             -archivePath dist/ISP.xcarchive CURRENT_PROJECT_VERSION="$BUILD" \
-            MARKETING_VERSION="$VERSION" RELEASE_CHANNEL="$CHANNEL" DEVELOPMENT_TEAM="$TEAM_ID"
+            MARKETING_VERSION="$VERSION" RELEASE_CHANNEL="$CHANNEL" DEVELOPMENT_TEAM="$TEAM_ID" \
+            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Developer ID Application"
           xcodebuild -exportArchive -archivePath dist/ISP.xcarchive \
             -exportOptionsPlist "$RUN_SIGNING_DIR/ExportOptions.plist" -exportPath dist/export
           codesign --verify --deep --strict 'dist/export/Input Source Pro.app'
