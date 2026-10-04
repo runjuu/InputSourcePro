@@ -6,7 +6,7 @@ struct IndicatorView: NSViewControllerRepresentable {
     @EnvironmentObject var inputSourceVM: InputSourceVM
 
     func makeNSViewController(context _: Context) -> IndicatorViewController {
-        return IndicatorViewController()
+        return IndicatorViewController(layout: .preview)
     }
 
     func updateNSViewController(_ indicatorViewController: IndicatorViewController, context _: Context) {
@@ -31,7 +31,7 @@ struct DumpIndicatorView: NSViewControllerRepresentable {
     }
 
     func makeNSViewController(context _: Context) -> IndicatorViewController {
-        return IndicatorViewController()
+        return IndicatorViewController(layout: .preview)
     }
 
     func updateNSViewController(_ indicatorViewController: IndicatorViewController, context _: Context) {

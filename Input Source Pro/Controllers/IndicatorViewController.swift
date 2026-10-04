@@ -3,10 +3,15 @@ import SnapKit
 
 @MainActor
 class IndicatorViewController: NSViewController {
+    enum Layout {
+        case floatingWindow, preview
+    }
+
     enum DisplayMode {
         case normal, alwaysOn
     }
 
+    private let layout: Layout
     private var displayMode: DisplayMode = .normal
     private var caretContentOffset = CGPoint.zero
     let hoverableView = NSViewHoverable(frame: .zero)
@@ -39,7 +44,13 @@ class IndicatorViewController: NSViewController {
                 normalView.snp.makeConstraints { make in
                     let size = normalView.fittingSize
 
-                    make.leading.bottom.equalToSuperview()
+                    switch layout {
+                    case .floatingWindow:
+                        make.leading.bottom.equalToSuperview()
+                    case .preview:
+                        // SwiftUI needs the full content bounds to size and align previews.
+                        make.edges.equalToSuperview()
+                    }
                     make.width.equalTo(size.width)
                     make.height.equalTo(size.height)
                 }
@@ -63,7 +74,8 @@ class IndicatorViewController: NSViewController {
         }
     }
 
-    init() {
+    init(layout: Layout = .floatingWindow) {
+        self.layout = layout
         super.init(nibName: nil, bundle: nil)
     }
 

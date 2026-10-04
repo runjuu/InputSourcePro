@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import XCTest
 @testable import Input_Source_Pro
 
@@ -257,5 +258,93 @@ private final class PresentationObservingPanel: NSPanel {
     override func setFrame(_ frameRect: NSRect, display flag: Bool) {
         if flag { onDisplay?() }
         super.setFrame(frameRect, display: flag)
+    }
+}
+
+@MainActor
+final class IndicatorPreviewLayoutTests: XCTestCase {
+    func testAppearancePreviewIsCenteredAndFitsItsContent() throws {
+        for size in IndicatorSize.allCases {
+            for kind: IndicatorKind in [.icon, .title, .iconAndTitle] {
+                let hostingView = NSHostingView(rootView: ItemSection {
+                    DumpIndicatorView(config: config(kind: kind, size: size))
+                })
+                hostingView.frame = CGRect(x: 0, y: 0, width: 500, height: 100)
+                hostingView.layoutSubtreeIfNeeded()
+
+                let preview = try XCTUnwrap(previews(in: hostingView).first)
+                let content = try XCTUnwrap(preview.subviews.first)
+                let frame = content.convert(content.bounds, to: hostingView)
+                XCTAssertEqual(frame.midX, hostingView.bounds.midX, accuracy: 1)
+                XCTAssertEqual(frame.midY, hostingView.bounds.midY, accuracy: 1)
+                XCTAssertGreaterThanOrEqual(preview.bounds.height, content.fittingSize.height)
+                XCTAssertTrue(hostingView.bounds.contains(frame))
+            }
+        }
+    }
+
+    func testColorSchemeGridReservesHeightAndCentersEachPreview() throws {
+        for size in IndicatorSize.allCases {
+            let hostingView = NSHostingView(rootView:
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible())]) {
+                    DumpIndicatorView(config: config(kind: .alwaysOn, size: size))
+                    DumpIndicatorView(config: config(kind: .iconAndTitle, size: size))
+                    Text("Always-On Indicator")
+                    Text("Tooltip")
+                }
+                .padding(16)
+            )
+            hostingView.frame = CGRect(x: 0, y: 0, width: 500, height: hostingView.fittingSize.height)
+            hostingView.layoutSubtreeIfNeeded()
+
+            let previews = previews(in: hostingView)
+            XCTAssertEqual(previews.count, 2)
+            for preview in previews {
+                let content = try XCTUnwrap(preview.subviews.first)
+                let frame = content.convert(content.bounds, to: hostingView)
+                let columnCenter: CGFloat = frame.midX < 250 ? 131 : 369
+                XCTAssertEqual(frame.midX, columnCenter, accuracy: 1)
+                XCTAssertGreaterThanOrEqual(preview.bounds.height, content.fittingSize.height)
+                XCTAssertTrue(hostingView.bounds.contains(frame))
+            }
+        }
+    }
+
+    func testPositionPreviewFitsAtEveryAlignment() throws {
+        for alignment in IndicatorPosition.Alignment.allCases {
+            let hostingView = NSHostingView(rootView:
+                IndicatorAlignmentView(alignment: alignment) {
+                    DumpIndicatorView(config: config(kind: .iconAndTitle, size: .large))
+                        .fixedSize()
+                        .padding(12)
+                }
+            )
+            hostingView.frame = CGRect(x: 0, y: 0, width: 500, height: 230)
+            hostingView.layoutSubtreeIfNeeded()
+
+            let preview = try XCTUnwrap(previews(in: hostingView).first)
+            let content = try XCTUnwrap(preview.subviews.first)
+            let frame = content.convert(content.bounds, to: hostingView)
+            XCTAssertTrue(hostingView.bounds.insetBy(dx: 11, dy: 11).contains(frame), "\(alignment)")
+            XCTAssertEqual(preview.bounds.width, content.fittingSize.width, accuracy: 1)
+            XCTAssertEqual(preview.bounds.height, content.fittingSize.height, accuracy: 1)
+            if alignment == .center {
+                XCTAssertEqual(frame.midX, hostingView.bounds.midX, accuracy: 1)
+                XCTAssertEqual(frame.midY, hostingView.bounds.midY, accuracy: 1)
+            }
+        }
+    }
+
+    private func previews(in view: NSView) -> [NSViewHoverable] {
+        if let preview = view as? NSViewHoverable { return [preview] }
+        return view.subviews.flatMap { previews(in: $0) }
+    }
+
+    private func config(kind: IndicatorKind, size: IndicatorSize) -> IndicatorViewConfig {
+        IndicatorViewConfig(
+            inputSource: InputSource.getCurrentInputSource(), kind: kind, size: size,
+            bgColor: .black, textColor: .white,
+            badge: .init(glyph: .symbol("globe"), title: "Pinyin – Simplified")
+        )
     }
 }
