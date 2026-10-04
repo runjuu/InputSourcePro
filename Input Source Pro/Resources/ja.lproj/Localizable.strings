@@ -253,3 +253,6 @@
 "Display When Caps Lock Changes" = "Caps Lock の切り替え時に表示";
 "Display the input source when Caps Lock changes, with a symbol while it is on." = "Caps Lock の切り替え時に入力ソースを表示し、オンの間はマークを添えます。";
 "Caps Lock On" = "Caps Lock オン";
+
+"Receive beta updates" = "ベータ版のアップデートを受け取る";
+"Stable updates resume when a newer stable build is available." = "より新しい安定版のビルドが公開されると、安定版の更新が再開されます。";

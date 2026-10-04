@@ -32,6 +32,12 @@ final class PreferencesVM: ObservableObject {
 
     var permissionsVM: PermissionsVM
 
+    private let updateChannel = UpdateChannelSettings()
+
+    @Published var receivesBetaUpdates = false {
+        didSet { updateChannel.receivesBetaUpdates = receivesBetaUpdates }
+    }
+
     var updaterController: SPUStandardUpdaterController?
 
     var cancelBag = CancelBag()
@@ -47,7 +53,7 @@ final class PreferencesVM: ObservableObject {
     let container: NSPersistentContainer
     let mainStorage: MainStorage
 
-    let versionStr = "\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown")"
+    let versionStr = Bundle.main.displayVersion
 
     let buildStr = "\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "unknown")"
 
@@ -62,6 +68,7 @@ final class PreferencesVM: ObservableObject {
         container = NSPersistentContainer(name: "Main")
         mainStorage = MainStorage(container: container)
 
+        receivesBetaUpdates = updateChannel.receivesBetaUpdates
         setupAutoUpdate()
 
         // TODO: - Move to MainStorage
@@ -163,7 +170,7 @@ extension PreferencesVM {
     private func setupAutoUpdate() {
         updaterController = SPUStandardUpdaterController(
             startingUpdater: true,
-            updaterDelegate: nil,
+            updaterDelegate: updateChannel,
             userDriverDelegate: nil
         )
 
@@ -728,5 +735,32 @@ extension PreferencesVM {
 
     func needDisplayEnhancedModePrompt(bundleIdentifier: String?) -> Bool {
         NSApplication.isFloatingApp(bundleIdentifier) && !preferences.isEnhancedModeEnabled
+    }
+}
+
+@MainActor
+final class UpdateChannelSettings: NSObject, SPUUpdaterDelegate {
+    static let preferenceKey = "receivesBetaUpdates"
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard, isBetaBuild: Bool = Bundle.main.isBetaBuild) {
+        self.defaults = defaults
+        super.init()
+        if defaults.object(forKey: Self.preferenceKey) == nil {
+            defaults.set(isBetaBuild, forKey: Self.preferenceKey)
+        }
+    }
+
+    var receivesBetaUpdates: Bool {
+        get { defaults.bool(forKey: Self.preferenceKey) }
+        set { defaults.set(newValue, forKey: Self.preferenceKey) }
+    }
+
+    var feedURL: String {
+        "https://inputsource.pro/\(receivesBetaUpdates ? "beta" : "stable")/appcast.xml"
+    }
+
+    func feedURLString(for updater: SPUUpdater) -> String? {
+        feedURL
     }
 }

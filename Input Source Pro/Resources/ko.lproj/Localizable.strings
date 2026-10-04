@@ -253,3 +253,6 @@
 "Display When Caps Lock Changes" = "Caps Lock 상태 변경 시 표시";
 "Display the input source when Caps Lock changes, with a symbol while it is on." = "Caps Lock 상태가 바뀌면 입력 소스를 표시하고, 켜져 있을 때는 기호를 함께 표시합니다.";
 "Caps Lock On" = "Caps Lock 켜짐";
+
+"Receive beta updates" = "베타 업데이트 받기";
+"Stable updates resume when a newer stable build is available." = "더 높은 빌드 번호의 안정 버전이 나오면 안정 버전 업데이트가 재개됩니다.";

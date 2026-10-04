@@ -253,3 +253,6 @@
 "Display When Caps Lock Changes" = "Display When Caps Lock Changes";
 "Display the input source when Caps Lock changes, with a symbol while it is on." = "Display the input source when Caps Lock changes, with a symbol while it is on.";
 "Caps Lock On" = "Caps Lock On";
+
+"Receive beta updates" = "Receive beta updates";
+"Stable updates resume when a newer stable build is available." = "Stable updates resume when a newer stable build is available.";

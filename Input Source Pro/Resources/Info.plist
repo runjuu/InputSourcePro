@@ -43,6 +43,8 @@
 	<string>Input Source Pro needs to monitor keyboard input to automatically switch between English and Chinese punctuation marks based on your app-specific rules.</string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
+	<key>ISPReleaseChannel</key>
+	<string>$(RELEASE_CHANNEL)</string>
 	<key>SUFeedURL</key>
 	<string>https://inputsource.pro/stable/appcast.xml</string>
 	<key>SUPublicEDKey</key>

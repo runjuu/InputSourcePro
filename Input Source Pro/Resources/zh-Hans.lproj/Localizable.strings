@@ -255,3 +255,6 @@
 "Display When Caps Lock Changes" = "大写锁定状态更改时显示";
 "Display the input source when Caps Lock changes, with a symbol while it is on." = "大写锁定状态更改时显示输入法，开启时附带大写锁定图标。";
 "Caps Lock On" = "大写锁定已开启";
+
+"Receive beta updates" = "接收测试版更新";
+"Stable updates resume when a newer stable build is available." = "当有更新的稳定版构建可用时，将恢复稳定版更新。";

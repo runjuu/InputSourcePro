@@ -1,77 +1,147 @@
-name: App build
+name: Release
 on:
   push:
+    branches: [main]
     tags:
-      - '*'
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+# Only duplicate runs for the same commit/channel share a lock. Every main push is built.
+concurrency:
+  group: release-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
-  build_with_signing:
+  release:
     # Alamofire 5.12 requires Swift 6.4, included with Xcode 27.
     runs-on: xcode-27
-
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUN_SIGNING_DIR: ${{ runner.temp }}/release-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-      - name: Restore ExportOptions.plist
-        run: |
-          echo "$EXPORT_OPTIONS_PLIST_B64" | base64 --decode > ExportOptions.plist
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Prepare release
+        id: release
+        run: python3 scripts/release.py prepare
+      - name: Test release scripts
+        if: steps.release.outputs.complete != 'true'
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+      - name: Test app
+        if: steps.release.outputs.complete != 'true'
+        run: >-
+          xcodebuild -scheme "Input Source Pro" -configuration Debug
+          -destination 'platform=macOS' -derivedDataPath "$RUNNER_TEMP/release-derived-${GITHUB_RUN_ID}"
+          CODE_SIGNING_ALLOWED=NO test
+      - name: Install signing credentials
+        if: steps.release.outputs.complete != 'true'
         env:
           EXPORT_OPTIONS_PLIST_B64: ${{ secrets.EXPORT_OPTIONS_PLIST_B64 }}
-      - name: Install Certificates
-        run: |
-          # https://docs.github.com/en/actions/deployment/deploying-xcode-applications/installing-an-apple-certificate-on-macos-runners-for-xcode-development
-          APPLE_DEVELOPMENT_PATH=$RUNNER_TEMP/madev.p12
-          DEVELOPER_ID_APPLICATION_PATH=$RUNNER_TEMP/devid.p12
-          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-          echo -n "$APPLE_DEVELOPMENT" | base64 --decode -o $APPLE_DEVELOPMENT_PATH
-          echo -n "$DEVELOPER_ID_APPLICATION" | base64 --decode -o $DEVELOPER_ID_APPLICATION_PATH
-          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security import $APPLE_DEVELOPMENT_PATH -P "$APPLE_DEVELOPMENT_PSW" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-          security import $DEVELOPER_ID_APPLICATION_PATH -P "$DEVELOPER_ID_APPLICATION_PSW" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-          security list-keychain -d user -s $KEYCHAIN_PATH
-        env:
           DEVELOPER_ID_APPLICATION: ${{ secrets.DEVELOPER_ID_APPLICATION }}
           DEVELOPER_ID_APPLICATION_PSW: ${{ secrets.DEVELOPER_ID_APPLICATION_PSW }}
           APPLE_DEVELOPMENT: ${{ secrets.APPLE_DEVELOPMENT }}
           APPLE_DEVELOPMENT_PSW: ${{ secrets.APPLE_DEVELOPMENT_PSW }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-      - name: Build App
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
-          mkdir -p dist
-          xcodebuild \
-            archive \
-            -project Input\ Source\ Pro.xcodeproj/ \
-            -scheme "Input Source Pro" \
-            -destination "generic/platform=macOS" \
-            -archivePath dist/ISP.xcarchive
-          xcodebuild \
-            -exportArchive \
-            -archivePath dist/ISP.xcarchive \
-            -exportOptionsPlist ./ExportOptions.plist \
-            -exportPath dist/ \
-            -allowProvisioningUpdates
-          npx create-dmg dist/Input\ Source\ Pro.app dist/
-          mv dist/Input\ Source\ Pro*.dmg dist/Input\ Source\ Pro.dmg
-      - name: Notarize DMG
-        run: |
-          xcrun notarytool submit \
-            --team-id "$TEAM_ID" \
-            --apple-id "$APPLE_ID" \
-            --password "$NOTARY_PASSWORD" \
-            --wait \
-            dist/Input\ Source\ Pro.dmg
-          xcrun stapler staple dist/Input\ Source\ Pro.dmg
+          set -euo pipefail
+          umask 077
+          mkdir -p "$RUN_SIGNING_DIR"
+          security list-keychains -d user > "$RUN_SIGNING_DIR/keychains.txt"
+          printf '%s' "$EXPORT_OPTIONS_PLIST_B64" | base64 --decode > "$RUN_SIGNING_DIR/ExportOptions.plist"
+          printf '%s' "$APPLE_DEVELOPMENT" | base64 --decode > "$RUN_SIGNING_DIR/development.p12"
+          printf '%s' "$DEVELOPER_ID_APPLICATION" | base64 --decode > "$RUN_SIGNING_DIR/distribution.p12"
+          test -n "$SPARKLE_PRIVATE_KEY"
+          printf '%s' "$SPARKLE_PRIVATE_KEY" > "$RUN_SIGNING_DIR/sparkle.key"
+          keychain="$RUN_SIGNING_DIR/signing.keychain-db"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
+          security import "$RUN_SIGNING_DIR/development.p12" -P "$APPLE_DEVELOPMENT_PSW" -A -t cert -f pkcs12 -k "$keychain"
+          security import "$RUN_SIGNING_DIR/distribution.p12" -P "$DEVELOPER_ID_APPLICATION_PSW" -A -t cert -f pkcs12 -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain"
+          security list-keychains -d user -s "$keychain"
+      - name: Archive and package
+        if: steps.release.outputs.complete != 'true'
         env:
+          BUILD: ${{ steps.release.outputs.build }}
+          VERSION: ${{ steps.release.outputs.version }}
+          CHANNEL: ${{ steps.release.outputs.channel }}
+          ASSET: ${{ steps.release.outputs.asset }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
+        run: |
+          set -euo pipefail
+          xcodebuild archive -project 'Input Source Pro.xcodeproj' -scheme 'Input Source Pro' \
+            -configuration Release -destination 'generic/platform=macOS' \
+            -derivedDataPath "$RUNNER_TEMP/release-derived-${GITHUB_RUN_ID}" \
+            -archivePath dist/ISP.xcarchive CURRENT_PROJECT_VERSION="$BUILD" \
+            MARKETING_VERSION="$VERSION" RELEASE_CHANNEL="$CHANNEL" DEVELOPMENT_TEAM="$TEAM_ID"
+          xcodebuild -exportArchive -archivePath dist/ISP.xcarchive \
+            -exportOptionsPlist "$RUN_SIGNING_DIR/ExportOptions.plist" -exportPath dist/export
+          codesign --verify --deep --strict 'dist/export/Input Source Pro.app'
+          python3 scripts/release.py check-bundle
+          mkdir -p dist/dmg dist/updates
+          ditto 'dist/export/Input Source Pro.app' 'dist/dmg/Input Source Pro.app'
+          ln -s /Applications dist/dmg/Applications
+          hdiutil create -volname 'Input Source Pro' -srcfolder dist/dmg -ov -format UDZO "dist/updates/$ASSET"
+      - name: Notarize and staple
+        if: steps.release.outputs.complete != 'true'
+        env:
+          ASSET: ${{ steps.release.outputs.asset }}
           NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           TEAM_ID: ${{ secrets.TEAM_ID }}
-      - name: Rename DMG
         run: |
-          mv dist/Input\ Source\ Pro.dmg dist/Input\ Source\ Pro\ ${{ github.ref_name }}.dmg
-      - name: Upload DMG
+          set -euo pipefail
+          xcrun notarytool submit --team-id "$TEAM_ID" --apple-id "$APPLE_ID" \
+            --password "$NOTARY_PASSWORD" --wait --output-format json "dist/updates/$ASSET" > dist/notarization.json
+          python3 -c 'import json; assert json.load(open("dist/notarization.json"))["status"] == "Accepted", "Notarization failed"'
+          xcrun stapler staple "dist/updates/$ASSET"
+          xcrun stapler validate "dist/updates/$ASSET"
+      - name: Generate and verify Sparkle feed
+        if: steps.release.outputs.complete != 'true'
+        env:
+          ASSET: ${{ steps.release.outputs.asset }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          sparkle="$RUNNER_TEMP/release-derived-${GITHUB_RUN_ID}/SourcePackages/artifacts/sparkle/Sparkle/bin"
+          cp dist/notes.html "dist/updates/${ASSET%.dmg}.html"
+          "$sparkle/generate_appcast" --ed-key-file "$RUN_SIGNING_DIR/sparkle.key" \
+            --maximum-deltas 0 --embed-release-notes \
+            --download-url-prefix "https://inputsource.pro/releases/$RELEASE_TAG/" \
+            --link https://inputsource.pro \
+            --full-release-notes-url "https://github.com/runjuu/InputSourcePro/releases/tag/$RELEASE_TAG" \
+            dist/updates
+          python3 scripts/release.py finish-appcast
+      - name: Publish verified release
+        if: steps.release.outputs.complete != 'true'
+        run: python3 scripts/release.py publish
+      - name: Upload diagnostics
+        if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: Input Source Pro ${{ github.ref_name }}.dmg
-          path: dist/Input Source Pro ${{ github.ref_name }}.dmg
+          name: release-diagnostics-${{ github.run_id }}
+          path: |
+            dist/release.json
+            dist/notarization.json
+      - name: Remove signing credentials
+        if: always()
+        run: |
+          trap 'rm -rf "$RUN_SIGNING_DIR"' EXIT
+          if [ -f "$RUN_SIGNING_DIR/keychains.txt" ]; then
+            python3 - <<'PY'
+          import os, pathlib, shlex, subprocess
+          paths = shlex.split((pathlib.Path(os.environ['RUN_SIGNING_DIR']) / 'keychains.txt').read_text())
+          subprocess.run(['security', 'list-keychains', '-d', 'user', '-s', *paths], check=True)
+          PY
+          fi
+          if [ -f "$RUN_SIGNING_DIR/signing.keychain-db" ]; then
+            security delete-keychain "$RUN_SIGNING_DIR/signing.keychain-db"
+          fi
+          rm -rf "$RUN_SIGNING_DIR"
