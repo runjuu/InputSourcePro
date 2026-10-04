@@ -21,8 +21,10 @@ jobs:
     timeout-minutes: 90
     env:
       GH_TOKEN: ${{ github.token }}
-      RUN_SIGNING_DIR: ${{ runner.temp }}/release-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
+      - name: Set release paths
+        run: |
+          printf 'RUN_SIGNING_DIR=%s/release-%s-%s\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
