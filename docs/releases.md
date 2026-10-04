@@ -1,16 +1,32 @@
 # Releases
 
-A push to `main` builds and publishes a GitHub prerelease tagged `beta-<build>`.
+A push to `main` builds and publishes a GitHub prerelease tagged `beta-<build>`,
+unless that exact commit already has a numeric stable version tag.
 Push a numeric version tag (`2.13.0` or `v2.13.0`) on a commit in `main` to publish
 stable. The tag must advance the previous published stable version and build.
 Do not use both tag spellings for the same version.
+
+For a stable release, create the tag locally, then push `main` and that tag in
+one atomic push. For example, for the next release:
+
+```sh
+git tag 2.14.0
+git push --atomic origin main refs/tags/2.14.0
+```
+
+Both push events may appear in Actions. A lightweight Linux job checks the tags
+and skips the beta's macOS build job; only the stable run builds and publishes.
+Ordinary untagged `main` commits still produce betas. Push the refs together:
+if `main` is pushed first and its beta build starts before the stable tag exists,
+the later tag cannot prevent that build. A tag on an older commit does not skip
+the beta for a newer commit.
 
 Both channels use `1000 + git rev-list --count <commit>`, including merged commits.
 Keep full history and do not rewrite `main` or change the offset after publishing.
 A beta and stable release of the same commit have equal build numbers. Sparkle
 will not upgrade between them; users who disable beta wait for a higher stable
-build. Every push builds its tip, rather than separately building every commit
-included in that push.
+build. Eligible branch pushes build their tip, rather than separately building
+every commit included in that push.
 
 Beta builds display `Beta (build)` in settings, with `Beta` as the update's display
 version in Sparkle. Their internal marketing version stays numeric. Stable

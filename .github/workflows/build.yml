@@ -9,13 +9,28 @@ on:
 permissions:
   contents: write
 
-# Only duplicate runs for the same commit/channel share a lock. Every main push is built.
+# Keep stable and beta runs separate so a branch push cannot cancel a stable release.
 concurrency:
   group: release-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      build: ${{ steps.plan.outputs.build }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Decide whether to build
+        id: plan
+        run: python3 scripts/release.py plan
   release:
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
     # Alamofire 5.12 requires Swift 6.4, included with Xcode 27.
     runs-on: xcode-27
     timeout-minutes: 90

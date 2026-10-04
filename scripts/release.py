@@ -41,6 +41,22 @@ def version_tuple(tag):
     return tuple(map(int, match.groups())) if match else None
 
 
+def plan(args):
+    commit = git('rev-parse', f'{os.environ["GITHUB_SHA"]}^{{commit}}')
+    ref = os.environ['GITHUB_REF']
+    build = True
+    if ref == 'refs/heads/main':
+        stable_tags = [tag for tag in git('tag', '--points-at', commit).splitlines()
+                       if version_tuple(tag)]
+        if stable_tags:
+            build = False
+            print(f'Skipping beta build: {commit} has stable tag(s) {", ".join(stable_tags)}')
+    elif not (ref.startswith('refs/tags/') and version_tuple(ref.removeprefix('refs/tags/'))):
+        raise ValueError('Only main pushes and numeric version tags may release')
+    with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+        output.write(f'build={str(build).lower()}\n')
+
+
 def build_number(commit):
     if git('rev-parse', '--is-shallow-repository') != 'false':
         raise ValueError('Release builds require full Git history')
@@ -211,6 +227,6 @@ def publish(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('command', choices=['prepare', 'check-bundle', 'finish-appcast', 'publish'])
+    parser.add_argument('command', choices=['plan', 'prepare', 'check-bundle', 'finish-appcast', 'publish'])
     arguments = parser.parse_args()
-    {'prepare': prepare, 'check-bundle': check_bundle, 'finish-appcast': finish_appcast, 'publish': publish}[arguments.command](arguments)
+    {'plan': plan, 'prepare': prepare, 'check-bundle': check_bundle, 'finish-appcast': finish_appcast, 'publish': publish}[arguments.command](arguments)

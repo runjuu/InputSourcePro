@@ -40,6 +40,47 @@ class ReleaseTests(unittest.TestCase):
             release.prepare(None)
         return json.loads(Path('dist/release.json').read_text())
 
+    def plan(self, ref='refs/heads/main', commit='HEAD'):
+        output = Path('plan-output').resolve()
+        output.write_text('')
+        with patch.dict(os.environ, GITHUB_REF=ref, GITHUB_SHA=self.git('rev-parse', commit),
+                        GITHUB_OUTPUT=str(output)):
+            release.plan(None)
+        return output.read_text().strip()
+
+    def test_untagged_main_commit_builds_beta(self):
+        self.assertEqual(self.plan(), 'build=true')
+
+    def test_stable_tags_skip_beta_but_still_build_stable(self):
+        for tag in ['2.13.0', 'v2.13.0']:
+            for annotated in [False, True]:
+                with self.subTest(tag=tag, annotated=annotated):
+                    self.git('tag', *(['-a', '-m', 'Stable release'] if annotated else []), tag)
+                    self.assertEqual(self.plan(), 'build=false')
+                    self.assertEqual(self.plan(f'refs/tags/{tag}'), 'build=true')
+                    self.git('tag', '-d', tag)
+
+    def test_beta_and_nonstable_tags_do_not_skip_beta(self):
+        for tag in ['beta-1002', '2.13.0-beta', '2.13', 'v02.13.0']:
+            self.git('tag', tag)
+        self.assertEqual(self.plan(), 'build=true')
+
+    def test_plan_uses_event_commit_and_ignores_tags_on_other_commits(self):
+        self.git('tag', '2.13.0')
+        self.commit('feat: after stable release')
+        self.assertEqual(self.plan(), 'build=true')
+        self.assertEqual(self.plan(commit='2.13.0'), 'build=false')
+
+    def test_existing_beta_tag_does_not_skip_stable(self):
+        self.git('tag', 'beta-1002')
+        self.git('tag', '2.13.0')
+        self.assertEqual(self.plan('refs/tags/2.13.0'), 'build=true')
+
+    def test_plan_rejects_unsupported_refs(self):
+        for ref in ['refs/heads/feature', 'refs/tags/beta-1002', 'refs/tags/2.13.0-beta']:
+            with self.subTest(ref=ref), self.assertRaisesRegex(ValueError, 'numeric version tags'):
+                self.plan(ref)
+
     def test_build_count_includes_merged_commits_and_is_stable_for_tags(self):
         self.git('checkout', '-qb', 'feature')
         self.commit('feat: branch work')
