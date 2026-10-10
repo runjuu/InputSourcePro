@@ -131,7 +131,8 @@ final class CaretFocusObserver {
 
         func requestWatch(pid: pid_t?, generation: Int) {
             lock.lock()
-            requested = Request(pid: pid, generation: generation)
+            // NSRunningApplication can return -1 when it no longer has a process.
+            requested = Request(pid: pid.flatMap { $0 > 0 ? $0 : nil }, generation: generation)
             if !watchScheduled {
                 watchScheduled = true
                 scheduleLocked { [self] in watchLatest() }

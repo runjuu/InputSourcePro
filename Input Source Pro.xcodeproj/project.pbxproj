@@ -195,6 +195,7 @@
 		D60003242F20000000000324 /* ShortcutTriggerManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60003232F20000000000323 /* ShortcutTriggerManagerTests.swift */; };
 		D70000012F20000000000001 /* CaretPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70000022F20000000000002 /* CaretPalette.swift */; };
 		D70000032F20000000000003 /* CaretPaletteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70000042F20000000000004 /* CaretPaletteTests.swift */; };
+		DA1000010000000000000001 /* CaretFocusObserverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1000020000000000000002 /* CaretFocusObserverTests.swift */; };
 		D70000052F20000000000005 /* CaretPollingSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70000062F20000000000006 /* CaretPollingSchedule.swift */; };
 		D70000072F20000000000007 /* CaretGeometryFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70000082F20000000000008 /* CaretGeometryFilter.swift */; };
 		D71000012F20000000000001 /* CaretHelperManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71000022F20000000000001 /* CaretHelperManager.swift */; };
@@ -414,6 +415,7 @@
 		D60003232F20000000000323 /* ShortcutTriggerManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutTriggerManagerTests.swift; sourceTree = "<group>"; };
 		D70000022F20000000000002 /* CaretPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaretPalette.swift; sourceTree = "<group>"; };
 		D70000042F20000000000004 /* CaretPaletteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaretPaletteTests.swift; sourceTree = "<group>"; };
+		DA1000020000000000000002 /* CaretFocusObserverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaretFocusObserverTests.swift; sourceTree = "<group>"; };
 		D70000062F20000000000006 /* CaretPollingSchedule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CaretPollingSchedule.swift; path = Tools/CaretPalette/CaretPollingSchedule.swift; sourceTree = SOURCE_ROOT; };
 		D70000082F20000000000008 /* CaretGeometryFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CaretGeometryFilter.swift; path = Tools/CaretPalette/CaretGeometryFilter.swift; sourceTree = SOURCE_ROOT; };
 		D71000022F20000000000001 /* CaretHelperManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaretHelperManager.swift; sourceTree = "<group>"; };
@@ -817,6 +819,7 @@
 				D60002012F20000000000201 /* IndicatorNearMousePointTests.swift */,
 				D60002112F20000000000211 /* AlwaysNearMousePlacementTests.swift */,
 				D70000042F20000000000004 /* CaretPaletteTests.swift */,
+				DA1000020000000000000002 /* CaretFocusObserverTests.swift */,
 				D71000082F20000000000001 /* CaretHelperSetupTests.swift */,
 				D73000042F20000000000001 /* CaretChannelTests.swift */,
 				D71000062F20000000000001 /* Tools/CaretPalette/CaretHelperFiles.swift */,
@@ -1179,6 +1182,7 @@
 				D60002022F20000000000202 /* IndicatorNearMousePointTests.swift in Sources */,
 				D60002122F20000000000212 /* AlwaysNearMousePlacementTests.swift in Sources */,
 				D70000032F20000000000003 /* CaretPaletteTests.swift in Sources */,
+				DA1000010000000000000001 /* CaretFocusObserverTests.swift in Sources */,
 				D71000072F20000000000001 /* CaretHelperSetupTests.swift in Sources */,
 				D73000032F20000000000001 /* CaretChannelTests.swift in Sources */,
 				D71000052F20000000000001 /* Tools/CaretPalette/CaretHelperFiles.swift in Sources */,
@@ -1555,8 +1559,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/runjuu/AXSwift.git";
 			requirement = {
-				branch = main;
-				kind = branch;
+				kind = revision;
+				revision = 833860d988d836479c7dc6ba34c22b70ba549775;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
