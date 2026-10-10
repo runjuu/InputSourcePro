@@ -15,8 +15,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/runjuu/AXSwift.git",
       "state" : {
-        "branch" : "main",
-        "revision" : "9c3fd37675eb8368d6da30f1709010a9af9c9791"
+        "revision" : "833860d988d836479c7dc6ba34c22b70ba549775"
       }
     },
     {
