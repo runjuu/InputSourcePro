@@ -127,49 +127,65 @@ extension IndicatorVM {
         $state
             .withPrevious()
             .map { [weak self] previous, current -> ActivateEvent in
-                if let preferencesVM = self?.preferencesVM {
-                    if previous?.appKind?.getId() != current.appKind?.getId() {
-                        let event = ActivateEvent.appChanges(
-                            current: current.appKind,
-                            prev: previous?.appKind,
-                            inputSourceDidChange: previous?.inputSource.persistentIdentifier != current.inputSource.persistentIdentifier
-                        )
-
-                        if preferencesVM.preferences.isActiveWhenSwitchApp || preferencesVM.preferences.isActiveWhenFocusedElementChangesEnabled {
-                            if preferencesVM.preferences.isHideWhenSwitchAppWithForceKeyboard {
-                                switch current.inputSourceChangeReason {
-                                case let .appSpecified(status):
-                                    switch status {
-                                    case .cached:
-                                        return event
-                                    case .specified:
-                                        return .justHide
-                                    }
-                                default:
-                                    return .justHide
-                                }
-                            } else {
-                                return event
-                            }
-                        } else {
-                            return .justHide
-                        }
-                    }
-
-                    if previous?.inputSource.persistentIdentifier != current.inputSource.persistentIdentifier {
-                        switch current.inputSourceChangeReason {
-                        case .noChanges:
-                            return .justHide
-                        case .system, .shortcut, .appSpecified:
-                            guard preferencesVM.preferences.isActiveWhenSwitchInputSource else { return .justHide }
-                            return .inputSourceChanges(current.inputSource, current.inputSourceChangeReason)
-                        }
-                    }
-                }
-
-                return .justHide
+                guard let preferences = self?.preferencesVM.preferences else { return .justHide }
+                return Self.activationEvent(
+                    previous: previous,
+                    current: current,
+                    onAppSwitch: preferences.isActiveWhenSwitchApp,
+                    onInputFocus: preferences.isActiveWhenFocusedElementChangesEnabled,
+                    onInputSourceChange: preferences.isActiveWhenSwitchInputSource,
+                    hideWhenSwitchAppWithForceKeyboard: preferences.isHideWhenSwitchAppWithForceKeyboard
+                )
             }
             .eraseToAnyPublisher()
+    }
+
+    static func activationEvent(
+        previous: State?,
+        current: State,
+        onAppSwitch: Bool,
+        onInputFocus: Bool,
+        onInputSourceChange: Bool,
+        hideWhenSwitchAppWithForceKeyboard: Bool
+    ) -> ActivateEvent {
+        let inputSourceDidChange = previous?.inputSource.persistentIdentifier != current.inputSource.persistentIdentifier
+
+        // Reconciliation can discover an external switch during an app update.
+        if previous != nil, inputSourceDidChange, onInputSourceChange,
+           case .system = current.inputSourceChangeReason {
+            return .inputSourceChanges(current.inputSource, current.inputSourceChangeReason)
+        }
+
+        if previous?.appKind?.getId() != current.appKind?.getId() {
+            let event = ActivateEvent.appChanges(
+                current: current.appKind,
+                prev: previous?.appKind,
+                inputSourceDidChange: inputSourceDidChange
+            )
+
+            guard onAppSwitch || onInputFocus else { return .justHide }
+            if hideWhenSwitchAppWithForceKeyboard {
+                switch current.inputSourceChangeReason {
+                case .appSpecified(.cached):
+                    return event
+                default:
+                    return .justHide
+                }
+            }
+            return event
+        }
+
+        if inputSourceDidChange {
+            switch current.inputSourceChangeReason {
+            case .noChanges:
+                return .justHide
+            case .system, .shortcut, .appSpecified:
+                guard onInputSourceChange else { return .justHide }
+                return .inputSourceChanges(current.inputSource, current.inputSourceChangeReason)
+            }
+        }
+
+        return .justHide
     }
 }
 
