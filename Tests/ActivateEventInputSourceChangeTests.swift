@@ -96,6 +96,113 @@ final class ActivateEventInputSourceChangeTests: XCTestCase {
         }
     }
 
+    func testExternalSourceChangeAcrossHostsUsesInputSourceTrigger() {
+        let previous = state(source: "EN", host: "before.example")
+        let current = state(source: "RU", host: "after.example")
+
+        for hideForcedKeyboard in [false, true] {
+            let event = activationEvent(
+                previous: previous,
+                current: current,
+                hideWhenSwitchAppWithForceKeyboard: hideForcedKeyboard
+            )
+
+            guard case let .inputSourceChanges(source, reason) = event else {
+                XCTFail("An external source change must use its enabled trigger across hosts")
+                continue
+            }
+            XCTAssertEqual(source.persistentIdentifier, "RU")
+            guard case .system = reason else {
+                XCTFail("The external source-change reason must be preserved")
+                continue
+            }
+        }
+    }
+
+    func testExternalSourceChangeWithinHostUsesInputSourceTrigger() {
+        let event = activationEvent(
+            previous: state(source: "EN", host: "example.com"),
+            current: state(source: "RU", host: "example.com")
+        )
+
+        guard case let .inputSourceChanges(source, reason) = event else {
+            return XCTFail("An external source change must use its enabled trigger within a host")
+        }
+        XCTAssertEqual(source.persistentIdentifier, "RU")
+        guard case .system = reason else {
+            return XCTFail("The external source-change reason must be preserved")
+        }
+    }
+
+    func testDisabledSourceTriggerPreservesEnabledAppSwitchTrigger() {
+        let previous = state(source: "EN", host: "before.example")
+        let current = state(source: "RU", host: "after.example")
+        let event = activationEvent(
+            previous: previous,
+            current: current,
+            onAppSwitch: true,
+            onInputSourceChange: false
+        )
+
+        guard case let .appChanges(actualCurrent, actualPrevious, inputSourceDidChange) = event else {
+            return XCTFail("A disabled source trigger must leave the app-switch trigger available")
+        }
+        XCTAssertEqual(actualCurrent?.getId(), current.appKind?.getId())
+        XCTAssertEqual(actualPrevious?.getId(), previous.appKind?.getId())
+        XCTAssertTrue(inputSourceDidChange)
+    }
+
+    func testExternalSourceChangeStaysHiddenWhenAllTriggersAreDisabled() {
+        let event = activationEvent(
+            previous: state(source: "EN", host: "before.example"),
+            current: state(source: "RU", host: "after.example"),
+            onInputSourceChange: false
+        )
+
+        XCTAssertTrue(event.isJustHide)
+    }
+
+    func testInitialStateDoesNotInventAnExternalSourceChange() {
+        let current = state(source: "RU", host: "example.com")
+
+        XCTAssertTrue(activationEvent(previous: nil, current: current).isJustHide)
+        let appEvent = activationEvent(previous: nil, current: current, onAppSwitch: true)
+        guard case .appChanges = appEvent else {
+            return XCTFail("Initial state must continue to use app-switch gating")
+        }
+    }
+
+    func testRuleDrivenSourceChangesPreserveForcedKeyboardHiding() {
+        let previous = state(source: "EN", host: "before.example")
+        let forcedSource = TestInputSource("RU")
+        let current = state(
+            source: "RU",
+            host: "after.example",
+            reason: .appSpecified(.specified(forcedSource))
+        )
+
+        XCTAssertTrue(activationEvent(
+            previous: previous,
+            current: current,
+            onAppSwitch: true,
+            hideWhenSwitchAppWithForceKeyboard: true
+        ).isJustHide)
+        let visibleEvent = activationEvent(previous: previous, current: current, onAppSwitch: true)
+        guard case .appChanges = visibleEvent else {
+            return XCTFail("Rule-driven switches must retain app-switch gating")
+        }
+
+        let cachedEvent = activationEvent(
+            previous: previous,
+            current: state(source: "RU", host: "after.example", reason: .appSpecified(.cached(forcedSource))),
+            onAppSwitch: true,
+            hideWhenSwitchAppWithForceKeyboard: true
+        )
+        guard case .appChanges = cachedEvent else {
+            return XCTFail("Restoring a cached source must remain exempt from forced-keyboard hiding")
+        }
+    }
+
     func testAppSwitchStillRespectsInputSourceChangesAndFocusedFieldPreference() {
         let unchanged = IndicatorVM.ActivateEvent.appChanges(
             current: appKind(), prev: appKind(), inputSourceDidChange: false
@@ -241,5 +348,55 @@ final class ActivateEventInputSourceChangeTests: XCTestCase {
             event: .appChanges(current: appKind(), prev: appKind(), inputSourceDidChange: inputSourceDidChange),
             focusedField: focusedField
         )
+    }
+
+    private func state(
+        source: String,
+        host: String,
+        reason: IndicatorVM.InputSourceChangeReason = .system
+    ) -> IndicatorVM.State {
+        .init(
+            appKind: .browser(
+                app: app,
+                info: (
+                    focusedElement: nil,
+                    isFocusOnInputContainer: true,
+                    url: URL(string: "https://\(host)/"),
+                    rule: nil,
+                    isFocusedOnAddressBar: false
+                )
+            ),
+            inputSource: TestInputSource(source),
+            inputSourceChangeReason: reason
+        )
+    }
+
+    private func activationEvent(
+        previous: IndicatorVM.State?,
+        current: IndicatorVM.State,
+        onAppSwitch: Bool = false,
+        onInputFocus: Bool = false,
+        onInputSourceChange: Bool = true,
+        hideWhenSwitchAppWithForceKeyboard: Bool = false
+    ) -> IndicatorVM.ActivateEvent {
+        IndicatorVM.activationEvent(
+            previous: previous,
+            current: current,
+            onAppSwitch: onAppSwitch,
+            onInputFocus: onInputFocus,
+            onInputSourceChange: onInputSourceChange,
+            hideWhenSwitchAppWithForceKeyboard: hideWhenSwitchAppWithForceKeyboard
+        )
+    }
+
+    private final class TestInputSource: InputSource {
+        private let identifier: String
+
+        init(_ identifier: String) {
+            self.identifier = identifier
+            super.init(tisInputSource: InputSource.getCurrentInputSource().tisInputSource)
+        }
+
+        override var persistentIdentifier: String { identifier }
     }
 }
