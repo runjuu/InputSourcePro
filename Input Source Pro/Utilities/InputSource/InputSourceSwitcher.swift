@@ -4,6 +4,30 @@ import CoreGraphics
 
 @MainActor
 enum InputSourceSwitcher {
+    struct TemporarySelection<Source: Equatable> {
+        private var pending: (id: UUID, target: Source, temporary: Source)?
+
+        mutating func begin(target: Source, temporary: Source) -> UUID {
+            let id = UUID()
+            pending = (id, target, temporary)
+            return id
+        }
+
+        mutating func finish(_ id: UUID) {
+            guard pending?.id == id else { return }
+            pending = nil
+        }
+
+        mutating func cancel() {
+            pending = nil
+        }
+
+        func sourceForReconciliation(_ actual: Source) -> Source {
+            guard let pending, actual == pending.temporary else { return actual }
+            return pending.target
+        }
+    }
+
     struct Descriptor: CustomStringConvertible {
         let localizedName: String
         let inputSourceID: String
@@ -34,6 +58,7 @@ enum InputSourceSwitcher {
     }
 
     private static let logger = ISPLogger(category: String(describing: InputSourceSwitcher.self))
+    private static var temporarySelection = TemporarySelection<InputSource>()
     private static var pendingWorkItems: [DispatchWorkItem] = []
     private static var temporaryInputWindow: NSWindow?
     private static var temporaryInputWindowPreviousApplication: NSRunningApplication?
@@ -93,6 +118,10 @@ enum InputSourceSwitcher {
         logger.debug { "Discovered input sources (\(sources.count)):\n\(description)" }
     }
 
+    static func inputSourceForReconciliation() -> InputSource {
+        temporarySelection.sourceForReconciliation(InputSource.getCurrentInputSource())
+    }
+
     static func switchToInputSource(
         sourceID: String,
         cJKVFixStrategy: CJKVFixStrategy? = CJKVFixStrategy.defaultStrategy
@@ -121,6 +150,7 @@ enum InputSourceSwitcher {
         modeID: String,
         cJKVFixStrategy: CJKVFixStrategy? = CJKVFixStrategy.defaultStrategy
     ) {
+        cancelPendingWorkItems()
         guard let tisTarget = resolveInputSourceByModeID(modeID) else {
             logger.debug { "No input source found for modeID=\(modeID)" }
             return
@@ -214,12 +244,19 @@ enum InputSourceSwitcher {
         // corrupting modifier tracking state and blocking subsequent shortcut triggers.
         syntheticEventEndTime = ProcessInfo.processInfo.systemUptime + 0.35
         logger.debug { "Applying CJKV fix using previous input source shortcut" }
+        // The non-CJKV bounce is an implementation detail, not the user's choice
+        // to remember for the active app while the shortcut finishes.
+        let selectionID = temporarySelection.begin(
+            target: InputSource(tisInputSource: tisTarget),
+            temporary: InputSource(tisInputSource: nonCJKVSource)
+        )
         selectInputSource(tisTarget, reason: "CJKV target")
         selectInputSource(nonCJKVSource, reason: "CJKV bounce")
 
         scheduleWorkItem(after: 0.1, execute: {
-            triggerShortcut(previousShortcut, onFinish: { currentInputSouce in
-                if !target.matches(currentInputSouce) {
+            triggerShortcut(previousShortcut, onFinish: { currentInputSource in
+                defer { temporarySelection.finish(selectionID) }
+                if !target.matches(currentInputSource) {
                     selectInputSource(tisTarget, reason: "CJKV target mismatch fallback")
                 }
             })
@@ -281,6 +318,7 @@ enum InputSourceSwitcher {
     }
 
     private static func cancelPendingWorkItems() {
+        temporarySelection.cancel()
         syntheticEventEndTime = 0
         closeTemporaryInputWindow(restorePreviousApplication: true)
         guard !pendingWorkItems.isEmpty else { return }
@@ -453,6 +491,7 @@ extension InputSourceSwitcher {
               let keyUp = CGEvent(keyboardEventSource: source, virtualKey: hotKey.keyCode, keyDown: false)
         else {
             logger.debug { "Failed to create key press event." }
+            onFinish(InputSource.getCurrentInputSource())
             return
         }
         

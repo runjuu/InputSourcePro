@@ -27,7 +27,7 @@ class InputSourceVM: ObservableObject {
         
         inputSourceChangesPublisher = SourceReconciliationCore.observations(
             tokens: inputSourceChangesSubject.eraseToAnyPublisher(),
-            readActual: { InputSource.getCurrentInputSource() },
+            readActual: { InputSourceSwitcher.inputSourceForReconciliation() },
             observed: { IndicatorDiagnostics.record("inputSource.observed source=\($0.persistentIdentifier)") }
         )
 

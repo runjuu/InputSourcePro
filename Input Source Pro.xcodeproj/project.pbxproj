@@ -180,6 +180,7 @@
 		D60000322F20000000000032 /* BrowserRuleValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000312F20000000000031 /* BrowserRuleValidationTests.swift */; };
 		D60000522F20000000000052 /* InputSourceDeduplicationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000512F20000000000051 /* InputSourceDeduplicationTests.swift */; };
 		A14600020000000000000002 /* SourceReconciliationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14600010000000000000001 /* SourceReconciliationTests.swift */; };
+		A14600040000000000000004 /* CJKVSourceReconciliationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14600030000000000000003 /* CJKVSourceReconciliationTests.swift */; };
 		D60000622F20000000000062 /* AppURLAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000612F20000000000061 /* AppURLAction.swift */; };
 		D60000722F20000000000072 /* AppURLActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000712F20000000000071 /* AppURLActionTests.swift */; };
 		D60000822F20000000000082 /* URLActivationSuppressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000812F20000000000081 /* URLActivationSuppressionTests.swift */; };
@@ -402,6 +403,7 @@
 		D60000312F20000000000031 /* BrowserRuleValidationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserRuleValidationTests.swift; sourceTree = "<group>"; };
 		D60000512F20000000000051 /* InputSourceDeduplicationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSourceDeduplicationTests.swift; sourceTree = "<group>"; };
 		A14600010000000000000001 /* SourceReconciliationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceReconciliationTests.swift; sourceTree = "<group>"; };
+		A14600030000000000000003 /* CJKVSourceReconciliationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CJKVSourceReconciliationTests.swift; sourceTree = "<group>"; };
 		D60000612F20000000000061 /* AppURLAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppURLAction.swift; sourceTree = "<group>"; };
 		D60000712F20000000000071 /* AppURLActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppURLActionTests.swift; sourceTree = "<group>"; };
 		D60000812F20000000000081 /* URLActivationSuppressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLActivationSuppressionTests.swift; sourceTree = "<group>"; };
@@ -811,6 +813,7 @@
 				D60001012F20000000000101 /* AppKindComparisonTests.swift */,
 				D60000512F20000000000051 /* InputSourceDeduplicationTests.swift */,
 				A14600010000000000000001 /* SourceReconciliationTests.swift */,
+				A14600030000000000000003 /* CJKVSourceReconciliationTests.swift */,
 				D60000112F20000000000011 /* BrowserRuleSelectionTests.swift */,
 				D60000312F20000000000031 /* BrowserRuleValidationTests.swift */,
 				D60000212F20000000000021 /* RuntimeRuleChangeNotifierTests.swift */,
@@ -1176,6 +1179,7 @@
 				D60001022F20000000000102 /* AppKindComparisonTests.swift in Sources */,
 				D60000522F20000000000052 /* InputSourceDeduplicationTests.swift in Sources */,
 				A14600020000000000000002 /* SourceReconciliationTests.swift in Sources */,
+				A14600040000000000000004 /* CJKVSourceReconciliationTests.swift in Sources */,
 				D60000122F20000000000012 /* BrowserRuleSelectionTests.swift in Sources */,
 				D60000322F20000000000032 /* BrowserRuleValidationTests.swift in Sources */,
 				D60000222F20000000000022 /* RuntimeRuleChangeNotifierTests.swift in Sources */,
