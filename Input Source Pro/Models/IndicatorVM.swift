@@ -296,7 +296,7 @@ extension IndicatorVM {
             let preferencesVM = self.preferencesVM
             let inputSourceVM = self.inputSourceVM
             return SourceReconciliationCore.Dependencies(
-                readActual: { InputSource.getCurrentInputSource() },
+                readActual: { InputSourceSwitcher.inputSourceForReconciliation() },
                 rule: { app in
                     guard let status = preferencesVM.getAppAutoSwitchKeyboard(app) else { return nil }
                     return (status.inputSource, .appSpecified(status))
