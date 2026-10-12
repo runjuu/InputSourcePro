@@ -13,7 +13,6 @@ class InputSource {
 
     let tisInputSource: TISInputSource
 
-    let icon: NSImage?
 
     var id: String { tisInputSource.id }
     var name: String { tisInputSource.name }
@@ -32,42 +31,43 @@ class InputSource {
         return lang == "ru" || lang == "ko" || lang == "ja" || lang == "vi" || lang.hasPrefix("zh")
     }
 
+    // Unchanged reconciliation samples do not need icon decoding or copies.
+    private(set) lazy var icon: NSImage? = { () -> NSImage? in
+        if let imgName = Self.iconMap[String(self.tisInputSource.id.sha256().prefix(8))],
+           let image = NSImage(named: imgName)
+        {
+            return image.markTemplateIfGrayScaleOrPdf()
+        }
+
+        guard let imageURL = self.tisInputSource.iconImageURL else {
+            if #available(macOS 11.0, *) {
+                return nil
+            } else {
+                if let iconRef = self.tisInputSource.iconRef {
+                    return NSImage(iconRef: iconRef).markTemplateIfGrayScaleOrPdf()
+                } else {
+                    return nil
+                }
+            }
+        }
+
+        for url in [imageURL.retinaImageURL, imageURL.tiffImageURL, imageURL] {
+            if let image = NSImage(contentsOf: url) {
+                return image.markTemplateIfGrayScaleOrPdf(url: url)
+            }
+        }
+
+        if let baseURL = imageURL.baseURL,
+           baseURL.lastPathComponent.hasSuffix(".app")
+        {
+            return NSWorkspace.shared.icon(forFile: baseURL.relativePath)
+        }
+
+        return nil
+    }()
+
     init(tisInputSource: TISInputSource) {
         self.tisInputSource = tisInputSource
-
-        icon = { () -> NSImage? in
-            if let imgName = Self.iconMap[String(tisInputSource.id.sha256().prefix(8))],
-               let image = NSImage(named: imgName)
-            {
-                return image.markTemplateIfGrayScaleOrPdf()
-            }
-
-            guard let imageURL = tisInputSource.iconImageURL else {
-                if #available(macOS 11.0, *) {
-                    return nil
-                } else {
-                    if let iconRef = tisInputSource.iconRef {
-                        return NSImage(iconRef: iconRef).markTemplateIfGrayScaleOrPdf()
-                    } else {
-                        return nil
-                    }
-                }
-            }
-
-            for url in [imageURL.retinaImageURL, imageURL.tiffImageURL, imageURL] {
-                if let image = NSImage(contentsOf: url) {
-                    return image.markTemplateIfGrayScaleOrPdf(url: url)
-                }
-            }
-
-            if let baseURL = imageURL.baseURL,
-               baseURL.lastPathComponent.hasSuffix(".app")
-            {
-                return NSWorkspace.shared.icon(forFile: baseURL.relativePath)
-            }
-
-            return nil
-        }()
     }
 
     func select(cJKVFixStrategy: CJKVFixStrategy?) {

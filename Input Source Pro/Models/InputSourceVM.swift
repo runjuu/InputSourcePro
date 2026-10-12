@@ -25,30 +25,31 @@ class InputSourceVM: ObservableObject {
     init(preferencesVM: PreferencesVM) {
         self.preferencesVM = preferencesVM
         
-        inputSourceChangesPublisher = inputSourceChangesSubject
-            .map { _ in InputSource.getCurrentInputSource() }
-            .handleEvents(receiveOutput: { IndicatorDiagnostics.record("inputSource.observed source=\($0.persistentIdentifier)") })
-            .removeDuplicates()
-            .eraseToAnyPublisher()
+        inputSourceChangesPublisher = SourceReconciliationCore.observations(
+            tokens: inputSourceChangesSubject.eraseToAnyPublisher(),
+            readActual: { InputSource.getCurrentInputSource() },
+            observed: { IndicatorDiagnostics.record("inputSource.observed source=\($0.persistentIdentifier)") }
+        )
 
         watchSystemNotification()
 
+        // Requests perform selection; they never reset the read-only heartbeat.
         selectInputSourceSubject
-            .tap { [weak self] in
-                if let self {
-                    $0.inputSource.select(cJKVFixStrategy: self.preferencesVM.activeCJKVFixStrategy(for: $0.app))
-                }
+            .sink { [weak self] request in
+                guard let self else { return }
+                request.inputSource.select(cJKVFixStrategy: self.preferencesVM.activeCJKVFixStrategy(for: request.app))
             }
-            .flatMapLatest({ _ in
-                Timer
-                    .interval(seconds: 1)
-                    .eraseToAnyPublisher()
-            })
-            .sink { [weak self] _ in
+            .store(in: cancelBag)
+
+        SourceReconciliationCore.connectHeartbeat(
+            tokens: Timer.interval(seconds: 1).map { _ in () }.eraseToAnyPublisher(),
+            deliver: { [weak self] in
                 IndicatorDiagnostics.record("inputSource.trigger reason=poll")
                 self?.inputSourceChangesSubject.send(())
             }
-            .store(in: cancelBag)
+        )
+        .store(in: cancelBag)
+
     }
 
     func select(inputSource: InputSource, app: NSRunningApplication? = nil) {

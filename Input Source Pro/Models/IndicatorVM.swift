@@ -31,7 +31,11 @@ final class IndicatorVM: ObservableObject {
     @Published
     private(set) var state: State
 
-    var actionSubject = PassthroughSubject<Action, Never>()
+    private let actionRelay = SourceReconciliationCore.SerializedActionRelay<Action>(
+        onFault: { fault in
+            NSLog("Input Source Pro: input-source action relay TERMINAL FAULT %@; subsequent actions rejected until restart", String(describing: fault))
+        }
+    )
 
     var refreshShortcutSubject = PassthroughSubject<Void, Never>()
 
@@ -243,16 +247,11 @@ extension IndicatorVM {
         }
 
         static func isSame(_ lhs: IndicatorVM.State, _ rhs: IndicatorVM.State) -> Bool {
-            guard let appKind1 = lhs.appKind, let appKind2 = rhs.appKind
-            else { return lhs.appKind == nil && rhs.appKind == nil }
-
-            guard appKind1.isSameAppOrWebsite(with: appKind2, detectAddressBar: true)
-            else { return false }
-
-            guard lhs.inputSource.persistentIdentifier == rhs.inputSource.persistentIdentifier
-            else { return false }
-
-            return true
+            return SourceReconciliationCore.same(
+                .init(appKind: lhs.appKind, inputSource: lhs.inputSource, inputSourceChangeReason: lhs.inputSourceChangeReason),
+                .init(appKind: rhs.appKind, inputSource: rhs.inputSource, inputSourceChangeReason: rhs.inputSourceChangeReason),
+                sameContext: { $0.isSameAppOrWebsite(with: $1, detectAddressBar: true) }
+            )
         }
 
         static func from(
@@ -277,7 +276,7 @@ extension IndicatorVM {
     }
 
     func send(_ action: Action) {
-        actionSubject.send(action)
+        actionRelay.send(action)
     }
 
     func refreshShortcut() {
@@ -285,72 +284,52 @@ extension IndicatorVM {
     }
 
     func watchState() {
-        actionSubject
-            .scan(state) { [weak self] state, action -> State in
-                guard let preferencesVM = self?.preferencesVM,
-                      let inputSourceVM = self?.inputSourceVM
-                else { return state }
-
-                @MainActor
-                func updateState(appKind: AppKind?, inputSource: InputSource, inputSourceChangeReason: InputSourceChangeReason) -> State {
-                    // TODO: Move to outside
-                    if let appKind = appKind {
-                        preferencesVM.cacheKeyboardFor(appKind, keyboard: inputSource)
-                    }
-
-                    return .from(
-                        preferencesVM: preferencesVM,
-                        inputSourceChangeReason: inputSourceChangeReason,
-                        appKind,
-                        inputSource
-                    )
-                }
-
-                switch action {
-                case .start:
-                    return state
-                case let .appChanged(appKind):
-                    if let status = preferencesVM.getAppAutoSwitchKeyboard(appKind) {
-                        // The target keyboard is already active in macOS: skip the
-                        // redundant TIS select (and CJKV fix) so nothing "switches",
-                        // and mark the reason as .noChanges so the indicator won't
-                        // announce it. Compare against the live system source rather
-                        // than the reducer's optimistic `state.inputSource`, so a
-                        // failed or delayed select is retried instead of skipped.
-                        let liveInputSource = InputSource.getCurrentInputSource()
-                        if status.inputSource.persistentIdentifier == liveInputSource.persistentIdentifier {
-                            return updateState(
-                                appKind: appKind,
-                                inputSource: liveInputSource,
-                                inputSourceChangeReason: .noChanges
-                            )
-                        }
-
-                        inputSourceVM.select(inputSource: status.inputSource, app: appKind.getApp())
-
-                        return updateState(
-                            appKind: appKind,
-                            inputSource: status.inputSource,
-                            inputSourceChangeReason: .appSpecified(status)
-                        )
-                    } else {
-                        return updateState(
-                            appKind: appKind,
-                            inputSource: state.inputSource,
-                            inputSourceChangeReason: .noChanges
-                        )
-                    }
-                case let .inputSourceChanged(inputSource):
-                    guard inputSource.persistentIdentifier != state.inputSource.persistentIdentifier else { return state }
-
-                    return updateState(appKind: state.appKind, inputSource: inputSource, inputSourceChangeReason: .system)
-                case let .switchInputSourceByShortcut(inputSource):
-                    inputSourceVM.select(inputSource: inputSource, app: state.appKind?.getApp())
-
-                    return updateState(appKind: state.appKind, inputSource: inputSource, inputSourceChangeReason: .shortcut)
-                }
+        let initial = SourceReconciliationCore.Snapshot(
+            appKind: state.appKind,
+            inputSource: state.inputSource,
+            inputSourceChangeReason: state.inputSourceChangeReason
+        )
+        // R3 ownership contract: do not retain the VM's collaborators for the
+        // lifetime of the scan. Promote weak owner to strong only for one action.
+        let dependencies: () -> SourceReconciliationCore.Dependencies<AppKind, InputSource, InputSourceChangeReason>? = { [weak self] in
+            guard let self else { return nil }
+            let preferencesVM = self.preferencesVM
+            let inputSourceVM = self.inputSourceVM
+            return SourceReconciliationCore.Dependencies(
+                readActual: { InputSource.getCurrentInputSource() },
+                rule: { app in
+                    guard let status = preferencesVM.getAppAutoSwitchKeyboard(app) else { return nil }
+                    return (status.inputSource, .appSpecified(status))
+                },
+                select: { source, app in inputSourceVM.select(inputSource: source, app: app?.getApp()) },
+                cache: { app, source in preferencesVM.cacheKeyboardFor(app, keyboard: source) },
+                noChanges: .noChanges,
+                system: .system,
+                shortcut: .shortcut
+            )
+        }
+        let coreActions = actionRelay.publisher.map { action -> SourceReconciliationCore.Action<AppKind, InputSource> in
+            switch action {
+            case .start: return .start
+            case let .appChanged(app): return .appChanged(app)
+            case let .switchInputSourceByShortcut(source): return .switchInputSourceByShortcut(source)
+            case let .inputSourceChanged(source): return .inputSourceChanged(source)
             }
-            .removeDuplicates(by: { $0.isSame(with: $1) })
+        }
+        .eraseToAnyPublisher()
+        SourceReconciliationCore.states(
+            actions: coreActions,
+            initial: initial,
+            dependencies: dependencies,
+            sameContext: { $0.isSameAppOrWebsite(with: $1, detectAddressBar: true) }
+        )
+        .map { snapshot in
+            State(
+                appKind: snapshot.appKind,
+                inputSource: snapshot.inputSource,
+                inputSourceChangeReason: snapshot.inputSourceChangeReason
+            )
+        }
             .handleEvents(receiveOutput: {
                 IndicatorDiagnostics.record("state.published source=\($0.inputSource.persistentIdentifier) reason=\($0.inputSourceChangeReason.diagnosticDescription) pid=\($0.appKind?.getApp().processIdentifier ?? 0)")
             })
