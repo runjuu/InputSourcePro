@@ -171,7 +171,9 @@ enum SourceReconciliationCore {
                 deps.select(rule.inputSource, app)
                 return update(app, rule.inputSource, rule.reason)
             }
-            return update(app, deps.readActual(), deps.noChanges)
+            let actual = deps.readActual()
+            let reason = actual == state.inputSource ? deps.noChanges : deps.system
+            return update(app, actual, reason)
         case let .inputSourceChanged(source):
             guard source != state.inputSource else { return state }
             return update(state.appKind, source, deps.system)
