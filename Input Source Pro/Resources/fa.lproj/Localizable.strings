@@ -1,0 +1,258 @@
+"Input Source Pro" = "Input Source Pro";
+"Preferences" = "تنظیمات";
+"Changelog" = "تاریخچهٔ تغییرات";
+"Check for Updates" = "بررسی به‌روزرسانی‌ها";
+"Buy me a bubble tea" = "برایم یک بابل‌تی بخرید";
+"Join Our Community" = "پیوستن به انجمن ما";
+"Quit" = "خروج";
+"Default Keyboard for %@" = "صفحه‌کلید پیش‌فرض برای %@";
+"Current App" = "برنامهٔ فعلی";
+"Default Keyboard Tooltip" = "خالی بگذارید (پیش‌فرض) تا Input Source Pro صفحه‌کلید را تغییر ندهد";
+"Default" = "پیش‌فرض";
+
+"Promotion" = "برنامهٔ Input Source Pro ۱۰۰٪ رایگان است — بدون تبلیغات، بدون خرید درون‌برنامه‌ای و کاملاً متن‌باز. اگر از این برنامه لذت می‌برید، چند روش برای حمایت از توسعهٔ آیندهٔ آن آورده شده است :)";
+"Star on GitHub" = "ستاره دادن در GitHub";
+"Sponsor" = "حمایت مالی";
+"Share with friends" = "اشتراک‌گذاری با دوستان";
+"Also by Runju" = "همچنین از Runju";
+"An AI-powered grammar checker that runs 100% locally" = "بررسی‌کنندهٔ گرامر مبتنی بر هوش مصنوعی که ۱۰۰٪ به‌صورت محلی اجرا می‌شود";
+
+"General" = "عمومی";
+"Rules" = "قوانین";
+"App Rules" = "قوانین برنامه";
+"Browser Rules" = "قوانین مرورگر";
+"Hot Keys" = "کلیدهای میان‌بر";
+"Others" = "سایر موارد";
+"About" = "درباره";
+
+"System" = "سیستم";
+"Launch at Login" = "راه‌اندازی هنگام ورود";
+"Display Icon in Menu Bar" = "نمایش آیکون در نوار منو";
+"Enhanced Mode" = "حالت پیشرفته";
+"Enhanced Mode Description" = "فعال کردن حالت پیشرفته امکان تعیین دقیق‌تر موقعیت اعلان و پشتیبانی بهتر از برنامه‌های مشابه Spotlight را فراهم می‌کند";
+"Enhanced Mode Permission Description" = "برنامهٔ Input Source Pro برای فعال‌سازی **حالت پیشرفته** به مجوز Accessibility نیاز دارد.";
+"Enhanced Mode Required Tips" = "این ویژگی نیازمند فعال بودن \"حالت پیشرفته\" است.";
+"Open Accessibility Preferences" = "باز کردن Accessibility Preferences";
+
+"For All Apps and Websites" = "برای همهٔ برنامه‌ها و وب‌سایت‌ها";
+"When Switching Back to the App or Website" = "هنگام بازگشت به برنامه یا وب‌سایت";
+
+"Tooltip" = "نشانگر";
+"Indicator Triggers" = "محرک‌های نشانگر";
+"isActiveWhenFocusedElementChanges" = "نمایش هنگام تغییر فیلد ورودی دارای فوکوس";
+"isActiveWhenSwitchApp" = "نمایش هنگام تعویض برنامه‌ها";
+"isActiveWhenSwitchInputSource" = "نمایش هنگام تعویض صفحه‌کلید";
+"isActiveWhenLongpressLeftMouse" = "نمایش هنگام فشردن طولانی کلیک چپ ماوس";
+"isHideWhenSwitchAppWithForceKeyboard" = "پنهان کردن هنگام اعمال قانون صفحه‌کلید پیش‌فرض";
+
+"Advanced" = "پیشرفته";
+"Troubleshooting" = "عیب‌یابی";
+"Enhanced Mode Required" = "نیازمند حالت پیشرفته";
+"Enabled CJKV Fix" = "حل مشکل تعویض منابع ورودی";
+"Enabled CJKV Fix Description" = "فعال کردن این ویژگی می‌تواند مشکلی را برطرف کند که در آن آیکون منبع ورودی تغییر کرده است، اما سیستم هنگام تایپ همچنان از منبع ورودی قبلی استفاده می‌کند.";
+"Enabled CJKV Fix Shortcut Img" = "CJKVFixEnableShortcut-EN";
+"CJKV Fix Method" = "روش رفع مشکل";
+"CJKV Fix Method Switching Focus" = "تعویض فوکوس";
+"CJKV Fix Method Switching Focus Description" = "فوکوس را برای لحظه‌ای تغییر می‌دهد تا macOS را وادار به تثبیت منبع ورودیِ انتخاب‌شده کند. این روش در macOS 26 بهتر کار می‌کند، اما برای برنامه‌های شناور کار نمی‌کند.";
+"CJKV Fix Method Shortcut Simulation" = "شبیه‌سازی میان‌بر";
+"CJKV Fix Method Shortcut Simulation Description" = "میان‌بر «Select the previous input source» سیستم را شبیه‌سازی می‌کند. این روش قبل از macOS 26 خوب کار می‌کند، اما در macOS 26 ممکن است باعث رفتار غیرمنتظرهٔ سیستم شود.";
+"CJKV Fix Shortcut Method Failed Desc" = "شبیه‌سازی میان‌بر نیازمند فعال بودن میان‌بر «Select the previous input source» سیستم است.";
+"Open Keyboard Settings" = "باز کردن Keyboard Settings";
+
+"Customize Keyboard" = "سفارشی‌سازی";
+"Keyboard Indicator Style" = "نشانگر";
+"Always-On Indicator Style" = "نشانگر همیشه‌روشن";
+"Reset" = "بازنشانی";
+
+"tryToDisplayIndicatorNearCursor" = "نمایش نشانگر پیش‌فرض نزدیک مکان‌نمای ورودی در صورت امکان";
+"isEnableAlwaysOnIndicator" = "نمایش نشانگر همیشه‌روشن نزدیک مکان‌نمای ورودی";
+"alwaysOnIndicatorTips" = "نشانگر همیشه‌روشن بدون وابستگی به موقعیت و محرک‌های نشانگر پیش‌فرض، مکان‌نمای ورودی را دنبال می‌کند. به حالت پیشرفته نیاز دارد.";
+"isAlwaysDisplayIndicatorNearMouse" = "نمایش همیشگی نشانگر نزدیک نشانگر ماوس";
+"alwaysDisplayIndicatorNearMouseTips" = "نشانگر نمایان می‌ماند و نشانگر ماوس را دنبال می‌کند. با فعال بودن \"نمایش نشانگر همیشه‌روشن نزدیک مکان‌نمای ورودی\"، هنگام فوکوس روی فیلد متنی در کنار مکان‌نمای ورودی می‌ماند و در غیر این صورت ماوس را دنبال می‌کند.";
+"Customize Styles" = "سفارشی‌سازی سبک‌ها";
+
+"Show" = "نمایش";
+"Keyboard Label" = "برچسب صفحه‌کلید";
+
+"Position" = "موقعیت";
+"Follow Mouse" = "دنبال کردن ماوس";
+"Relative to App" = "نسبت به برنامه";
+"Relative to Screen" = "نسبت به صفحه";
+"Spacing" = "فاصله‌گذاری";
+"Nope" = "هیچ";
+"XS" = "XS";
+"S" = "S";
+"M" = "M";
+"L" = "L";
+"XL" = "XL";
+"Alignment" = "تراز";
+"Top-Left Corner" = "گوشهٔ بالا-چپ";
+"Top-Center" = "بالا-وسط";
+"Top-Right Corner" = "گوشهٔ بالا-راست";
+"Center-Left" = "وسط-چپ";
+"Center" = "وسط";
+"Center-Right" = "وسط-راست";
+"Bottom-Left Corner" = "گوشهٔ پایین-چپ";
+"Bottom-Center" = "پایین-وسط";
+"Bottom-Right Corner" = "گوشهٔ پایین-راست";
+
+"Appearance" = "ظاهر";
+"Indicator Info" = "اطلاعات نشانگر";
+"Icon and Title" = "آیکون و عنوان";
+"Icon" = "آیکون";
+"Title" = "عنوان";
+"Indicator Size" = "اندازهٔ نشانگر";
+"Small" = "کوچک";
+"Medium" = "متوسط";
+"Large" = "بزرگ";
+"Color Scheme" = "طرح رنگی";
+"In Dark Mode" = "در حالت تیره";
+"In Light Mode" = "در حالت روشن";
+"Sync with OS" = "همگام‌سازی با سیستم‌عامل";
+
+"Color" = "رنگ";
+"Background" = "پس‌زمینه";
+"Reset Colors" = "بازنشانی رنگ‌ها";
+
+"%@ App(s) Selected" = "تعداد %@ برنامه انتخاب شد";
+"System-Wide" = "سرتاسر سیستم";
+"Default Keyboard" = "منبع ورودی پیش‌فرض";
+"Default Function Keys" = "کلیدهای عملکردی پیش‌فرض";
+"Function Keys" = "کلیدهای عملکردی";
+"Media Keys" = "کلیدهای چندرسانه‌ای";
+"Keyboard Restore Strategy" = "راهبرد بازیابی منبع ورودی";
+"Restore Previously Used Keyboard" = "بازیابی صفحه‌کلید استفاده‌شدهٔ قبلی";
+"Use Default Keyboard Instead" = "استفاده از منبع ورودی پیش‌فرض";
+"Restore Previously Used One" = "بازیابی مورد استفاده‌شدهٔ قبلی";
+"Indicator" = "نشانگر";
+"Hide Indicator" = "پنهان کردن نشانگر";
+"Punctuation" = "نشانه‌گذاری";
+"ASCII Punctuation" = "نشانه‌گذاری ASCII";
+"Force English Punctuation" = "اجبار به نشانه‌گذاری انگلیسی";
+"Use Function Keys" = "استفاده از کلیدهای عملکردی (F1، F2 و غیره)";
+"Use Media Keys" = "استفاده از کلیدهای چندرسانه‌ای (روشنایی، صدا و غیره)";
+"Use Global Setting" = "استفاده از تنظیم سراسری";
+"Function Keys Description" = "استفاده از F1، F2 و غیره به‌عنوان کلیدهای عملکردی استاندارد به‌جای کلیدهای چندرسانه‌ای";
+"Toggle Function Keys" = "تغییر وضعیت کلیدهای عملکردی";
+"Toggle Function Keys Description" = "جابه‌جایی بین کلیدهای عملکردی استاندارد (F1، F2…) و کلیدهای چندرسانه‌ای (روشنایی، صدا…) با یک میان‌بر.";
+"Input Sources" = "منابع ورودی";
+"Input Monitoring Required" = "نیازمند مجوز Input Monitoring";
+"This feature requires input monitoring permission to work" = "این ویژگی برای کارکرد به مجوز Input Monitoring نیاز دارد";
+"Open Permission Settings" = "باز کردن تنظیمات مجوز";
+"Add Running Apps" = "افزودن برنامه‌های در حال اجرا";
+"(unknown)" = "(ناشناخته)";
+
+"Permission Required" = "مجوز لازم است";
+"Authorized" = "مجاز";
+"Browser Rules Accessibility Permission Description" = "برای دریافت اعلان هنگام جابه‌جایی تب‌های مرورگر، Input Source Pro به مجوز **Accessibility** نیاز دارد.";
+
+"Edit" = "ویرایش";
+"Match" = "تطابق";
+"Sample URL" = "نمونهٔ URL";
+"Rule Type" = "نوع قانون";
+"Domain" = "دامنه";
+"Restore Strategy" = "راهبرد بازیابی";
+"Keyboard" = "صفحه‌کلید";
+"Cancel" = "لغو";
+"Add" = "افزودن";
+"Save" = "ذخیره";
+"Close" = "بستن";
+
+"DOMAIN-SUFFIX Explanation" = "تطابق URLها بر اساس پسوند دامنه. برای مثال: '`google.com`' با '`www.google.com`'، '`mail.google.com`' و '`google.com`' مطابقت دارد، اما با '`xxx-google.com`' **مطابقت ندارد**.";
+"DOMAIN Explanation" = "تطابق URLها بر اساس دامنهٔ دقیق. برای مثال: '`google.com`' با '`google.com`' مطابقت دارد، اما با '`www.google.com`' یا '`mail.google.com`' **مطابقت ندارد**.";
+"URL-REGEX Explanation" = "تطابق URLها با استفاده از [عبارت‌های باقاعده](https://inputsource.pro/help/regex). فراموش نکنید که نویسه‌های خاص مانند '`\\`'، '`.`' و غیره را escape کنید.";
+
+"Default Keyboard for Address Bar" = "صفحه‌کلید پیش‌فرض برای نوار آدرس";
+
+"Version" = "نسخه";
+"Check Updates" = "بررسی به‌روزرسانی‌ها";
+"Automatically Check for Updates" = "بررسی خودکار برای به‌روزرسانی‌ها";
+
+"Support" = "پشتیبانی";
+"Website" = "وب‌سایت";
+"Email" = "ایمیل";
+"Copy" = "کپی";
+"Twitter" = "Twitter";
+
+"Privacy" = "حریم خصوصی";
+"Privacy Content" = "ما فقط داده‌های راه‌اندازی و خرابی برنامه را جمع‌آوری می‌کنیم که شامل هیچ‌گونه اطلاعات شخصی نیست.";
+
+"Find Us" = "ما را پیدا کنید";
+"Right click each section to copy link" = "برای کپی کردن پیوند روی هر بخش راست‌کلیک کنید";
+
+"Send Feedback" = "ارسال بازخورد";
+"FeedbackTips" = "مشتاقانه مایلیم بدانیم چگونه می‌توانیم Input Source Pro را بهتر کنیم. فرم را پر کنید تا با شما در ارتباط باشیم. 🥰";
+"FeedbackMessageTitle" = "پیام";
+"FeedbackMessagePlaceholder" = "باگی پیدا کرده‌اید یا جای خالی قابلیتی را احساس می‌کنید که واقعاً دوست دارید ببینید؟";
+"FeedbackEmailTitle" = "ایمیل (اختیاری)";
+"FeedbackSuccessTips" = "از این‌که وقت گذاشتید و نظراتتان را با ما در میان گذاشتید متشکریم! ❤️";
+
+"Delete" = "حذف";
+"Select Input Sources" = "انتخاب منابع ورودی";
+"Add Switch Group" = "افزودن گروه تعویض";
+"Add a switch group to allow switching between multiple input sources using the same hotkey. Select at least two input sources." = "یک گروه تعویض اضافه کنید تا امکان جابه‌جایی بین چندین منبع ورودی با یک کلید میان‌بر فراهم شود. حداقل دو منبع ورودی را انتخاب کنید.";
+
+"System Reboot Required" = "تغییرات پس از راه‌اندازی مجدد Mac شما اعمال خواهند شد";
+"Cursor Lag Fix" = "رفع تأخیر در تایپ/مکان‌نما";
+"Cursor Lag Fix Description" = "سیستم‌عامل macOS 14 Sonoma یک مکان‌نمای متنی آزمایشی معرفی کرده است که کادر راهنمای کوچکی را در زیر نقطهٔ درج متن نمایش می‌دهد (مانند Caps Lock، تغییرات منبع ورودی). در برخی از Macها این ویژگی می‌تواند باعث فریز شدن CursorUIViewService شود و منجر به تأخیر در تایپ و مکان‌نما گردد. اگر با این مشکل مواجه شدید، می‌توانید این گزینه را فعال کنید تا مکان‌نمای آزمایشی غیرفعال شده و مکان‌نمای کلاسیک I-beam بازیابی شود.";
+
+"Shortcut Mode" = "حالت میان‌بر";
+"Shortcut Type" = "نوع میان‌بر";
+"Shortcut" = "میان‌بر";
+"Modifier" = "کلید تبدیل";
+"Choose modifier combination" = "ترکیب کلیدهای تبدیل را انتخاب کنید";
+"Trigger" = "محرک";
+"Keyboard Shortcuts" = "میان‌برهای صفحه‌کلید";
+"Single Modifier" = "تک‌کلید تبدیل";
+"Modifier Combination" = "ترکیب کلیدهای تبدیل";
+"Modifier Trigger" = "محرک کلید تبدیل";
+"Press Once" = "یک بار فشردن";
+"Press Twice" = "دو بار فشردن";
+"None" = "هیچ‌کدام";
+"Left Shift" = "کلید Shift چپ";
+"Right Shift" = "کلید Shift راست";
+"Left Control" = "کلید Control چپ";
+"Right Control" = "کلید Control راست";
+"Left Option" = "کلید Option چپ";
+"Right Option" = "کلید Option راست";
+"Left Command" = "کلید Command چپ";
+"Right Command" = "کلید Command راست";
+"Single Modifier shortcuts require additional permissions to work reliably." = "میان‌برهای تک‌کلید تبدیل برای کارکرد مطمئن به مجوزهای بیشتری نیاز دارند.";
+"Modifier shortcuts require additional permissions to work reliably." = "میان‌برهای کلید تبدیل برای کارکرد مطمئن به مجوزهای بیشتری نیاز دارند.";
+"Accessibility" = "Accessibility";
+"Open Accessibility Settings" = "باز کردن Accessibility Settings";
+"Open Accessibility Settings, find \"Input Source Pro\" in the list and enable the toggle." = "وارد Accessibility Settings شوید، \"Input Source Pro\" را در فهرست پیدا کنید و کلید تغییر وضعیت را فعال کنید.";
+"Input Monitoring" = "Input Monitoring";
+"Open Input Monitoring Settings" = "باز کردن Input Monitoring Settings";
+"Open Input Monitoring Settings, click the \"+\" button and add \"Input Source Pro\" to the list." = "وارد Input Monitoring Settings شوید، روی دکمهٔ \"+\" کلیک کرده و \"Input Source Pro\" را به فهرست اضافه کنید.";
+"Disabled until permissions are granted" = "تا زمان اعطای مجوزها غیرفعال است";
+"Conflicts with the %@ shortcut" = "با میان‌بر %@ تداخل دارد";
+
+"Settings Backup" = "پشتیبان‌گیری از تنظیمات";
+"Export Settings" = "برون‌بری تنظیمات";
+"Import Settings" = "درون‌ریزی تنظیمات";
+"Scriptable Import Entry" = "بازیابی از خط فرمان";
+"Scriptable Import Title" = "درون‌ریزی تنظیمات با یک فرمان";
+"Scriptable Import Summary" = "بازیابی Input Source Pro در یک Mac جدید.";
+"Scriptable Import Silent" = "پنهان کردن پیام موفقیت";
+"Done" = "انجام شد";
+"Settings Exported" = "تنظیمات برون‌بری شد";
+"Settings Exported Message" = "نسخهٔ پشتیبان تنظیمات شما با موفقیت برون‌بری شد.";
+"Settings Imported" = "تنظیمات درون‌ریزی شد";
+"Settings Imported Message" = "تنظیمات شما با موفقیت درون‌ریزی شد.";
+"Export Settings Failed" = "برون‌بری تنظیمات ناموفق بود";
+"Import Settings Failed" = "درون‌ریزی تنظیمات ناموفق بود";
+"No valid file path was provided. Use an absolute path, e.g. inputsourcepro://import?path=/path/to/settings.json" = "هیچ مسیر فایل معتبری ارائه نشد. از یک مسیر مطلق استفاده کنید، مانند inputsourcepro://import?path=/path/to/settings.json";
+"Replace Current Settings?" = "تنظیمات فعلی جایگزین شود؟";
+"Import Settings Confirmation Message" = "درون‌ریزی این فایل، تنظیمات پشتیبانی‌شده، قوانین، پیکربندی رنگ‌ها، گروه‌های کلیدهای میان‌بر و میان‌برهای ثبت‌شدهٔ فعلی شما را جایگزین خواهد کرد.";
+"Unsupported settings backup version %@" = "نسخهٔ پشتیبان تنظیمات %@ پشتیبانی نمی‌شود.";
+"Unable to save imported settings." = "ذخیرهٔ تنظیمات درون‌ریزی‌شده امکان‌پذیر نیست.";
+
+// Caps Lock
+"Caps Lock" = "Caps Lock";
+"Display When Caps Lock Changes" = "نمایش هنگام تغییر Caps Lock";
+"Display the input source when Caps Lock changes, with a symbol while it is on." = "نمایش منبع ورودی هنگام تغییر Caps Lock، به همراه نمادی هنگام روشن بودن آن.";
+"Caps Lock On" = "روشن بودن Caps Lock";
+
+"Receive beta updates" = "دریافت به‌روزرسانی‌های بتا";
+"Stable updates resume when a newer stable build is available." = "به‌روزرسانی‌های پایدار زمانی از سر گرفته می‌شوند که نسخهٔ پایدار جدیدتری در دسترس باشد.";
