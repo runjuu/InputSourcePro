@@ -165,7 +165,7 @@ extension Browser {
     }
 
     private static func comparableAddress(_ value: String) -> String {
-        let address = value.contains("://") ? value : "https://\(value)"
+        let address = URLComponents(string: value)?.host == nil ? "https://\(value)" : value
         guard var components = URLComponents(string: address), let host = components.host
         else { return value }
 
@@ -175,7 +175,23 @@ extension Browser {
         if components.path == "/" {
             components.path = ""
         }
-        return components.string?.removingPercentEncoding ?? value
+        let parts = (components.string ?? value).components(separatedBy: "%")
+        var normalized = parts[0]
+        let unreserved = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
+        for part in parts.dropFirst() {
+            let escape = "%" + part.prefix(2)
+            // Decode display-safe characters while preserving delimiters such as %2F.
+            if let character = escape.removingPercentEncoding,
+               character.count == 1,
+               unreserved.contains(character)
+            {
+                normalized += character
+            } else {
+                normalized += escape.uppercased()
+            }
+            normalized += part.dropFirst(2)
+        }
+        return normalized
     }
 }
 

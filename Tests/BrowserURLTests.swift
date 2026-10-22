@@ -81,4 +81,55 @@ final class BrowserURLTests: XCTestCase {
             addressBarValue: "http://example.com/"
         ), httpPage)
     }
+
+    func testWhalePreservesEncodedDelimitersWhenMatchingAddressBar() {
+        let paths = [("/a%2Fb", "/a/b"), ("/a%3Fb", "/a?b"), ("/?q=a%26b", "/?q=a&b")]
+        for (encodedPath, literalPath) in paths {
+            let encodedURL = URL(string: "https://example.com\(encodedPath)")!
+            let literalURL = URL(string: "https://example.com\(literalPath)")!
+            for (documentURL, activeURL, address) in [
+                (encodedURL, literalURL, "example.com\(literalPath)"),
+                (literalURL, encodedURL, "example.com\(encodedPath)"),
+            ] {
+                XCTAssertEqual(Browser.Whale.selectWhaleTabURL(
+                    documentURL: documentURL,
+                    webAreaURLs: [encodedURL, literalURL],
+                    focusedWebAreaURL: nil,
+                    addressBarValue: address
+                ), activeURL, address)
+            }
+        }
+    }
+
+    func testWhaleMatchesUnicodeAddressBarWithEncodedPageURL() {
+        for path in ["/%ED%95%9C%EA%B8%80", "/%ed%95%9c%ea%b8%80"] {
+            let koreanPage = URL(string: "https://example.com\(path)")!
+            XCTAssertEqual(Browser.Whale.selectWhaleTabURL(
+                documentURL: left,
+                webAreaURLs: [left, koreanPage],
+                focusedWebAreaURL: nil,
+                addressBarValue: "example.com/한글"
+            ), koreanPage)
+        }
+    }
+
+    func testWhaleMatchesUnreservedEscapesInAddressBar() {
+        let encodedPage = URL(string: "https://example.com/%41%7e%2D%2E%5f%30")!
+        XCTAssertEqual(Browser.Whale.selectWhaleTabURL(
+            documentURL: left,
+            webAreaURLs: [left, encodedPage],
+            focusedWebAreaURL: nil,
+            addressBarValue: "example.com/A~-._0"
+        ), encodedPage)
+    }
+
+    func testWhaleMatchesElidedAddressContainingURLInQuery() {
+        let searchPage = URL(string: "https://search.example/search?q=https://example.org")!
+        XCTAssertEqual(Browser.Whale.selectWhaleTabURL(
+            documentURL: left,
+            webAreaURLs: [left, searchPage],
+            focusedWebAreaURL: nil,
+            addressBarValue: "search.example/search?q=https://example.org"
+        ), searchPage)
+    }
 }
