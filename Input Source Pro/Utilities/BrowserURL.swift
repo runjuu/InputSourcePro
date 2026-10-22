@@ -74,11 +74,47 @@ enum Browser: String, CaseIterable {
 }
 
 extension Browser {
-    func getCurrentTabURL(focusedWindow: UIElement) -> URL? {
-        guard let windowElement = Element.initialize(rawElement: focusedWindow.element),
-              let webArea = (try? QueryWebAreaService(windowElement: windowElement).perform()),
+    func getCurrentTabURL(focusedWindow: UIElement, focusedElement: UIElement? = nil) -> URL? {
+        let documentURL = focusedWindow.safeString(attribute: .document)
+            .flatMap { URL(string: $0) }
+            .flatMap { $0.scheme == nil ? nil : $0 }
+
+        // These browsers expose sidebars and extension-based new tabs as web areas.
+        if self == .Comet || self == .Aside, let documentURL {
+            return normalizedTabURL(documentURL)
+        }
+
+        guard let windowElement = Element.initialize(rawElement: focusedWindow.element)
+        else { return nil }
+
+        let query = QueryWebAreaService(windowElement: windowElement)
+        if self == .Whale {
+            guard let content = try? query.whaleContent(focusedElement: focusedElement)
+            else { return documentURL.map(normalizedTabURL) }
+
+            return selectWhaleTabURL(
+                documentURL: documentURL,
+                webAreaURLs: content.urls,
+                focusedWebAreaURL: content.focusedURL,
+                addressBarValue: content.addressBarValue
+            )
+        }
+
+        guard let webArea = try? query.perform(),
               let url = webArea.url
         else { return nil }
+
+        return normalizedTabURL(url)
+    }
+
+    func normalizedTabURL(_ url: URL) -> URL {
+        if self == .Whale,
+           url.scheme == "chrome-extension",
+           url.host == "mdppnmkhoflepinhojdkmkanhhlkginn",
+           url.path == "/index.html"
+        {
+            return .newtab
+        }
 
         if [
             "favorites://",
@@ -92,6 +128,54 @@ extension Browser {
         } else {
             return url
         }
+    }
+
+    func selectWhaleTabURL(
+        documentURL: URL?,
+        webAreaURLs: [URL],
+        focusedWebAreaURL: URL?,
+        addressBarValue: String?
+    ) -> URL? {
+        if let focusedWebAreaURL, webAreaURLs.contains(focusedWebAreaURL) {
+            return normalizedTabURL(focusedWebAreaURL)
+        }
+
+        // Whale's AXDocument stays on the left pane. The omnibox identifies the
+        // active pane when focus moves to browser controls or the sidebar.
+        if let addressBarValue {
+            if let exactMatch = webAreaURLs.first(where: { $0.absoluteString == addressBarValue }) {
+                return normalizedTabURL(exactMatch)
+            }
+
+            if addressBarValue.isEmpty,
+               webAreaURLs.contains(where: { normalizedTabURL($0) == .newtab })
+            {
+                return .newtab
+            }
+
+            let matches = webAreaURLs.filter {
+                Self.comparableAddress($0.absoluteString) == Self.comparableAddress(addressBarValue)
+            }
+            if matches.count == 1 {
+                return normalizedTabURL(matches[0])
+            }
+        }
+
+        return (documentURL ?? webAreaURLs.first).map(normalizedTabURL)
+    }
+
+    private static func comparableAddress(_ value: String) -> String {
+        let address = value.contains("://") ? value : "https://\(value)"
+        guard var components = URLComponents(string: address), let host = components.host
+        else { return value }
+
+        components.scheme = nil
+        let normalizedHost = host.lowercased()
+        components.host = normalizedHost.hasPrefix("www.") ? String(normalizedHost.dropFirst(4)) : normalizedHost
+        if components.path == "/" {
+            components.path = ""
+        }
+        return components.string?.removingPercentEncoding ?? value
     }
 }
 

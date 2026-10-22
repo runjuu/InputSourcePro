@@ -250,7 +250,10 @@ extension PreferencesVM {
 
         if let application = application,
            let focusedWindow: UIElement = try? application.attribute(.focusedWindow),
-           let url = browser.getCurrentTabURL(focusedWindow: focusedWindow)
+           let url = browser.getCurrentTabURL(
+               focusedWindow: focusedWindow,
+               focusedElement: try? application.attribute(.focusedUIElement)
+           )
         {
             return url
         } else {

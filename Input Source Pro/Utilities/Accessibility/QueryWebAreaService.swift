@@ -13,6 +13,44 @@ class QueryWebAreaService {
         try fetchScrollArea()
     }
 
+    func whaleContent(focusedElement: UIElement?) throws -> (urls: [URL], focusedURL: URL?, addressBarValue: String?) {
+        var stack = [windowElement]
+        var webAreas: [Element] = []
+        var addressBarValue: String?
+
+        while let element = stack.popLast() {
+            let uiElement = UIElement(element.rawElement)
+            let classes = uiElement.domClassList()
+            if classes.contains("SidebarHost") {
+                continue
+            }
+
+            if element.role == "AXWebArea" {
+                webAreas.append(element)
+                continue
+            }
+
+            if classes.contains("OmniboxViewViews") {
+                addressBarValue = uiElement.safeString(attribute: .value)
+            }
+            stack.append(contentsOf: try fetchChildren(element) ?? [])
+        }
+
+        var focusedURL: URL?
+        var ancestor = focusedElement
+        for _ in 0..<128 {
+            guard let element = ancestor else { break }
+            if let webArea = webAreas.first(where: { CFEqual($0.rawElement, element.element) }) {
+                focusedURL = webArea.url
+                break
+            }
+            if CFEqual(element.element, windowElement.rawElement) { break }
+            ancestor = try? element.attribute(.parent)
+        }
+
+        return (webAreas.compactMap(\.url), focusedURL, addressBarValue)
+    }
+
     private func fetchScrollArea() throws -> Element? {
         var stack: [Element] = [windowElement]
 
