@@ -395,6 +395,7 @@
 		D5F1A1B23A4B5C6D7E8F9012 /* RuleSettingIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuleSettingIcon.swift; sourceTree = "<group>"; };
 		D5F4A1C92F0B1234001B2C3D /* InputSourceSwitcher.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InputSourceSwitcher.swift; sourceTree = "<group>"; };
 		D5F6E8D429EC812500DE042B /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/Localizable.strings; sourceTree = "<group>"; };
+		2EA294C90AFA94CCFB8F2E64 /* fa */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fa; path = fa.lproj/Localizable.strings; sourceTree = "<group>"; };
 		D5F73B012A2C1DCD00BBC10A /* InputSourceVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSourceVM.swift; sourceTree = "<group>"; };
 		D5FC8F542A4134B5002AE1F2 /* IndicatorSize.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndicatorSize.swift; sourceTree = "<group>"; };
 		D60000012F20000000000001 /* Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -931,6 +932,7 @@
 				ja,
 				ko,
 				"zh-Hant",
+				fa,
 			);
 			mainGroup = 4A2A1722280BA6A500E13249;
 			packageReferences = (
@@ -1230,6 +1232,7 @@
 				4A5BABE82830A720009F42D7 /* zh-Hans */,
 				4A5BABEA2830A726009F42D7 /* en */,
 				D5F6E8D429EC812500DE042B /* ja */,
+				2EA294C90AFA94CCFB8F2E64 /* fa */,
 				D5EAAC512A47BF7E00A41BC1 /* ko */,
 				D51488D52A495F39001463B6 /* zh-Hant */,
 			);
