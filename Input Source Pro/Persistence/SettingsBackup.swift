@@ -137,6 +137,9 @@ struct SettingsBackupPreferences: Codable {
     var isEnableURLSwitchForZen: Bool?
     var isEnableURLSwitchForDia: Bool?
     var isEnableURLSwitchForHelium: Bool?
+    var isEnableURLSwitchForComet: Bool?
+    var isEnableURLSwitchForAside: Bool?
+    var isEnableURLSwitchForWhale: Bool?
     var isShowCapsLockStatus: Bool?
     var indicatorInfo: IndicatorInfo?
     var indicatorSize: IndicatorSize?
@@ -197,6 +200,9 @@ struct SettingsBackupPreferences: Codable {
         isEnableURLSwitchForZen = preferences.isEnableURLSwitchForZen
         isEnableURLSwitchForDia = preferences.isEnableURLSwitchForDia
         isEnableURLSwitchForHelium = preferences.isEnableURLSwitchForHelium
+        isEnableURLSwitchForComet = preferences.isEnableURLSwitchForComet
+        isEnableURLSwitchForAside = preferences.isEnableURLSwitchForAside
+        isEnableURLSwitchForWhale = preferences.isEnableURLSwitchForWhale
         isShowCapsLockStatus = preferences.isShowCapsLockStatus
         indicatorInfo = preferences.indicatorInfo
         indicatorSize = preferences.indicatorSize
@@ -286,6 +292,9 @@ struct SettingsBackupPreferences: Codable {
         if let isEnableURLSwitchForZen { preferences.isEnableURLSwitchForZen = isEnableURLSwitchForZen }
         if let isEnableURLSwitchForDia { preferences.isEnableURLSwitchForDia = isEnableURLSwitchForDia }
         if let isEnableURLSwitchForHelium { preferences.isEnableURLSwitchForHelium = isEnableURLSwitchForHelium }
+        if let isEnableURLSwitchForComet { preferences.isEnableURLSwitchForComet = isEnableURLSwitchForComet }
+        if let isEnableURLSwitchForAside { preferences.isEnableURLSwitchForAside = isEnableURLSwitchForAside }
+        if let isEnableURLSwitchForWhale { preferences.isEnableURLSwitchForWhale = isEnableURLSwitchForWhale }
         if let isShowCapsLockStatus { preferences.isShowCapsLockStatus = isShowCapsLockStatus }
         if let indicatorInfo { preferences.indicatorInfo = indicatorInfo }
         if let indicatorSize { preferences.indicatorSize = indicatorSize }

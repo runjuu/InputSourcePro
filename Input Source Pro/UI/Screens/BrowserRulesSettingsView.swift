@@ -187,6 +187,12 @@ struct BrowserRulesSettingsView: View {
                 $0.isEnableURLSwitchForDia = isEnable
             case .Helium:
                 $0.isEnableURLSwitchForHelium = isEnable
+            case .Comet:
+                $0.isEnableURLSwitchForComet = isEnable
+            case .Aside:
+                $0.isEnableURLSwitchForAside = isEnable
+            case .Whale:
+                $0.isEnableURLSwitchForWhale = isEnable
             }
         }
     }

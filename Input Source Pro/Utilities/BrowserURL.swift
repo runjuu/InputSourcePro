@@ -21,6 +21,9 @@ enum Browser: String, CaseIterable {
     case Zen = "app.zen-browser.zen"
     case Dia = "company.thebrowser.dia"
     case Helium = "net.imput.helium"
+    case Comet = "ai.perplexity.comet"
+    case Aside = "at.studio.AsideBrowser"
+    case Whale = "com.naver.Whale"
 
     var displayName: String {
         switch self {
@@ -60,6 +63,12 @@ enum Browser: String, CaseIterable {
             return "Dia"
         case .Helium:
             return "Helium"
+        case .Comet:
+            return "Comet"
+        case .Aside:
+            return "Aside"
+        case .Whale:
+            return "Whale"
         }
     }
 }

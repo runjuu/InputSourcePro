@@ -131,6 +131,12 @@ extension PreferencesVM {
             return preferences.isEnableURLSwitchForDia
         case .Helium:
             return preferences.isEnableURLSwitchForHelium
+        case .Comet:
+            return preferences.isEnableURLSwitchForComet
+        case .Aside:
+            return preferences.isEnableURLSwitchForAside
+        case .Whale:
+            return preferences.isEnableURLSwitchForWhale
         }
     }
 

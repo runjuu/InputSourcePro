@@ -240,6 +240,12 @@ extension PreferencesVM {
             guard preferences.isEnableURLSwitchForDia else { return nil }
         case .Helium:
             guard preferences.isEnableURLSwitchForHelium else { return nil }
+        case .Comet:
+            guard preferences.isEnableURLSwitchForComet else { return nil }
+        case .Aside:
+            guard preferences.isEnableURLSwitchForAside else { return nil }
+        case .Whale:
+            guard preferences.isEnableURLSwitchForWhale else { return nil }
         }
 
         if let application = application,
@@ -311,6 +317,9 @@ struct Preferences {
         static let isEnableURLSwitchForZen = "isEnableURLSwitchForZen"
         static let isEnableURLSwitchForDia = "isEnableURLSwitchForDia"
         static let isEnableURLSwitchForHelium = "isEnableURLSwitchForHelium"
+        static let isEnableURLSwitchForComet = "isEnableURLSwitchForComet"
+        static let isEnableURLSwitchForAside = "isEnableURLSwitchForAside"
+        static let isEnableURLSwitchForWhale = "isEnableURLSwitchForWhale"
 
         static let shortcutTriggerMode = "shortcutTriggerMode"
         static let singleModifierTrigger = "singleModifierTrigger"
@@ -506,6 +515,15 @@ struct Preferences {
 
     @UserDefault(Preferences.Key.isEnableURLSwitchForHelium)
     var isEnableURLSwitchForHelium = false
+
+    @UserDefault(Preferences.Key.isEnableURLSwitchForComet)
+    var isEnableURLSwitchForComet = false
+
+    @UserDefault(Preferences.Key.isEnableURLSwitchForAside)
+    var isEnableURLSwitchForAside = false
+
+    @UserDefault(Preferences.Key.isEnableURLSwitchForWhale)
+    var isEnableURLSwitchForWhale = false
 
     // MARK: - Appearance
 
