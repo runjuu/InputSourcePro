@@ -1,11 +1,7 @@
 import SwiftUI
-import VisualEffects
 
 struct KeyboardCustomization: View {
     @EnvironmentObject var preferencesVM: PreferencesVM
-
-    @State var textColor: Color = .clear
-    @State var bgColor: Color = .clear
 
     let inputSource: InputSource
 
@@ -20,8 +16,6 @@ struct KeyboardCustomization: View {
     ]
 
     var body: some View {
-        let keyboardConfig = preferencesVM.getOrCreateKeyboardConfig(inputSource)
-
         VStack(alignment: .leading) {
             ZStack {
                 LazyVGrid(columns: indicatorColumns) {
@@ -29,16 +23,16 @@ struct KeyboardCustomization: View {
                         inputSource: inputSource,
                         kind: .alwaysOn,
                         size: preferencesVM.preferences.indicatorSize ?? .medium,
-                        bgColor: NSColor(bgColor),
-                        textColor: NSColor(textColor)
+                        bgColor: NSColor(bgColor.wrappedValue),
+                        textColor: NSColor(textColor.wrappedValue)
                     ))
 
                     DumpIndicatorView(config: IndicatorViewConfig(
                         inputSource: inputSource,
                         kind: preferencesVM.preferences.indicatorKind,
                         size: preferencesVM.preferences.indicatorSize ?? .medium,
-                        bgColor: NSColor(bgColor),
-                        textColor: NSColor(textColor)
+                        bgColor: NSColor(bgColor.wrappedValue),
+                        textColor: NSColor(textColor.wrappedValue)
                     ))
 
                     Text("Always-On Indicator Style")
@@ -57,8 +51,8 @@ struct KeyboardCustomization: View {
 
                     HStack {
                         Spacer()
-                        Button(action: { reset(keyboardConfig) }) {
-                            Text("Reset")
+                        Button(action: { preferencesVM.resetKeyboardColors(inputSource) }) {
+                            Text("Use Global Colors")
                         }
                         .buttonStyle(GhostButton(icon: Image(systemName: "arrow.clockwise")))
                     }
@@ -68,52 +62,51 @@ struct KeyboardCustomization: View {
             }
 
             VStack(alignment: .center) {
-                ColorBlocks(onSelectColor: {
-                    textColor = $0.a
-                    bgColor = $0.b
+                ColorBlocks(onSelectColor: { scheme in
+                    preferencesVM.updateKeyboardConfig(inputSource) {
+                        $0.textColor = scheme.a
+                        $0.bgColor = scheme.b
+                    }
                 })
                 .padding(.vertical, 8)
 
                 HStack {
-                    ColorPicker("Color", selection: $textColor)
+                    ColorPicker("Color", selection: textColor)
 
                     Button(
-                        action: {
-                            let a = textColor
-                            let b = bgColor
-
-                            textColor = b
-                            bgColor = a
-                        },
+                        action: { preferencesVM.swapKeyboardColors(inputSource) },
                         label: {
                             Image(systemName: "repeat")
                         }
                     )
 
-                    ColorPicker("Background", selection: $bgColor)
+                    ColorPicker("Background", selection: bgColor)
                 }
                 .labelsHidden()
             }
             .padding(.horizontal)
         }
         .padding()
-        .onAppear {
-            textColor = preferencesVM.getTextColor(inputSource)
-            bgColor = preferencesVM.getBgColor(inputSource)
-        }
-        .onChange(of: bgColor, perform: { _ in save(keyboardConfig) })
-        .onChange(of: textColor, perform: { _ in save(keyboardConfig) })
         .onDisappear {
             NSColorPanel.shared.close()
         }
     }
 
-    func save(_ keyboardConfig: KeyboardConfig) {
-        preferencesVM.update(keyboardConfig, textColor: textColor, bgColor: bgColor)
+    private var textColor: Binding<Color> {
+        Binding(
+            get: { preferencesVM.getTextColor(inputSource) },
+            set: { color in
+                preferencesVM.updateKeyboardConfig(inputSource) { $0.textColor = color }
+            }
+        )
     }
 
-    func reset(_: KeyboardConfig) {
-        bgColor = preferencesVM.preferences.indicatorBackgroundColor
-        textColor = preferencesVM.preferences.indicatorForgegroundColor
+    private var bgColor: Binding<Color> {
+        Binding(
+            get: { preferencesVM.getBgColor(inputSource) },
+            set: { color in
+                preferencesVM.updateKeyboardConfig(inputSource) { $0.bgColor = color }
+            }
+        )
     }
 }

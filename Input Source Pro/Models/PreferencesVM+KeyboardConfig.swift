@@ -7,34 +7,40 @@ extension PreferencesVM {
         "didMigrateModeAwareKeyboardConfigs"
     }
 
-    func addKeyboardConfig(_ inputSource: InputSource) -> KeyboardConfig {
-        if let config = getKeyboardConfig(inputSource) {
-            return config
+    func updateKeyboardConfig(_ inputSource: InputSource, _ change: (KeyboardConfig) -> Void) {
+        let config: KeyboardConfig
+        if let existingConfig = getKeyboardConfig(inputSource) {
+            config = existingConfig
         } else {
-            let config = KeyboardConfig(context: container.viewContext)
-
+            config = KeyboardConfig(context: container.viewContext)
             config.id = inputSource.persistentIdentifier
+        }
 
-            saveContext()
+        change(config)
+        saveContext()
+    }
 
-            return config
+    func resetKeyboardColors(_ inputSource: InputSource) {
+        guard let config = getKeyboardConfig(inputSource) else { return }
+
+        saveContext {
+            config.textColor = nil
+            config.bgColor = nil
         }
     }
 
-    func update(_ config: KeyboardConfig, textColor: Color, bgColor: Color) {
-        saveContext {
-            config.textColor = textColor == self.preferences.indicatorForgegroundColor ? nil : textColor
-            config.bgColor = bgColor == self.preferences.indicatorBackgroundColor ? nil : bgColor
+    func swapKeyboardColors(_ inputSource: InputSource) {
+        let foreground = getTextColor(inputSource)
+        let background = getBgColor(inputSource)
+        updateKeyboardConfig(inputSource) {
+            $0.textColor = background
+            $0.bgColor = foreground
         }
     }
 
     func getKeyboardConfig(_ inputSource: InputSource) -> KeyboardConfig? {
         return keyboardConfigs.first(where: { $0.id == inputSource.persistentIdentifier })
             ?? keyboardConfigs.first(where: { $0.id == inputSource.id })
-    }
-
-    func getOrCreateKeyboardConfig(_ inputSource: InputSource) -> KeyboardConfig {
-        return getKeyboardConfig(inputSource) ?? addKeyboardConfig(inputSource)
     }
 
     func migrateKeyboardConfigIdentifiersIfNeed() {

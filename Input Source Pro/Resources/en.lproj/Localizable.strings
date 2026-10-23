@@ -63,6 +63,7 @@
 "Keyboard Indicator Style" = "Tooltip";
 "Always-On Indicator Style" = "Always-On Indicator";
 "Reset" = "Reset";
+"Use Global Colors" = "Use Global Colors";
 
 "tryToDisplayIndicatorNearCursor" = "Display the Default Indicator Near the Input Cursor if Available";
 "isEnableAlwaysOnIndicator" = "Display Always-On Indicator Near the Input Cursor";

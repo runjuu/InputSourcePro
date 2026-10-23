@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C34000000000000000000002 /* KeyboardAppearanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C34000000000000000000001 /* KeyboardAppearanceTests.swift */; };
 		D73000012F20000000000001 /* CaretChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D73000022F20000000000001 /* CaretChannel.swift */; };
 		D73000032F20000000000001 /* CaretChannelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D73000042F20000000000001 /* CaretChannelTests.swift */; };
 		D72000012F20000000000001 /* CaretFocusObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = D72000022F20000000000001 /* CaretFocusObserver.swift */; };
@@ -234,6 +235,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		C34000000000000000000001 /* KeyboardAppearanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardAppearanceTests.swift; sourceTree = "<group>"; };
 		D73000022F20000000000001 /* CaretChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tools/CaretPalette/CaretChannel.swift; sourceTree = SOURCE_ROOT; };
 		D73000042F20000000000001 /* CaretChannelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaretChannelTests.swift; sourceTree = "<group>"; };
 		D72000022F20000000000001 /* CaretFocusObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaretFocusObserver.swift; sourceTree = "<group>"; };
@@ -813,6 +815,7 @@
 		D60000042F20000000000004 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				C34000000000000000000001 /* KeyboardAppearanceTests.swift */,
 				D60001012F20000000000101 /* AppKindComparisonTests.swift */,
 				C33000000000000000000001 /* BrowserURLTests.swift */,
 				D60000512F20000000000051 /* InputSourceDeduplicationTests.swift */,
@@ -1210,6 +1213,7 @@
 				D60002422F20000000000242 /* SpotlightCompatibilityTests.swift in Sources */,
 				D60002322F20000000000232 /* SpotlightIndicatorPositionTests.swift in Sources */,
 				C32000000000000000000002 /* IndicatorWindowStabilityTests.swift in Sources */,
+				C34000000000000000000002 /* KeyboardAppearanceTests.swift in Sources */,
 				D60003042F20000000000304 /* ShortcutConflictTests.swift in Sources */,
 				D60003142F20000000000314 /* ModifierComboTriggerTests.swift in Sources */,
 			);

@@ -24,6 +24,9 @@ final class RuntimeRuleChangeNotifier: ObservableObject {
 
 @MainActor
 final class PreferencesVM: ObservableObject {
+    // Core Data's generated subclasses need one shared model across persistent and in-memory stores.
+    static let managedObjectModel = NSPersistentContainer(name: "Main").managedObjectModel
+
     @Published
     var preferences = Preferences()
 
@@ -63,10 +66,18 @@ final class PreferencesVM: ObservableObject {
     @Published
     var canChecksForUpdates = false
 
-    init(permissionsVM: PermissionsVM) {
+    init(permissionsVM: PermissionsVM, container: NSPersistentContainer) {
         self.permissionsVM = permissionsVM
-        container = NSPersistentContainer(name: "Main")
+        self.container = container
         mainStorage = MainStorage(container: container)
+        watchKeyboardConfigsChange()
+    }
+
+    convenience init(permissionsVM: PermissionsVM) {
+        self.init(
+            permissionsVM: permissionsVM,
+            container: NSPersistentContainer(name: "Main", managedObjectModel: Self.managedObjectModel)
+        )
 
         receivesBetaUpdates = updateChannel.receivesBetaUpdates
         setupAutoUpdate()
@@ -97,7 +108,6 @@ final class PreferencesVM: ObservableObject {
         cleanRemovedAppCustomizationIfNeed()
         migratePreferncesIfNeed()
         migrateShortcutPreferencesIfNeed()
-        watchKeyboardConfigsChange()
     }
 
     func update(_ change: (inout Preferences) -> Void) {

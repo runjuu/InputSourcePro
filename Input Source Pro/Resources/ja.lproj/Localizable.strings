@@ -63,6 +63,7 @@
 "Keyboard Indicator Style" = "ツールチップ";
 "Always-On Indicator Style" = "常時表示インジケーター";
 "Reset" = "リセット";
+"Use Global Colors" = "全体の色設定を使用";
 
 "tryToDisplayIndicatorNearCursor" = "利用可能な場合、通常のインジケーターを入力カーソルの近くに表示";
 "isEnableAlwaysOnIndicator" = "入力カーソルの近くに常時表示インジケーターを表示";

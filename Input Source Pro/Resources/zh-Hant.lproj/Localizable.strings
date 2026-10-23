@@ -64,6 +64,7 @@
 "Keyboard Indicator Style" = "預設樣式";
 "Always-On Indicator Style" = "常駐樣式";
 "Reset" = "重設";
+"Use Global Colors" = "使用全域顏色";
 
 "Enhanced" = "實驗性功能";
 "tryToDisplayIndicatorNearCursor" = "優先在輸入游標附近顯示預設提示";

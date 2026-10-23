@@ -63,6 +63,7 @@
 "Keyboard Indicator Style" = "표시기";
 "Always-On Indicator Style" = "항상 켜진 표시기";
 "Reset" = "재설정";
+"Use Global Colors" = "전체 색상 설정 사용";
 
 "tryToDisplayIndicatorNearCursor" = "가능한 경우 기본 표시기를 입력 커서 근처에 표시";
 "isEnableAlwaysOnIndicator" = "입력 커서 근처에 항상 켜진 표시기 표시";
