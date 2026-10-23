@@ -63,6 +63,7 @@
 "Keyboard Indicator Style" = "نشانگر";
 "Always-On Indicator Style" = "نشانگر همیشه‌روشن";
 "Reset" = "بازنشانی";
+"Use Global Colors" = "استفاده از رنگ‌های سراسری";
 
 "tryToDisplayIndicatorNearCursor" = "نمایش نشانگر پیش‌فرض نزدیک مکان‌نمای ورودی در صورت امکان";
 "isEnableAlwaysOnIndicator" = "نمایش نشانگر همیشه‌روشن نزدیک مکان‌نمای ورودی";
