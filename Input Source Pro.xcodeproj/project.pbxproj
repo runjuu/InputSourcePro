@@ -209,6 +209,7 @@
 		D71000212F20000000000001 /* CaretInputSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71000222F20000000000001 /* CaretInputSource.swift */; };
 		C32000000000000000000002 /* IndicatorWindowStabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C32000000000000000000001 /* IndicatorWindowStabilityTests.swift */; };
 		C33000000000000000000002 /* BrowserURLTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C33000000000000000000001 /* BrowserURLTests.swift */; };
+		C35000000000000000000002 /* QueryWebAreaServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C35000000000000000000001 /* QueryWebAreaServiceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -435,6 +436,7 @@
 		D71000222F20000000000001 /* CaretInputSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CaretInputSource.swift; path = Tools/CaretPalette/CaretInputSource.swift; sourceTree = SOURCE_ROOT; };
 		C32000000000000000000001 /* IndicatorWindowStabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndicatorWindowStabilityTests.swift; sourceTree = "<group>"; };
 		C33000000000000000000001 /* BrowserURLTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserURLTests.swift; sourceTree = "<group>"; };
+		C35000000000000000000001 /* QueryWebAreaServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryWebAreaServiceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -818,6 +820,7 @@
 				C34000000000000000000001 /* KeyboardAppearanceTests.swift */,
 				D60001012F20000000000101 /* AppKindComparisonTests.swift */,
 				C33000000000000000000001 /* BrowserURLTests.swift */,
+				C35000000000000000000001 /* QueryWebAreaServiceTests.swift */,
 				D60000512F20000000000051 /* InputSourceDeduplicationTests.swift */,
 				A14600010000000000000001 /* SourceReconciliationTests.swift */,
 				A14600030000000000000003 /* CJKVSourceReconciliationTests.swift */,
@@ -1186,6 +1189,7 @@
 			files = (
 				D60001022F20000000000102 /* AppKindComparisonTests.swift in Sources */,
 				C33000000000000000000002 /* BrowserURLTests.swift in Sources */,
+				C35000000000000000000002 /* QueryWebAreaServiceTests.swift in Sources */,
 				D60000522F20000000000052 /* InputSourceDeduplicationTests.swift in Sources */,
 				A14600020000000000000002 /* SourceReconciliationTests.swift in Sources */,
 				A14600040000000000000004 /* CJKVSourceReconciliationTests.swift in Sources */,

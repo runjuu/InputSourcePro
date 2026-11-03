@@ -100,7 +100,7 @@ extension Browser {
             )
         }
 
-        guard let webArea = try? query.perform(),
+        guard let webArea = try? query.perform(documentURL: documentURL),
               let url = webArea.url
         else { return nil }
 
