@@ -157,7 +157,7 @@ enum BrowserThatCanWatchBrowserAddressFocus: CaseIterable {
         case .Safari, .SafariTechnologyPreview:
             return focusedElement.domIdentifier() == "WEB_BROWSER_ADDRESS_AND_SEARCH_FIELD"
 
-        case .Arc:
+        case .Arc, .Dia:
             return focusedElement.domIdentifier() == "commandBarTextField"
 
         case .Vivaldi:
@@ -167,7 +167,7 @@ enum BrowserThatCanWatchBrowserAddressFocus: CaseIterable {
         case .Opera:
             return focusedElement.domClassList().contains("AddressTextfieldView")
 
-        case .Chromium, .Chrome, .Brave, .BraveBeta, .BraveNightly, .Edge, .Dia, .Helium, .Comet, .Aside, .Whale:
+        case .Chromium, .Chrome, .Brave, .BraveBeta, .BraveNightly, .Edge, .Helium, .Comet, .Aside, .Whale:
             if focusedElement.domClassList().contains("OmniboxViewViews") {
                 if let description = focusedElement.safeString(attribute: .description),
                    chromiumSearchBarDescMap[description] == true
