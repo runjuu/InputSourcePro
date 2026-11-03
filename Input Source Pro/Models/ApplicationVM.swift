@@ -41,9 +41,18 @@ extension ApplicationVM {
             .publisher(for: NSWorkspace.activeSpaceDidChangeNotification, object: NSWorkspace.shared)
             .mapToVoid()
 
+        // focusedApplication lags AX events, so re-read it a few times after each one.
+        let axNotificationBurst = axNotification
+            .flatMapLatest { _ in
+                Timer.interval(seconds: 0.04)
+                    .prepend(Date())
+                    .prefix(21) // ~0.8 s
+                    .mapToVoid()
+            }
+
         Publishers
             .MergeMany([
-                axNotification.eraseToAnyPublisher(),
+                axNotificationBurst.eraseToAnyPublisher(),
                 didActivateAppNotification.eraseToAnyPublisher(),
                 activeSpaceDidChangeNotification.eraseToAnyPublisher()
             ])
