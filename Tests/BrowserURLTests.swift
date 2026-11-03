@@ -67,6 +67,12 @@ final class BrowserURLTests: XCTestCase {
         }
     }
 
+    func testChromeRecognizesBothNewTabWebAreaURLs() {
+        for address in ["chrome://newtab/", "chrome://new-tab-page/"] {
+            XCTAssertEqual(Browser.Chrome.normalizedTabURL(URL(string: address)!), .newtab)
+        }
+    }
+
     func testWhalePreservesRegularExtensionPages() {
         let settings = URL(string: "chrome-extension://mdppnmkhoflepinhojdkmkanhhlkginn/settings.html")!
         XCTAssertEqual(Browser.Whale.normalizedTabURL(settings), settings)
