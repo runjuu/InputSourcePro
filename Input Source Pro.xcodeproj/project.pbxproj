@@ -184,7 +184,7 @@
 		A14600040000000000000004 /* CJKVSourceReconciliationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14600030000000000000003 /* CJKVSourceReconciliationTests.swift */; };
 		D60000622F20000000000062 /* AppURLAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000612F20000000000061 /* AppURLAction.swift */; };
 		D60000722F20000000000072 /* AppURLActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000712F20000000000071 /* AppURLActionTests.swift */; };
-		D60000822F20000000000082 /* URLActivationSuppressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000812F20000000000081 /* URLActivationSuppressionTests.swift */; };
+		D60000822F20000000000082 /* AppLaunchBehaviorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000812F20000000000081 /* AppLaunchBehaviorTests.swift */; };
 		D60001022F20000000000102 /* AppKindComparisonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60001012F20000000000101 /* AppKindComparisonTests.swift */; };
 		D60001922F20000000000192 /* ActivateEventInputSourceChangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60001912F20000000000191 /* ActivateEventInputSourceChangeTests.swift */; };
 		D60002022F20000000000202 /* IndicatorNearMousePointTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60002012F20000000000201 /* IndicatorNearMousePointTests.swift */; };
@@ -411,7 +411,7 @@
 		A14600030000000000000003 /* CJKVSourceReconciliationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CJKVSourceReconciliationTests.swift; sourceTree = "<group>"; };
 		D60000612F20000000000061 /* AppURLAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppURLAction.swift; sourceTree = "<group>"; };
 		D60000712F20000000000071 /* AppURLActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppURLActionTests.swift; sourceTree = "<group>"; };
-		D60000812F20000000000081 /* URLActivationSuppressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLActivationSuppressionTests.swift; sourceTree = "<group>"; };
+		D60000812F20000000000081 /* AppLaunchBehaviorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLaunchBehaviorTests.swift; sourceTree = "<group>"; };
 		D60001012F20000000000101 /* AppKindComparisonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKindComparisonTests.swift; sourceTree = "<group>"; };
 		D60001912F20000000000191 /* ActivateEventInputSourceChangeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivateEventInputSourceChangeTests.swift; sourceTree = "<group>"; };
 		D60002012F20000000000201 /* IndicatorNearMousePointTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndicatorNearMousePointTests.swift; sourceTree = "<group>"; };
@@ -831,7 +831,7 @@
 				D60000022F20000000000002 /* TestHarnessTests.swift */,
 				D60003232F20000000000323 /* ShortcutTriggerManagerTests.swift */,
 				D60000712F20000000000071 /* AppURLActionTests.swift */,
-				D60000812F20000000000081 /* URLActivationSuppressionTests.swift */,
+				D60000812F20000000000081 /* AppLaunchBehaviorTests.swift */,
 				D60001912F20000000000191 /* ActivateEventInputSourceChangeTests.swift */,
 				D60003112F20000000000311 /* ScreenLockStateTests.swift */,
 				C31000000000000000000001 /* CapsLockStateTests.swift */,
@@ -1200,7 +1200,7 @@
 				D60000032F20000000000003 /* TestHarnessTests.swift in Sources */,
 				D60003242F20000000000324 /* ShortcutTriggerManagerTests.swift in Sources */,
 				D60000722F20000000000072 /* AppURLActionTests.swift in Sources */,
-				D60000822F20000000000082 /* URLActivationSuppressionTests.swift in Sources */,
+				D60000822F20000000000082 /* AppLaunchBehaviorTests.swift in Sources */,
 				D60001922F20000000000192 /* ActivateEventInputSourceChangeTests.swift in Sources */,
 				D60003122F20000000000312 /* ScreenLockStateTests.swift in Sources */,
 				C31000000000000000000002 /* CapsLockStateTests.swift in Sources */,

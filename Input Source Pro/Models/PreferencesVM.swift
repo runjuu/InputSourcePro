@@ -43,6 +43,9 @@ final class PreferencesVM: ObservableObject {
 
     var updaterController: SPUStandardUpdaterController?
 
+    private(set) var isUserInitiatedUpdateSessionInProgress = false
+    private(set) var updateCheckGeneration = 0
+
     var cancelBag = CancelBag()
 
     var appKeyboardCache = AppKeyboardCache()
@@ -185,6 +188,12 @@ extension PreferencesVM {
         )
 
         updaterController?.updater
+            .publisher(for: \.sessionInProgress)
+            .filter { !$0 }
+            .sink { [weak self] _ in self?.isUserInitiatedUpdateSessionInProgress = false }
+            .store(in: cancelBag)
+
+        updaterController?.updater
             .publisher(for: \.automaticallyChecksForUpdates)
             .removeDuplicates()
             .assign(to: &$automaticallyChecksForUpdates)
@@ -201,7 +210,13 @@ extension PreferencesVM {
     }
 
     func checkUpdates() {
-        updaterController?.updater.checkForUpdates()
+        guard let updater = updaterController?.updater, updater.canCheckForUpdates else { return }
+        updateCheckGeneration += 1
+        isUserInitiatedUpdateSessionInProgress = true
+        updater.checkForUpdates()
+        if !updater.sessionInProgress {
+            isUserInitiatedUpdateSessionInProgress = false
+        }
     }
 }
 

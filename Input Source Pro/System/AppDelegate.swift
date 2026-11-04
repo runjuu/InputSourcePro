@@ -20,25 +20,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var isReadyForURLs = false
     private var pendingURLs: [URL] = []
 
-    /// Timestamp of the most recent `inputsourcepro://` action. An activation that
-    /// lands within `urlActivationSuppressionWindow` of it is the foregrounding
-    /// `open` triggers, so it must not also pop Preferences. A timestamp (vs. a
-    /// one-shot flag) auto-expires — it can't linger and swallow a later genuine
-    /// activation — and it absorbs every activation in the same `open` burst.
     private var lastURLActionAt: Date?
-
-    /// How recently a URL action must have happened for an activation to be
-    /// attributed to it.
+    private var pendingPreferencesOpen: DispatchWorkItem?
     static let urlActivationSuppressionWindow: TimeInterval = 2
-
-    /// `open <url>` activates the app a beat *before* it delivers the URL, so the
-    /// activation handler waits this long before deciding whether to open
-    /// Preferences — giving an incoming URL action time to arrive and cancel it.
     static let urlActivationGrace: TimeInterval = 0.35
 
-    /// Whether an activation observed at `now` should be attributed to a URL
-    /// action at `lastURLActionAt` (and so skip opening Preferences). Pure, so the
-    /// window logic can be unit-tested without driving the AppKit lifecycle.
     static func shouldSuppressPreferences(
         lastURLActionAt: Date?,
         now: Date,
@@ -47,6 +33,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let last = lastURLActionAt else { return false }
         let elapsed = now.timeIntervalSince(last)
         return elapsed >= 0 && elapsed < window
+    }
+
+    @MainActor
+    var isUserInitiatedUpdateSessionInProgress: Bool {
+        preferencesVM?.isUserInitiatedUpdateSessionInProgress ?? false
+    }
+
+    @MainActor
+    var updateCheckGeneration: Int {
+        preferencesVM?.updateCheckGeneration ?? 0
     }
 
     func applicationDidFinishLaunching(_: Notification) {
@@ -83,7 +79,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
         
         LaunchAtLogin.migrateIfNeeded()
-        openPreferencesAtFirstLaunch()
+        openPreferencesAtFirstLaunch(
+            previousBuildVersion: preferencesVM.preferences.prevInstalledBuildVersion,
+            currentBuildVersion: preferencesVM.preferences.buildVersion
+        )
         sendLaunchPing()
         updateInstallVersionInfo()
 
@@ -94,22 +93,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_: Notification) {
-        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
         guard !InputSourceSwitcher.isHandlingTemporaryInputWindowActivation else { return }
+        // Sparkle activates the app for its dialogs. Check before scheduling so
+        // dismissing an update dialog during the grace period cannot open Settings.
+        guard !isUserInitiatedUpdateSessionInProgress else { return }
+        let updateCheckGeneration = self.updateCheckGeneration
 
-        // `open <url>` activates the app a beat *before* it delivers the URL
-        // (measured: AppKit calls this ~10–200ms ahead of `application(open:)`),
-        // so we can't tell synchronously whether this is a genuine user
-        // activation or the side effect of an incoming URL action. Defer by the
-        // grace window; a URL action that lands in the meantime records its
-        // timestamp and cancels the Preferences open.
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.urlActivationGrace) { [weak self] in
+        // URL opens can activate the app before delivering the URL action.
+        pendingPreferencesOpen?.cancel()
+        let openPreferences = DispatchWorkItem { [weak self] in
             guard let self else { return }
-            if Self.shouldSuppressPreferences(lastURLActionAt: self.lastURLActionAt, now: Date()) {
-                return
-            }
-            self.statusItemController.openPreferences()
+            self.pendingPreferencesOpen = nil
+            guard !self.isUserInitiatedUpdateSessionInProgress else { return }
+            // A check may have started and finished while this activation was pending.
+            guard self.updateCheckGeneration == updateCheckGeneration else { return }
+            guard !Self.shouldSuppressPreferences(lastURLActionAt: self.lastURLActionAt, now: Date()) else { return }
+            self.openPreferences()
         }
+        pendingPreferencesOpen = openPreferences
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.urlActivationGrace, execute: openPreferences)
+    }
+
+    func applicationShouldHandleReopen(_: NSApplication, hasVisibleWindows _: Bool) -> Bool {
+        pendingPreferencesOpen?.cancel()
+        pendingPreferencesOpen = nil
+        openPreferences()
+        return false
     }
 
     /// Handles `inputsourcepro://` URLs delivered by `open` (e.g. for CLI-driven
@@ -120,10 +129,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @MainActor
-    func openPreferencesAtFirstLaunch() {
-        if preferencesVM.preferences.prevInstalledBuildVersion != preferencesVM.preferences.buildVersion {
-            statusItemController.openPreferences()
+    func openPreferencesAtFirstLaunch(previousBuildVersion: Int, currentBuildVersion: Int) {
+        if previousBuildVersion != currentBuildVersion {
+            openPreferences()
         }
+    }
+
+    @MainActor
+    func openPreferences() {
+        statusItemController?.openPreferences()
     }
 
     @MainActor
@@ -162,10 +176,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let action = AppURLAction(url: url)
         guard action != .unsupported else { return }
 
-        // `open` also activates the app; record the moment so the activation it
-        // triggers doesn't also pop Preferences on top of the result alert. The
-        // queued path re-enters here on drain, re-anchoring the window near the
-        // alert.
         lastURLActionAt = Date()
 
         guard isReadyForURLs else {
@@ -175,7 +185,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         switch action {
         case .unsupported:
-            break // unreachable: guarded out above before activation was suppressed
+            break
         case .importInvalidPath:
             presentResultAlert(
                 title: "Import Settings Failed".i18n(),
