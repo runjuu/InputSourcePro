@@ -164,6 +164,50 @@ final class QueryWebAreaServiceTests: XCTestCase {
         }
     }
 
+    func testPropagatesAccessibilityFailureBeforePendingDocumentMatch() {
+        let window = element(nil, role: "AXWindow")
+        let unavailable = element(nil, role: "AXGroup")
+        let content = element(nil, role: "AXGroup")
+        let page = element(pageURL.absoluteString)
+        var didReadContent = false
+        let service = QueryWebAreaService(windowElement: window) { node in
+            if node === window { return [content, unavailable] }
+            if node === unavailable { throw ReadFailure.unavailable }
+            if node === content {
+                didReadContent = true
+                return [page]
+            }
+            return []
+        }
+
+        XCTAssertThrowsError(try service.perform(documentURL: pageURL)) { error in
+            XCTAssertTrue(error is ReadFailure)
+        }
+        XCTAssertFalse(didReadContent)
+    }
+
+    func testPropagatesAccessibilityFailureBeforePendingPageWithoutDocument() {
+        let window = element(nil, role: "AXWindow")
+        let unavailable = element(nil, role: "AXGroup")
+        let content = element(nil, role: "AXGroup")
+        let page = element(pageURL.absoluteString)
+        var didReadContent = false
+        let service = QueryWebAreaService(windowElement: window) { node in
+            if node === window { return [content, unavailable] }
+            if node === unavailable { throw ReadFailure.unavailable }
+            if node === content {
+                didReadContent = true
+                return [page]
+            }
+            return []
+        }
+
+        XCTAssertThrowsError(try service.perform()) { error in
+            XCTAssertTrue(error is ReadFailure)
+        }
+        XCTAssertFalse(didReadContent)
+    }
+
     private enum ReadFailure: Error {
         case unavailable
     }
