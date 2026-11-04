@@ -1,5 +1,6 @@
 import AppKit
 import Carbon
+import Combine
 import CoreGraphics
 
 @MainActor
@@ -25,6 +26,23 @@ enum InputSourceSwitcher {
         func sourceForReconciliation(_ actual: Source) -> Source {
             guard let pending, actual == pending.temporary else { return actual }
             return pending.target
+        }
+    }
+
+    /// Waits for focus to leave this app after the temporary input window hands it back.
+    struct ApplicationRestoration {
+        private(set) var remainingChecks: Int
+
+        init(checks: Int) {
+            remainingChecks = checks
+        }
+
+        /// Returns true once waiting should stop: any app but this one is frontmost, or the checks ran out.
+        /// Not only the previous app: the user may have switched to another one, or the previous app quit.
+        mutating func isFinished(frontPID: pid_t?, selfPID: pid_t) -> Bool {
+            if let frontPID, frontPID != selfPID { return true }
+            remainingChecks -= 1
+            return remainingChecks <= 0
         }
     }
 
@@ -67,8 +85,23 @@ enum InputSourceSwitcher {
     private static let temporaryInputWindowActivationSuppressionDuration: TimeInterval = 0.5
     private static var temporaryInputWindowActivationSuppressionEndTime: TimeInterval = 0
     private static let syntheticEventUserData: Int64 = 0x49535043534A4B56 // "ISPCSJKV"
+    private static var restoration: ApplicationRestoration?
+    private static var restorationTimer: AnyCancellable?
+    private static let restorationCheckInterval: TimeInterval = 0.01
+    private static let restorationCheckLimit = 50
 
     private(set) static var isShowingTemporaryInputWindow = false
+
+    private static let restored = PassthroughSubject<Void, Never>()
+
+    /// Sends once the temporary input window has closed and focus has left this app,
+    /// or once waiting for that has given up.
+    static var temporaryInputWindowRestored: AnyPublisher<Void, Never> { restored.eraseToAnyPublisher() }
+
+    /// True from the moment a temporary input window is requested until `temporaryInputWindowRestored` sends.
+    static var isTemporaryInputWindowInProgress: Bool {
+        isShowingTemporaryInputWindow || restoration != nil
+    }
 
     static var isHandlingTemporaryInputWindowActivation: Bool {
         isShowingTemporaryInputWindow ||
@@ -77,7 +110,11 @@ enum InputSourceSwitcher {
 
     static func isTemporaryInputWindowApplicationActivation(_ application: NSRunningApplication) -> Bool {
         guard isHandlingTemporaryInputWindowActivation else { return false }
-        return application.bundleIdentifier == Bundle.main.bundleIdentifier
+        return isSelf(application)
+    }
+
+    private static func isSelf(_ application: NSRunningApplication?) -> Bool {
+        application?.bundleIdentifier == Bundle.main.bundleIdentifier
     }
 
     /// End time for the synthetic event suppression window.
@@ -217,6 +254,16 @@ enum InputSourceSwitcher {
     ) {
         logger.debug { "Applying CJKV fix using temporary input window" }
         selectInputSource(tisTarget, reason: "CJKV target")
+        // A window requested while the previous one is still handing focus back takes over that wait.
+        let frontmostApplication = NSWorkspace.shared.frontmostApplication
+        temporaryInputWindowPreviousApplication = applicationToRestore(
+            frontmost: frontmostApplication,
+            frontmostIsSelf: isSelf(frontmostApplication),
+            restoring: temporaryInputWindowPreviousApplication
+        )
+        restoration = nil
+        restorationTimer = nil
+        isShowingTemporaryInputWindow = true
         showTemporaryInputWindow()
 
         scheduleWorkItem(after: temporaryInputWindowDuration + 0.05) {
@@ -320,7 +367,7 @@ enum InputSourceSwitcher {
     private static func cancelPendingWorkItems() {
         temporarySelection.cancel()
         syntheticEventEndTime = 0
-        closeTemporaryInputWindow(restorePreviousApplication: true)
+        closeTemporaryInputWindow()
         guard !pendingWorkItems.isEmpty else { return }
         pendingWorkItems.forEach { $0.cancel() }
         pendingWorkItems.removeAll()
@@ -349,11 +396,10 @@ enum InputSourceSwitcher {
     /// Adapted from macism's showTemporaryInputWindow approach.
     /// macism is MIT licensed, copyright (c) 2023 https://github.com/laishulu.
     private static func showTemporaryInputWindow() {
-        closeTemporaryInputWindow(restorePreviousApplication: false)
-
-        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
-
-        temporaryInputWindowPreviousApplication = NSWorkspace.shared.frontmostApplication
+        guard let screen = NSScreen.main ?? NSScreen.screens.first else {
+            closeTemporaryInputWindow()
+            return
+        }
 
         let screenRect = screen.visibleFrame
         let windowSize = NSSize(width: 3, height: 3)
@@ -384,7 +430,6 @@ enum InputSourceSwitcher {
 
         temporaryInputWindow = window
         suppressTemporaryInputWindowActivation()
-        isShowingTemporaryInputWindow = true
         IndicatorDiagnostics.record("switch.temporaryWindow show previousPID=\(temporaryInputWindowPreviousApplication?.processIdentifier ?? 0) frame=\(window.frame)")
 
         window.makeKeyAndOrderFront(nil)
@@ -392,35 +437,65 @@ enum InputSourceSwitcher {
         window.makeFirstResponder(textView)
 
         scheduleWorkItem(after: temporaryInputWindowDuration) {
-            closeTemporaryInputWindow(restorePreviousApplication: true)
+            closeTemporaryInputWindow()
         }
     }
 
-    private static func closeTemporaryInputWindow(restorePreviousApplication: Bool) {
-        guard let window = temporaryInputWindow else {
-            isShowingTemporaryInputWindow = false
-            temporaryInputWindowPreviousApplication = nil
+    /// The app a new temporary input window hands focus back to. While the previous window is still
+    /// handing focus back, this app or no app can be frontmost; the app being restored is the one to return to.
+    static func applicationToRestore<App>(frontmost: App?, frontmostIsSelf: Bool, restoring: App?) -> App? {
+        frontmost == nil || frontmostIsSelf ? restoring ?? frontmost : frontmost
+    }
+
+    private static func closeTemporaryInputWindow() {
+        guard isShowingTemporaryInputWindow else { return }
+        isShowingTemporaryInputWindow = false
+        if let window = temporaryInputWindow {
+            IndicatorDiagnostics.record("switch.temporaryWindow close previousPID=\(temporaryInputWindowPreviousApplication?.processIdentifier ?? 0)")
+            temporaryInputWindow = nil
+            window.orderOut(nil)
+            window.close()
+            suppressTemporaryInputWindowActivation()
+        }
+
+        guard let previousApplication = temporaryInputWindowPreviousApplication,
+              !isSelf(previousApplication),
+              isSelf(NSWorkspace.shared.frontmostApplication),
+              previousApplication.activate(options: [])
+        else {
+            IndicatorDiagnostics.record("switch.temporaryWindow restored reason=no-handback previousPID=\(temporaryInputWindowPreviousApplication?.processIdentifier ?? 0) frontPID=\(NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0)")
+            finishRestoration()
             return
         }
 
-        IndicatorDiagnostics.record("switch.temporaryWindow close restore=\(restorePreviousApplication) previousPID=\(temporaryInputWindowPreviousApplication?.processIdentifier ?? 0)")
-        temporaryInputWindow = nil
-        window.orderOut(nil)
-        window.close()
-        suppressTemporaryInputWindowActivation()
-        isShowingTemporaryInputWindow = false
+        waitForRestoration()
+    }
 
-        defer {
-            temporaryInputWindowPreviousApplication = nil
+    // Not a scheduled work item: the next switch cancels those, but must not cut this wait short.
+    // Polled, not notified: consumers read frontmostApplication, which in 19 of 32 measured switches still
+    // returned this app when didActivateApplicationNotification for the previous app arrived (~10ms before the poll).
+    private static func waitForRestoration() {
+        restoration = ApplicationRestoration(checks: restorationCheckLimit)
+        restorationTimer = Timer.interval(seconds: restorationCheckInterval)
+            .sink { _ in checkRestoration() }
+    }
+
+    private static func checkRestoration() {
+        guard var current = restoration else { return }
+        let frontPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        guard current.isFinished(frontPID: frontPID, selfPID: ProcessInfo.processInfo.processIdentifier) else {
+            restoration = current
+            return
         }
+        IndicatorDiagnostics.record("switch.temporaryWindow restored previousPID=\(temporaryInputWindowPreviousApplication?.processIdentifier ?? 0) frontPID=\(frontPID ?? 0) remainingChecks=\(current.remainingChecks)")
+        finishRestoration()
+    }
 
-        guard restorePreviousApplication,
-              let previousApplication = temporaryInputWindowPreviousApplication,
-              previousApplication.bundleIdentifier != Bundle.main.bundleIdentifier,
-              NSWorkspace.shared.frontmostApplication?.bundleIdentifier == Bundle.main.bundleIdentifier
-        else { return }
-
-        previousApplication.activate(options: [])
+    private static func finishRestoration() {
+        restoration = nil
+        restorationTimer = nil
+        temporaryInputWindowPreviousApplication = nil
+        restored.send()
     }
 
     private static func suppressTemporaryInputWindowActivation() {

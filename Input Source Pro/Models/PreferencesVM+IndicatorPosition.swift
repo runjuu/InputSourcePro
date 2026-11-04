@@ -94,6 +94,11 @@ extension PreferencesVM {
         .eraseToAnyPublisher()
     }
 
+    /// Whether the default indicator for `app` goes at the text caret when one is found.
+    func positionsNearCaret(app: NSRunningApplication) -> Bool {
+        preferences.isEnhancedModeEnabled && preferences.tryToDisplayIndicatorNearCursor && isAbleToQueryLocation(app)
+    }
+
     func getIndicatorPositionPublisher(
         appSize: CGSize,
         app: NSRunningApplication,
@@ -176,10 +181,7 @@ extension PreferencesVM {
                             return Just((.floatingApp, positionForFloatingWindow)).eraseToAnyPublisher()
                         }
 
-                        if self.preferences.isEnhancedModeEnabled,
-                           self.preferences.tryToDisplayIndicatorNearCursor == true,
-                           self.isAbleToQueryLocation(app)
-                        {
+                        if self.positionsNearCaret(app: app) {
                             return Self.caretPositionWhenReadyPublisher(
                                 query: { self.getPositionAroundInputCursor(app: app, traceID: traceID) },
                                 changes: CaretPalette.shared.changes,
