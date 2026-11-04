@@ -98,6 +98,29 @@ final class CJKVSourceReconciliationTests: XCTestCase {
         XCTAssertEqual(selection.sourceForReconciliation("EN"), "EN")
     }
 
+    func testRestorationEndsWhenAnyOtherAppIsFrontmost() {
+        var restoration = InputSourceSwitcher.ApplicationRestoration(checks: 3)
+
+        XCTAssertFalse(restoration.isFinished(frontPID: 1, selfPID: 1))
+        XCTAssertFalse(restoration.isFinished(frontPID: nil, selfPID: 1))
+        XCTAssertTrue(restoration.isFinished(frontPID: 42, selfPID: 1))
+    }
+
+    func testRestorationGivesUpWhileThisAppStaysFrontmost() {
+        var restoration = InputSourceSwitcher.ApplicationRestoration(checks: 2)
+
+        XCTAssertFalse(restoration.isFinished(frontPID: 1, selfPID: 1))
+        XCTAssertTrue(restoration.isFinished(frontPID: 1, selfPID: 1))
+    }
+
+    func testWindowShownDuringRestorationReturnsFocusToTheRestoringApp() {
+        XCTAssertEqual(InputSourceSwitcher.applicationToRestore(frontmost: "ISP", frontmostIsSelf: true, restoring: "App"), "App")
+        XCTAssertEqual(InputSourceSwitcher.applicationToRestore(frontmost: "ISP", frontmostIsSelf: true, restoring: nil), "ISP")
+        XCTAssertEqual(InputSourceSwitcher.applicationToRestore(frontmost: "Other", frontmostIsSelf: false, restoring: "App"), "Other")
+        XCTAssertEqual(InputSourceSwitcher.applicationToRestore(frontmost: nil as String?, frontmostIsSelf: false, restoring: "App"), "App")
+        XCTAssertNil(InputSourceSwitcher.applicationToRestore(frontmost: nil as String?, frontmostIsSelf: false, restoring: nil))
+    }
+
     @MainActor
     private final class Harness {
         typealias Action = SourceReconciliationCore.Action<String, String>

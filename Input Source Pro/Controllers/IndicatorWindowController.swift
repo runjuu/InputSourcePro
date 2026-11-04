@@ -77,28 +77,7 @@ class IndicatorWindowController: FloatWindowController {
                 IndicatorDiagnostics.record("activation.received event=\(event.diagnosticDescription) renderedSource=\(inputSource.persistentIdentifier) frontPID=\(NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0)")
 
                 guard let self = self else { return Empty().eraseToAnyPublisher() }
-                guard let appKind = self.applicationVM.appKind,
-                      !preferencesVM.isHideIndicator(appKind)
-                else {
-                    IndicatorDiagnostics.record("activation.hide reason=missing-or-excluded-app")
-                    return self.justHidePublisher()
-                }
-
-                let app = appKind.getApp()
-
-                let mode = Self.activationMode(
-                    event: event,
-                    focusedField: preferencesVM.needDetectFocusedFieldChanges(app: app)
-                )
-                IndicatorDiagnostics.record("activation.mode mode=\(mode) app=\(app.bundleIdentifier ?? "?") pid=\(app.processIdentifier)")
-                switch mode {
-                case .hide:
-                    return self.justHidePublisher()
-                case .autoShow:
-                    return self.autoShowPublisher(event: event, inputSource: inputSource, appKind: appKind)
-                case .autoHide:
-                    return self.autoHidePublisher(event: event, inputSource: inputSource, appKind: appKind)
-                }
+                return self.activationPublisher(event: event, inputSource: inputSource)
             }
             .eraseToAnyPublisher()
 
@@ -126,6 +105,48 @@ class IndicatorWindowController: FloatWindowController {
     @available(*, unavailable)
     required init?(coder _: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    private func activationPublisher(
+        event: IndicatorVM.ActivateEvent,
+        inputSource: InputSource
+    ) -> AnyPublisher<Void, Never> {
+        guard let appKind = applicationVM.appKind,
+              !preferencesVM.isHideIndicator(appKind)
+        else {
+            IndicatorDiagnostics.record("activation.hide reason=missing-or-excluded-app")
+            return justHidePublisher()
+        }
+
+        let app = appKind.getApp()
+
+        let mode = Self.activationMode(
+            event: event,
+            focusedField: preferencesVM.needDetectFocusedFieldChanges(app: app)
+        )
+        IndicatorDiagnostics.record("activation.mode mode=\(mode) app=\(app.bundleIdentifier ?? "?") pid=\(app.processIdentifier)")
+        // A caret lookup now would target the temporary input window, not the app it took focus from.
+        // Mouse and screen positions don't look one up; the always-on indicator's suppression check does.
+        if mode != .hide, InputSourceSwitcher.isTemporaryInputWindowInProgress,
+           preferencesVM.positionsNearCaret(app: app) || preferencesVM.preferences.isAlwaysOnIndicatorEnabled
+        {
+            IndicatorDiagnostics.record("activation.deferred reason=temporary-input-window")
+            return InputSourceSwitcher.temporaryInputWindowRestored
+                .first()
+                .receive(on: DispatchQueue.main)
+                .flatMap { [weak self] _ -> AnyPublisher<Void, Never> in
+                    self?.activationPublisher(event: event, inputSource: inputSource) ?? Empty().eraseToAnyPublisher()
+                }
+                .eraseToAnyPublisher()
+        }
+        switch mode {
+        case .hide:
+            return justHidePublisher()
+        case .autoShow:
+            return autoShowPublisher(event: event, inputSource: inputSource, appKind: appKind)
+        case .autoHide:
+            return autoHidePublisher(event: event, inputSource: inputSource, appKind: appKind)
+        }
     }
 }
 

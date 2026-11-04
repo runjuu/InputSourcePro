@@ -28,6 +28,7 @@ final class CaretPalette {
     private var observers: [NSObjectProtocol] = []
     private var timer: Timer?
     private var activitySubscription: AnyCancellable?
+    private var restorationSubscription: AnyCancellable?
     private var channel: CaretChannel?
     private var channelGeneration = UUID()
     private var suspension = Suspension()
@@ -150,11 +151,30 @@ final class CaretPalette {
         }
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
-        ) { [weak self] _ in
+        ) { [weak self] notification in
             MainActor.assumeIsolated {
+                // The temporary input window briefly activates this app, and the previous app's reactivation
+                // can arrive while frontmostApplication still reports this app; rebind once restoration completes.
+                // That reactivation can also arrive after restoration completed: keep the bound app's state,
+                // as the restoration subscriber does.
+                let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+                if InputSourceSwitcher.isTemporaryInputWindowInProgress { return }
+                if let app, InputSourceSwitcher.isHandlingTemporaryInputWindowActivation,
+                   InputSourceSwitcher.isTemporaryInputWindowApplicationActivation(app)
+                    || app.processIdentifier == self?.focusApplication?.processIdentifier
+                { return }
                 self?.watchTextFocus()
             }
         })
+        restorationSubscription = InputSourceSwitcher.temporaryInputWindowRestored
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in
+                // Focus came back to the app still bound: keep its state; the next activity resumes the helper.
+                guard let self = self,
+                      NSWorkspace.shared.frontmostApplication?.processIdentifier != self.focusApplication?.processIdentifier
+                else { return }
+                self.watchTextFocus()
+            }
         let lifecycleEvents: [(Notification.Name, Suspension.Reason, Bool)] = [
             (NSWorkspace.willSleepNotification, .systemSleep, true),
             (NSWorkspace.didWakeNotification, .systemSleep, false),
@@ -294,6 +314,7 @@ final class CaretPalette {
         channel = nil
         activitySubscription?.cancel()
         activitySubscription = nil
+        restorationSubscription = nil
         timer?.invalidate()
         timer = nil
         sample = nil
