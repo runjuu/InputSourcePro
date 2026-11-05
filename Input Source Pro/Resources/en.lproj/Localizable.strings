@@ -56,6 +56,8 @@
 "CJKV Fix Method Switching Focus Description" = "Briefly switches focus to force macOS to settle the selected input source. This method works better on macOS 26, but does not work for floating apps.";
 "CJKV Fix Method Shortcut Simulation" = "Shortcut Simulation";
 "CJKV Fix Method Shortcut Simulation Description" = "Simulates the system's “Select the previous input source” shortcut. This works well before macOS 26, but on macOS 26 it may cause unexpected system behavior.";
+"CJKV Fix Method Direct Activation" = "Direct Activation (Experimental)";
+"CJKV Fix Method Direct Activation Description" = "Uses private macOS APIs to activate the input source directly in the focused app, following an approach shared by [@harukawu](https://github.com/harukawu). We haven’t verified whether this fixes the switching issue. Please try it and share your feedback in [issue #85](https://github.com/runjuu/InputSourcePro/issues/85).";
 "CJKV Fix Shortcut Method Failed Desc" = "Shortcut Simulation requires the system's “Select the previous input source” shortcut to be enabled.";
 "Open Keyboard Settings" = "Open Keyboard Settings";
 

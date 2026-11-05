@@ -305,7 +305,8 @@ extension IndicatorVM {
                 cache: { app, source in preferencesVM.cacheKeyboardFor(app, keyboard: source) },
                 noChanges: .noChanges,
                 system: .system,
-                shortcut: .shortcut
+                shortcut: .shortcut,
+                prepareForContextChange: { _ in InputSourceSwitcher.prepareForContextChange() }
             )
         }
         let coreActions = actionRelay.publisher.map { action -> SourceReconciliationCore.Action<AppKind, InputSource> in

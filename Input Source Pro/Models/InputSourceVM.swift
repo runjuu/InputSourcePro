@@ -37,7 +37,10 @@ class InputSourceVM: ObservableObject {
         selectInputSourceSubject
             .sink { [weak self] request in
                 guard let self else { return }
-                request.inputSource.select(cJKVFixStrategy: self.preferencesVM.activeCJKVFixStrategy(for: request.app))
+                request.inputSource.select(
+                    cJKVFixStrategy: self.preferencesVM.activeCJKVFixStrategy(for: request.app),
+                    for: request.app
+                )
             }
             .store(in: cancelBag)
 

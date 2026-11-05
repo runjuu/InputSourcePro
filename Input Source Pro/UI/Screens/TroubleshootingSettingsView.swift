@@ -43,7 +43,7 @@ struct TroubleshootingSettingsView: View {
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text(strategy.name)
 
-                                        Text(strategy.explanation)
+                                        Text(.init(strategy.explanation))
                                             .font(.body)
                                             .foregroundColor(.secondary)
                                             .fixedSize(horizontal: false, vertical: true)
@@ -54,10 +54,7 @@ struct TroubleshootingSettingsView: View {
                             .labelsHidden()
                             .pickerStyle(.radioGroup)
                             .accessibilityLabel("CJKV Fix Method".i18n())
-                            .disabled(
-                                !preferencesVM.preferences.isEnhancedModeEnabled ||
-                                    !preferencesVM.preferences.isCJKVFixEnabled
-                            )
+                            .disabled(!preferencesVM.preferences.isEnhancedModeEnabled)
                         }
                     }
                     .padding()
@@ -100,7 +97,8 @@ struct TroubleshootingSettingsView: View {
     }
 
     func onSelectCJKVFixStrategy(_ cJKVFixStrategy: CJKVFixStrategy) {
-        if cJKVFixStrategy == .previousInputSourceShortcut,
+        if preferencesVM.preferences.isCJKVFixEnabled,
+           cJKVFixStrategy == .previousInputSourceShortcut,
            InputSourceSwitcher.getPreviousInputSourceShortcut() == nil {
             isShowCJKVFixEnableFailedView = true
             return

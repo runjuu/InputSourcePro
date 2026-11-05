@@ -148,6 +148,7 @@ final class PreferencesVM: ObservableObject {
 enum CJKVFixStrategy: String, CaseIterable, Codable, Equatable, Identifiable {
     case previousInputSourceShortcut
     case temporaryInputWindow // Adapted from https://github.com/laishulu/macism
+    case directActivation
 
     var id: String { rawValue }
 
@@ -159,6 +160,8 @@ enum CJKVFixStrategy: String, CaseIterable, Codable, Equatable, Identifiable {
             return "CJKV Fix Method Switching Focus".i18n()
         case .previousInputSourceShortcut:
             return "CJKV Fix Method Shortcut Simulation".i18n()
+        case .directActivation:
+            return "CJKV Fix Method Direct Activation".i18n()
         }
     }
 
@@ -168,6 +171,8 @@ enum CJKVFixStrategy: String, CaseIterable, Codable, Equatable, Identifiable {
             return "CJKV Fix Method Switching Focus Description".i18n()
         case .previousInputSourceShortcut:
             return "CJKV Fix Method Shortcut Simulation Description".i18n()
+        case .directActivation:
+            return "CJKV Fix Method Direct Activation Description".i18n()
         }
     }
 }

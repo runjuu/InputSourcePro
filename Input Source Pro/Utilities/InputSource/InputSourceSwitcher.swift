@@ -5,6 +5,74 @@ import CoreGraphics
 
 @MainActor
 enum InputSourceSwitcher {
+    struct PrivateSelectionQueue<Source: Equatable> {
+        private var active: (id: UUID, target: Source, baseline: Source, observed: Source, isCurrent: Bool)?
+        private var pending: (target: Source, previous: Source, select: () -> Void)?
+
+        var isBusy: Bool { active != nil }
+
+        mutating func begin(target: Source, current: Source) -> UUID {
+            precondition(!isBusy)
+            let id = UUID()
+            active = (id, target, current, current, true)
+            return id
+        }
+
+        mutating func enqueue(target: Source, current: Source, select: @escaping () -> Void) {
+            precondition(isBusy)
+            pending = (target, current, select)
+            active?.observed = current
+        }
+
+        mutating func discardPending(current: Source? = nil) {
+            if let current { _ = isUnexpectedSource(current) }
+            pending = nil
+            active?.isCurrent = false
+        }
+
+        mutating func finish(_ id: UUID, current: Source, fallback: (() -> Void)? = nil) -> (() -> Void)? {
+            guard active?.id == id else { return nil }
+            defer {
+                active = nil
+                pending = nil
+            }
+            // Notifications may lag behind the reply. A newer actual source
+            // supersedes both the queued selection and the original fallback.
+            guard !isUnexpectedSource(current) else { return nil }
+            if let pending { return pending.select }
+            return active?.isCurrent == true ? fallback : nil
+        }
+
+        mutating func isUnexpectedSource(_ actual: Source) -> Bool {
+            guard let active else { return false }
+            self.active?.observed = actual
+            // The in-flight request can only produce its target. A different
+            // transition, including back to the original source, is newer intent.
+            let unexpected = actual != active.observed && actual != active.target
+            if unexpected || (active.isCurrent && actual == active.target) {
+                self.active?.baseline = actual
+            }
+            return unexpected
+        }
+
+        func sourceForReconciliation(_ actual: Source) -> Source {
+            guard let active else { return actual }
+            if let pending {
+                // These sources can be observed before the newest request runs.
+                // Neither the previous source nor a superseded activation is a
+                // new user choice to remember for the current app or website.
+                if actual == active.target || actual == active.baseline || actual == pending.previous {
+                    return pending.target
+                }
+            } else if active.isCurrent, actual == active.baseline {
+                return active.target
+            } else if !active.isCurrent, actual == active.target {
+                return active.baseline
+            }
+            return actual
+        }
+    }
+
     struct TemporarySelection<Source: Equatable> {
         private var pending: (id: UUID, target: Source, temporary: Source)?
 
@@ -78,6 +146,9 @@ enum InputSourceSwitcher {
     private static let logger = ISPLogger(category: String(describing: InputSourceSwitcher.self))
     private static var temporarySelection = TemporarySelection<InputSource>()
     private static var pendingWorkItems: [DispatchWorkItem] = []
+    private static var pendingPrivateSelection: PrivateInputSourceSelector.Request?
+    private static var privateSelectionQueue = PrivateSelectionQueue<InputSource>()
+    private static var privateSelectionActivationObserver: NSObjectProtocol?
     private static var temporaryInputWindow: NSWindow?
     private static var temporaryInputWindowPreviousApplication: NSRunningApplication?
     private static let temporaryInputWindowDuration: TimeInterval = 0.08
@@ -161,12 +232,34 @@ enum InputSourceSwitcher {
     }
 
     static func inputSourceForReconciliation() -> InputSource {
-        temporarySelection.sourceForReconciliation(InputSource.getCurrentInputSource())
+        if let request = pendingPrivateSelection,
+           request.deadline <= ProcessInfo.processInfo.systemUptime || PrivateInputSourceSelector.keyFocusPID() != request.pid {
+            cancelPrivateSelection()
+        }
+        let actual = InputSource.getCurrentInputSource()
+        if privateSelectionQueue.isUnexpectedSource(actual) {
+            // Preserve a newer external choice after an already-sent activation finishes.
+            cancelPrivateSelection()
+            if let pid = PrivateInputSourceSelector.keyFocusPID() {
+                privateSelectionQueue.enqueue(target: actual, current: actual) {
+                    guard PrivateInputSourceSelector.keyFocusPID() == pid else { return }
+                    selectInputSource(actual.tisInputSource, reason: "newer external selection")
+                }
+            }
+        }
+        return temporarySelection.sourceForReconciliation(privateSelectionQueue.sourceForReconciliation(actual))
+    }
+
+    static func prepareForContextChange() -> Bool {
+        guard privateSelectionQueue.isBusy else { return false }
+        cancelPrivateSelection(current: InputSource.getCurrentInputSource())
+        return true
     }
 
     static func switchToInputSource(
         sourceID: String,
-        cJKVFixStrategy: CJKVFixStrategy? = CJKVFixStrategy.defaultStrategy
+        cJKVFixStrategy: CJKVFixStrategy? = CJKVFixStrategy.defaultStrategy,
+        expectedPID: pid_t? = nil
     ) {
         cancelPendingWorkItems()
         guard let tisTarget = resolveInputSourceBySourceID(sourceID) else {
@@ -184,13 +277,15 @@ enum InputSourceSwitcher {
         switchToTarget(
             target,
             tisTarget: tisTarget,
-            cJKVFixStrategy: cJKVFixStrategy
+            cJKVFixStrategy: cJKVFixStrategy,
+            expectedPID: expectedPID
         )
     }
 
     static func switchToInputMode(
         modeID: String,
-        cJKVFixStrategy: CJKVFixStrategy? = CJKVFixStrategy.defaultStrategy
+        cJKVFixStrategy: CJKVFixStrategy? = CJKVFixStrategy.defaultStrategy,
+        expectedPID: pid_t? = nil
     ) {
         cancelPendingWorkItems()
         guard let tisTarget = resolveInputSourceByModeID(modeID) else {
@@ -208,11 +303,16 @@ enum InputSourceSwitcher {
         switchToTarget(
             target,
             tisTarget: tisTarget,
-            cJKVFixStrategy: cJKVFixStrategy
+            cJKVFixStrategy: cJKVFixStrategy,
+            expectedPID: expectedPID
         )
     }
 
-    static func switchToInputSource(_ inputSource: InputSource, cJKVFixStrategy: CJKVFixStrategy?) {
+    static func switchToInputSource(
+        _ inputSource: InputSource,
+        cJKVFixStrategy: CJKVFixStrategy?,
+        expectedPID: pid_t? = nil
+    ) {
         cancelPendingWorkItems()
         let target = SwitchTarget(
             localizedName: inputSource.name,
@@ -222,22 +322,37 @@ enum InputSourceSwitcher {
         )
 
         if inputSource.isCJKVR, let modeID = inputSource.inputModeID {
-            return switchToInputMode(modeID: modeID, cJKVFixStrategy: cJKVFixStrategy)
+            return switchToInputMode(modeID: modeID, cJKVFixStrategy: cJKVFixStrategy, expectedPID: expectedPID)
         }
 
         switchToTarget(
             target,
             tisTarget: inputSource.tisInputSource,
-            cJKVFixStrategy: cJKVFixStrategy
+            cJKVFixStrategy: cJKVFixStrategy,
+            expectedPID: expectedPID
         )
     }
 
     private static func switchToTarget(
         _ target: SwitchTarget,
         tisTarget: TISInputSource,
-        cJKVFixStrategy: CJKVFixStrategy?
+        cJKVFixStrategy: CJKVFixStrategy?,
+        expectedPID: pid_t?
     ) {
         IndicatorDiagnostics.record("switch.target source=\(target.sourceID) mode=\(target.inputModeID ?? "nil") strategy=\(String(describing: cJKVFixStrategy))")
+        // Cancelling a sent IPC cannot recall it. Keep later selections behind
+        // its bounded wait; a timed-out receiver could still process it later.
+        if privateSelectionQueue.isBusy {
+            guard let pid = expectedPID ?? PrivateInputSourceSelector.keyFocusPID() else { return }
+            privateSelectionQueue.enqueue(
+                target: InputSource(tisInputSource: tisTarget),
+                current: InputSource.getCurrentInputSource()
+            ) {
+                guard PrivateInputSourceSelector.keyFocusPID() == pid else { return }
+                switchToTarget(target, tisTarget: tisTarget, cJKVFixStrategy: cJKVFixStrategy, expectedPID: pid)
+            }
+            return
+        }
         guard target.isCJKV,
               let cJKVFixStrategy
         else {
@@ -250,6 +365,71 @@ enum InputSourceSwitcher {
             switchToCJKVTargetWithTemporaryInputWindow(target, tisTarget: tisTarget)
         case .previousInputSourceShortcut:
             switchToCJKVTargetWithPreviousInputSourceShortcut(target, tisTarget: tisTarget)
+        case .directActivation:
+            switchToCJKVTargetWithDirectActivation(tisTarget, expectedPID: expectedPID)
+        }
+    }
+
+    private static func switchToCJKVTargetWithDirectActivation(_ source: TISInputSource, expectedPID: pid_t?) {
+        let fallbackPID = expectedPID ?? NSWorkspace.shared.frontmostApplication?.processIdentifier
+        switch PrivateInputSourceSelector.prepare(source, expectedPID: expectedPID) {
+        case let .failure(error):
+            logger.debug { "Direct activation could not start: \(error)" }
+            IndicatorDiagnostics.record("switch.directActivation prepare=\(error)")
+            guard error != .focusChanged, error != .invalidSource,
+                  let fallbackPID, NSWorkspace.shared.frontmostApplication?.processIdentifier == fallbackPID
+            else { return }
+            selectInputSource(source, reason: "direct activation unavailable fallback")
+
+        case let .success(request):
+            let target = InputSource(tisInputSource: source)
+            let transactionID = privateSelectionQueue.begin(target: target, current: InputSource.getCurrentInputSource())
+            pendingPrivateSelection = request
+            privateSelectionActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+                forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+            ) { notification in
+                MainActor.assumeIsolated {
+                    guard pendingPrivateSelection === request,
+                          let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                          app.processIdentifier != request.pid
+                    else { return }
+                    cancelPrivateSelection()
+                }
+            }
+            PrivateInputSourceSelector.select(request) { result in
+                IndicatorDiagnostics.record("switch.directActivation pid=\(request.pid) result=\(result)")
+                let actual = InputSource.getCurrentInputSource()
+                var fallback: (() -> Void)?
+                if pendingPrivateSelection === request,
+                   request.validationFailure(
+                       focusPID: PrivateInputSourceSelector.keyFocusPID,
+                       now: { ProcessInfo.processInfo.systemUptime }
+                   ) == nil {
+                    if case let .failure(error) = result {
+                        logger.debug { "Direct activation failed: \(error)" }
+                        if error != .cancelled, error != .focusChanged, error != .timedOut {
+                            fallback = { selectInputSource(source, reason: "direct activation failed fallback") }
+                        }
+                    } else if actual != target {
+                        fallback = { selectInputSource(source, reason: "direct activation source mismatch fallback") }
+                    }
+                }
+                let nextSelection = privateSelectionQueue.finish(transactionID, current: actual, fallback: fallback)
+                if pendingPrivateSelection === request { cancelPrivateSelection() }
+                nextSelection?()
+            }
+        }
+    }
+
+    private static func cancelPrivateSelection(current: InputSource? = nil) {
+        privateSelectionQueue.discardPending(current: current)
+        if let request = pendingPrivateSelection {
+            request.cancel()
+            pendingPrivateSelection = nil
+        }
+        if let observer = privateSelectionActivationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+            privateSelectionActivationObserver = nil
         }
     }
 
@@ -378,6 +558,7 @@ enum InputSourceSwitcher {
     }
 
     private static func cancelPendingWorkItems() {
+        cancelPrivateSelection(current: privateSelectionQueue.isBusy ? InputSource.getCurrentInputSource() : nil)
         temporarySelection.cancel()
         syntheticEventEndTime = 0
         closeTemporaryInputWindow()

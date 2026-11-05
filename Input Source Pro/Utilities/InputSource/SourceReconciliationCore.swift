@@ -131,6 +131,9 @@ enum SourceReconciliationCore {
         let noChanges: Reason
         let system: Reason
         let shortcut: Reason
+        // An in-flight selection requires reapplying the new context's choice,
+        // even when TIS still reports that choice before the old request lands.
+        var prepareForContextChange: (Context) -> Bool = { _ in false }
     }
 
     /// Precisely mirrors R3 equality: source identity always matters, even at nil context.
@@ -163,15 +166,18 @@ enum SourceReconciliationCore {
         case .start:
             return state
         case let .appChanged(app):
+            let hasPendingSelection = deps.prepareForContextChange(app)
             if let rule = deps.rule(app) {
                 let actual = deps.readActual()
                 if actual == rule.inputSource {
+                    if hasPendingSelection { deps.select(rule.inputSource, app) }
                     return update(app, actual, deps.noChanges)
                 }
                 deps.select(rule.inputSource, app)
                 return update(app, rule.inputSource, rule.reason)
             }
             let actual = deps.readActual()
+            if hasPendingSelection { deps.select(actual, app) }
             let reason = actual == state.inputSource ? deps.noChanges : deps.system
             return update(app, actual, reason)
         case let .inputSourceChanged(source):

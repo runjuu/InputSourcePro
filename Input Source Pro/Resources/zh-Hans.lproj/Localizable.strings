@@ -57,6 +57,8 @@
 "CJKV Fix Method Switching Focus Description" = "短暂切换焦点，以促使 macOS 确认所选输入法。此方法在 macOS 26 上效果更好，但不适用于悬浮类 App。";
 "CJKV Fix Method Shortcut Simulation" = "模拟快捷键";
 "CJKV Fix Method Shortcut Simulation Description" = "模拟系统的「选择上一个输入法」快捷键。它在 macOS 26 之前表现稳定，但在 macOS 26 可能引发其他意外的系统行为。";
+"CJKV Fix Method Direct Activation" = "直接激活（实验性）";
+"CJKV Fix Method Direct Activation Description" = "采用 [@harukawu](https://github.com/harukawu) 分享的方法，使用 macOS 私有 API 在当前聚焦的应用中直接激活输入法。我们尚未验证此方法是否解决了切换问题。欢迎试用，并在 [问题 #85](https://github.com/runjuu/InputSourcePro/issues/85) 中分享反馈。";
 "CJKV Fix Shortcut Method Failed Desc" = "「模拟快捷键」方式需要启用系统的「选择上一个输入法」快捷键。";
 "Open Keyboard Settings" = "打开「键盘」设置";
 

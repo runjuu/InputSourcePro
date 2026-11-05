@@ -56,6 +56,8 @@
 "CJKV Fix Method Switching Focus Description" = "잠시 포커스를 전환해 macOS가 선택한 입력 소스를 확정하도록 합니다. 이 방법은 macOS 26에서 더 잘 작동하지만 플로팅 앱에서는 작동하지 않습니다.";
 "CJKV Fix Method Shortcut Simulation" = "단축키 시뮬레이션";
 "CJKV Fix Method Shortcut Simulation Description" = "시스템의 \"이전 입력 소스 선택\" 단축키를 시뮬레이션합니다. macOS 26 이전 버전에서는 잘 작동하지만 macOS 26에서는 예상치 못한 시스템 동작이 발생할 수 있습니다.";
+"CJKV Fix Method Direct Activation" = "직접 활성화 (실험적)";
+"CJKV Fix Method Direct Activation Description" = "[@harukawu](https://github.com/harukawu) 님이 공유한 방법으로 macOS 비공개 API를 사용해 포커스된 앱에서 입력 소스를 직접 활성화합니다. 전환 문제가 해결되는지는 아직 검증하지 않았습니다. 사용해 보시고 [이슈 #85](https://github.com/runjuu/InputSourcePro/issues/85)에 의견을 남겨 주세요.";
 "CJKV Fix Shortcut Method Failed Desc" = "단축키 시뮬레이션 방식을 사용하려면 시스템의 \"이전 입력 소스 선택\" 단축키를 활성화해야 합니다.";
 "Open Keyboard Settings" = "키보드 설정 열기";
 

@@ -56,6 +56,8 @@
 "CJKV Fix Method Switching Focus Description" = "فوکوس را برای لحظه‌ای تغییر می‌دهد تا macOS را وادار به تثبیت منبع ورودیِ انتخاب‌شده کند. این روش در macOS 26 بهتر کار می‌کند، اما برای برنامه‌های شناور کار نمی‌کند.";
 "CJKV Fix Method Shortcut Simulation" = "شبیه‌سازی میان‌بر";
 "CJKV Fix Method Shortcut Simulation Description" = "میان‌بر «Select the previous input source» سیستم را شبیه‌سازی می‌کند. این روش قبل از macOS 26 خوب کار می‌کند، اما در macOS 26 ممکن است باعث رفتار غیرمنتظرهٔ سیستم شود.";
+"CJKV Fix Method Direct Activation" = "فعال‌سازی مستقیم (آزمایشی)";
+"CJKV Fix Method Direct Activation Description" = "با روشی که [@harukawu](https://github.com/harukawu) به اشتراک گذاشته است، از APIهای غیرعمومی macOS برای فعال‌سازی مستقیم منبع ورودی در برنامهٔ دارای تمرکز استفاده می‌کند. هنوز تأیید نکرده‌ایم که این روش مشکل تغییر منبع ورودی را حل می‌کند. لطفاً آن را امتحان کنید و بازخوردتان را در [گزارش #85](https://github.com/runjuu/InputSourcePro/issues/85) به اشتراک بگذارید.";
 "CJKV Fix Shortcut Method Failed Desc" = "شبیه‌سازی میان‌بر نیازمند فعال بودن میان‌بر «Select the previous input source» سیستم است.";
 "Open Keyboard Settings" = "باز کردن Keyboard Settings";
 

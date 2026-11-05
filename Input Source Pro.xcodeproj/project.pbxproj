@@ -173,6 +173,7 @@
 		D5E8C9332A29BC38008BDABE /* AXSwift in Frameworks */ = {isa = PBXBuildFile; productRef = D5E8C9322A29BC38008BDABE /* AXSwift */; };
 		D5F1A1B33A4B5C6D7E8F9012 /* RuleSettingIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5F1A1B23A4B5C6D7E8F9012 /* RuleSettingIcon.swift */; };
 		D5F4A1CA2F0B1234001B2C3D /* InputSourceSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5F4A1C92F0B1234001B2C3D /* InputSourceSwitcher.swift */; };
+		B85000000000000000000002 /* PrivateInputSourceSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B85000000000000000000001 /* PrivateInputSourceSelector.swift */; };
 		D5F73B022A2C1DCD00BBC10A /* InputSourceVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5F73B012A2C1DCD00BBC10A /* InputSourceVM.swift */; };
 		D5FC8F552A4134B5002AE1F2 /* IndicatorSize.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5FC8F542A4134B5002AE1F2 /* IndicatorSize.swift */; };
 		D60000032F20000000000003 /* TestHarnessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000022F20000000000002 /* TestHarnessTests.swift */; };
@@ -182,6 +183,7 @@
 		D60000522F20000000000052 /* InputSourceDeduplicationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000512F20000000000051 /* InputSourceDeduplicationTests.swift */; };
 		A14600020000000000000002 /* SourceReconciliationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14600010000000000000001 /* SourceReconciliationTests.swift */; };
 		A14600040000000000000004 /* CJKVSourceReconciliationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14600030000000000000003 /* CJKVSourceReconciliationTests.swift */; };
+		B85000000000000000000004 /* PrivateInputSourceSelectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B85000000000000000000003 /* PrivateInputSourceSelectorTests.swift */; };
 		D60000622F20000000000062 /* AppURLAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000612F20000000000061 /* AppURLAction.swift */; };
 		D60000722F20000000000072 /* AppURLActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000712F20000000000071 /* AppURLActionTests.swift */; };
 		D60000822F20000000000082 /* AppLaunchBehaviorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000812F20000000000081 /* AppLaunchBehaviorTests.swift */; };
@@ -210,6 +212,7 @@
 		C32000000000000000000002 /* IndicatorWindowStabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C32000000000000000000001 /* IndicatorWindowStabilityTests.swift */; };
 		C33000000000000000000002 /* BrowserURLTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C33000000000000000000001 /* BrowserURLTests.swift */; };
 		C35000000000000000000002 /* QueryWebAreaServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C35000000000000000000001 /* QueryWebAreaServiceTests.swift */; };
+		B85000000000000000000006 /* MacIMEKit-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = B85000000000000000000005 /* MacIMEKit-LICENSE.txt */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -397,6 +400,7 @@
 		D5EAAC512A47BF7E00A41BC1 /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = ko.lproj/Localizable.strings; sourceTree = "<group>"; };
 		D5F1A1B23A4B5C6D7E8F9012 /* RuleSettingIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuleSettingIcon.swift; sourceTree = "<group>"; };
 		D5F4A1C92F0B1234001B2C3D /* InputSourceSwitcher.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InputSourceSwitcher.swift; sourceTree = "<group>"; };
+		B85000000000000000000001 /* PrivateInputSourceSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateInputSourceSelector.swift; sourceTree = "<group>"; };
 		D5F6E8D429EC812500DE042B /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/Localizable.strings; sourceTree = "<group>"; };
 		2EA294C90AFA94CCFB8F2E64 /* fa */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fa; path = fa.lproj/Localizable.strings; sourceTree = "<group>"; };
 		D5F73B012A2C1DCD00BBC10A /* InputSourceVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSourceVM.swift; sourceTree = "<group>"; };
@@ -409,6 +413,7 @@
 		D60000512F20000000000051 /* InputSourceDeduplicationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSourceDeduplicationTests.swift; sourceTree = "<group>"; };
 		A14600010000000000000001 /* SourceReconciliationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceReconciliationTests.swift; sourceTree = "<group>"; };
 		A14600030000000000000003 /* CJKVSourceReconciliationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CJKVSourceReconciliationTests.swift; sourceTree = "<group>"; };
+		B85000000000000000000003 /* PrivateInputSourceSelectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateInputSourceSelectorTests.swift; sourceTree = "<group>"; };
 		D60000612F20000000000061 /* AppURLAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppURLAction.swift; sourceTree = "<group>"; };
 		D60000712F20000000000071 /* AppURLActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppURLActionTests.swift; sourceTree = "<group>"; };
 		D60000812F20000000000081 /* AppLaunchBehaviorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLaunchBehaviorTests.swift; sourceTree = "<group>"; };
@@ -437,6 +442,7 @@
 		C32000000000000000000001 /* IndicatorWindowStabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndicatorWindowStabilityTests.swift; sourceTree = "<group>"; };
 		C33000000000000000000001 /* BrowserURLTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserURLTests.swift; sourceTree = "<group>"; };
 		C35000000000000000000001 /* QueryWebAreaServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryWebAreaServiceTests.swift; sourceTree = "<group>"; };
+		B85000000000000000000005 /* MacIMEKit-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "MacIMEKit-LICENSE.txt"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -703,6 +709,7 @@
 				4A2A1732280BA6A800E13249 /* Assets.xcassets */,
 				4A2AACCA280BAD3700CA8124 /* Info.plist */,
 				4A5BABE92830A720009F42D7 /* Localizable.strings */,
+				B85000000000000000000005 /* MacIMEKit-LICENSE.txt */,
 				4A2A1737280BA6A800E13249 /* Signing.entitlements */,
 			);
 			path = Resources;
@@ -790,6 +797,7 @@
 				4A2A1772280BA7FA00E13249 /* InputSource.swift */,
 				A71113C41011111111111112 /* SourceReconciliationCore.swift */,
 				D5F4A1C92F0B1234001B2C3D /* InputSourceSwitcher.swift */,
+				B85000000000000000000001 /* PrivateInputSourceSelector.swift */,
 				D5D029072A3C129F005F2FB9 /* InputSource+Name.swift */,
 				4A2A1760280BA7FA00E13249 /* TISInputSource+Extension.swift */,
 				D57334252A84B40B00C8438F /* IconMap.swift */,
@@ -824,6 +832,7 @@
 				D60000512F20000000000051 /* InputSourceDeduplicationTests.swift */,
 				A14600010000000000000001 /* SourceReconciliationTests.swift */,
 				A14600030000000000000003 /* CJKVSourceReconciliationTests.swift */,
+				B85000000000000000000003 /* PrivateInputSourceSelectorTests.swift */,
 				D60000112F20000000000011 /* BrowserRuleSelectionTests.swift */,
 				D60000312F20000000000031 /* BrowserRuleValidationTests.swift */,
 				D60000212F20000000000021 /* RuntimeRuleChangeNotifierTests.swift */,
@@ -971,6 +980,7 @@
 				D58168CE2894408200E84058 /* Always-On-Indicator-Demo-Dark.mp4 in Resources */,
 				4A2A1736280BA6A800E13249 /* Preview Assets.xcassets in Resources */,
 				4A5BABE72830A720009F42D7 /* Localizable.strings in Resources */,
+				B85000000000000000000006 /* MacIMEKit-LICENSE.txt in Resources */,
 				D58168CA28943A5400E84058 /* Indicator-Near-Cursor-Demo-Dark.mp4 in Resources */,
 				D58168CB28943A5400E84058 /* Indicator-Near-Cursor-Demo-Light.mp4 in Resources */,
 				4A2A1733280BA6A800E13249 /* Assets.xcassets in Resources */,
@@ -1174,6 +1184,7 @@
 				4A2A1798280BA7FA00E13249 /* InputSource.swift in Sources */,
 				A71113C41011111111111111 /* SourceReconciliationCore.swift in Sources */,
 				D5F4A1CA2F0B1234001B2C3D /* InputSourceSwitcher.swift in Sources */,
+				B85000000000000000000002 /* PrivateInputSourceSelector.swift in Sources */,
 				D5115A1E2A33D57A00D94E51 /* ItemSection.swift in Sources */,
 				D58C184628A6B2DE00F52845 /* ISPLogger.swift in Sources */,
 				4A8E47692F08814500424D11 /* SwiftUI+FlexibleButtonSizing.swift in Sources */,
@@ -1193,6 +1204,7 @@
 				D60000522F20000000000052 /* InputSourceDeduplicationTests.swift in Sources */,
 				A14600020000000000000002 /* SourceReconciliationTests.swift in Sources */,
 				A14600040000000000000004 /* CJKVSourceReconciliationTests.swift in Sources */,
+				B85000000000000000000004 /* PrivateInputSourceSelectorTests.swift in Sources */,
 				D60000122F20000000000012 /* BrowserRuleSelectionTests.swift in Sources */,
 				D60000322F20000000000032 /* BrowserRuleValidationTests.swift in Sources */,
 				D60000222F20000000000022 /* RuntimeRuleChangeNotifierTests.swift in Sources */,

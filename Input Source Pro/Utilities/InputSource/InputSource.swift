@@ -70,8 +70,8 @@ class InputSource {
         self.tisInputSource = tisInputSource
     }
 
-    func select(cJKVFixStrategy: CJKVFixStrategy?) {
-        InputSourceSwitcher.switchToInputSource(self, cJKVFixStrategy: cJKVFixStrategy)
+    func select(cJKVFixStrategy: CJKVFixStrategy?, for app: NSRunningApplication? = nil) {
+        InputSourceSwitcher.switchToInputSource(self, cJKVFixStrategy: cJKVFixStrategy, expectedPID: app?.processIdentifier)
     }
 
     private var normalizedInputModeID: String? {
