@@ -127,8 +127,10 @@ class IndicatorWindowController: FloatWindowController {
         IndicatorDiagnostics.record("activation.mode mode=\(mode) app=\(app.bundleIdentifier ?? "?") pid=\(app.processIdentifier)")
         // A caret lookup now would target the temporary input window, not the app it took focus from.
         // Mouse and screen positions don't look one up; the always-on indicator's suppression check does.
+        // The caret helper's sample from before the focus steal needs no lookup and places it right away.
         if mode != .hide, InputSourceSwitcher.isTemporaryInputWindowInProgress,
-           preferencesVM.positionsNearCaret(app: app) || preferencesVM.preferences.isAlwaysOnIndicatorEnabled
+           preferencesVM.positionsNearCaret(app: app) || preferencesVM.preferences.isAlwaysOnIndicatorEnabled,
+           CaretPalette.shared.point(for: app) == nil
         {
             IndicatorDiagnostics.record("activation.deferred reason=temporary-input-window")
             return InputSourceSwitcher.temporaryInputWindowRestored

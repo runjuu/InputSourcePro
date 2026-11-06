@@ -140,10 +140,13 @@ extension UIElement {
             IndicatorDiagnostics.record("AX.focusMissing id=\(traceID) error=\(error)")
             return nil
         }
-        if IndicatorDiagnostics.isEnabled {
-            var pid: pid_t = 0
-            let result = AXUIElementGetPid(focusedElement.element, &pid)
-            IndicatorDiagnostics.record("AX.focus id=\(traceID) actualPID=\(pid) pidStatus=\(result.rawValue)")
+        var pid: pid_t = 0
+        let pidStatus = AXUIElementGetPid(focusedElement.element, &pid)
+        IndicatorDiagnostics.record("AX.focus id=\(traceID) actualPID=\(pid) pidStatus=\(pidStatus.rawValue)")
+        // This app never follows its own caret; while the temporary input window holds focus, that is a hidden 3x3 text view.
+        guard pid != getpid() else {
+            IndicatorDiagnostics.record("AX.rejected id=\(traceID) reason=own-process")
+            return nil
         }
         guard Self.isInputContainer(focusedElement) else {
             IndicatorDiagnostics.record("AX.rejected id=\(traceID) reason=non-input-focus")
