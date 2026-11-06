@@ -353,24 +353,27 @@ final class CaretPalette {
             return
         }
         if rectString.isEmpty && !pending {
-            if self.session == session, uptime >= lastUptime {
+            // The temporary input window's focus steal makes the helper report focus loss;
+            // the sample stays valid for the app that gets focus back.
+            if self.session == session, uptime >= lastUptime, !InputSourceSwitcher.isTemporaryInputWindowInProgress {
                 sample = nil
                 pendingConfirmation = nil
                 if textFocus == .input, let app = focusApplication {
                     focus.confirmation = Confirmation(pid: app.processIdentifier, uptime: uptime)
                 }
             }
-        } else if textFocus.permitsCaret, let app = NSWorkspace.shared.frontmostApplication,
-                  Int(app.processIdentifier) == pid,
+        } else if textFocus.permitsCaret, let owner = pid_t(exactly: pid),
+                  // The temporary input window may hold focus while the helper reports the app it took it from.
+                  Self.holdsFocus(owner),
                   uptime >= focusedAt, uptime <= ProcessInfo.processInfo.systemUptime,
                   uptime >= lastUptime {
             self.session = session
             if pending {
-                pendingConfirmation = Confirmation(pid: app.processIdentifier, uptime: uptime)
+                pendingConfirmation = Confirmation(pid: owner, uptime: uptime)
             } else {
                 pendingConfirmation = nil
-                sample = Sample(rect: NSRectFromString(rectString), pid: app.processIdentifier, uptime: uptime)
-                if sample?.point(for: app.processIdentifier, now: uptime, focusedAt: focusedAt,
+                sample = Sample(rect: NSRectFromString(rectString), pid: owner, uptime: uptime)
+                if sample?.point(for: owner, now: uptime, focusedAt: focusedAt,
                                  screens: NSScreen.screens.map(\.frame)) != nil {
                     focus.confirmation = nil
                 }
@@ -381,10 +384,17 @@ final class CaretPalette {
         updates.send(())
     }
 
+    /// Whether `pid` is the app the user is typing in: frontmost, or the app the
+    /// temporary input window took focus from while it holds it.
+    private static func holdsFocus(_ pid: pid_t) -> Bool {
+        NSWorkspace.shared.frontmostApplication?.processIdentifier == pid
+            || InputSourceSwitcher.temporaryInputWindowPreviousPID == pid
+    }
+
     func point(for app: NSRunningApplication) -> CGPoint? {
         guard isEnabled, !suspension.isSuspended, !IsSecureEventInputEnabled(), textFocus.permitsCaret,
               focusApplication?.processIdentifier == app.processIdentifier,
-              NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier
+              Self.holdsFocus(app.processIdentifier)
         else {
             IndicatorDiagnostics.record("helper.unavailable pid=\(app.processIdentifier) enabled=\(isEnabled) suspended=\(suspension.isSuspended) focus=\(textFocus) frontPID=\(NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0)")
             return nil
@@ -402,7 +412,7 @@ final class CaretPalette {
         if isEnabled && IsSecureEventInputEnabled() { return true }
         if app.processIdentifier == ProcessInfo.processInfo.processIdentifier { return true }
         guard isEnabled, !suspension.isSuspended,
-              NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier
+              Self.holdsFocus(app.processIdentifier)
         else { return false }
         return focusApplication?.processIdentifier != app.processIdentifier
             || !textFocus.permitsCaret || isAwaitingConfirmation(for: app)
@@ -411,7 +421,7 @@ final class CaretPalette {
     func isAwaitingConfirmation(for app: NSRunningApplication) -> Bool {
         guard isEnabled, !suspension.isSuspended,
               app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
-              NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier
+              Self.holdsFocus(app.processIdentifier)
         else { return false }
         // The indicator's activation subscriber can run before our workspace observer.
         if focusApplication?.processIdentifier != app.processIdentifier { return true }

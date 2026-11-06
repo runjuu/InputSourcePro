@@ -103,6 +103,11 @@ enum InputSourceSwitcher {
         isShowingTemporaryInputWindow || restoration != nil
     }
 
+    /// The app the temporary input window took focus from, until `temporaryInputWindowRestored` sends.
+    static var temporaryInputWindowPreviousPID: pid_t? {
+        temporaryInputWindowPreviousApplication?.processIdentifier
+    }
+
     static var isHandlingTemporaryInputWindowActivation: Bool {
         isShowingTemporaryInputWindow ||
             ProcessInfo.processInfo.systemUptime < temporaryInputWindowActivationSuppressionEndTime
@@ -264,7 +269,15 @@ enum InputSourceSwitcher {
         restoration = nil
         restorationTimer = nil
         isShowingTemporaryInputWindow = true
-        showTemporaryInputWindow()
+        if let app = temporaryInputWindowPreviousApplication, CaretPalette.shared.point(for: app) != nil {
+            // The indicator's queued activation can place itself from that sample; let it run first, as activating
+            // the window blocks the main thread on the input method's session activation.
+            scheduleWorkItem(after: 0.001) { showTemporaryInputWindow() }
+        } else {
+            // Without a sample the activation is deferred anyway, and the deferral would only queue the window
+            // behind the activation pipeline.
+            showTemporaryInputWindow()
+        }
 
         scheduleWorkItem(after: temporaryInputWindowDuration + 0.05) {
             let currentInputSource = InputSource.getCurrentInputSource()
@@ -433,8 +446,11 @@ enum InputSourceSwitcher {
         IndicatorDiagnostics.record("switch.temporaryWindow show previousPID=\(temporaryInputWindowPreviousApplication?.processIdentifier ?? 0) frame=\(window.frame)")
 
         window.makeKeyAndOrderFront(nil)
+        IndicatorDiagnostics.record("switch.temporaryWindow step=orderedFront")
         NSApp.activate(ignoringOtherApps: true)
+        IndicatorDiagnostics.record("switch.temporaryWindow step=activated")
         window.makeFirstResponder(textView)
+        IndicatorDiagnostics.record("switch.temporaryWindow step=firstResponder")
 
         scheduleWorkItem(after: temporaryInputWindowDuration) {
             closeTemporaryInputWindow()
@@ -455,6 +471,7 @@ enum InputSourceSwitcher {
             temporaryInputWindow = nil
             window.orderOut(nil)
             window.close()
+            IndicatorDiagnostics.record("switch.temporaryWindow step=closed")
             suppressTemporaryInputWindowActivation()
         }
 
@@ -468,6 +485,7 @@ enum InputSourceSwitcher {
             return
         }
 
+        IndicatorDiagnostics.record("switch.temporaryWindow step=previousActivated")
         waitForRestoration()
     }
 

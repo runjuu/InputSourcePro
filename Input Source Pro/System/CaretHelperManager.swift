@@ -76,6 +76,8 @@ final class CaretHelperManager: ObservableObject {
             }
             .store(in: &subscriptions)
         NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+            // The temporary input window activates this app on every CJKV switch; only a user visit needs a status check.
+            .filter { _ in !InputSourceSwitcher.isHandlingTemporaryInputWindowActivation }
             .sink { [weak self] _ in Task { await self?.refresh() } }
             .store(in: &subscriptions)
         NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)
