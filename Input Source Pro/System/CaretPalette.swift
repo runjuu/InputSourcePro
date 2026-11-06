@@ -64,11 +64,30 @@ final class CaretPalette {
 
     struct FocusReadiness {
         private(set) var state: TextFocus = .unknown
+        private(set) var needsRefresh = false
         var confirmation: Confirmation?
 
         mutating func begin(pid: pid_t?, at uptime: TimeInterval) {
             state = .pending
+            needsRefresh = false
             confirmation = pid.map { Confirmation(pid: $0, uptime: uptime) }
+        }
+
+        mutating func receive(
+            _ update: CaretFocusObserver.Update,
+            generation: Int,
+            pid: pid_t?,
+            since uptime: TimeInterval,
+            frontmostPID: pid_t?
+        ) -> Bool {
+            guard update.isCurrent(generation: generation, pid: pid, since: uptime) else { return false }
+            guard frontmostPID == update.pid else {
+                // The observer caches this result even when temporary focus prevents us from using it.
+                needsRefresh = true
+                return false
+            }
+            resolve(update.state, pid: update.pid, at: update.uptime)
+            return true
         }
 
         mutating func resolve(_ state: TextFocus, pid: pid_t?, at uptime: TimeInterval) {
@@ -169,9 +188,10 @@ final class CaretPalette {
         restorationSubscription = InputSourceSwitcher.temporaryInputWindowRestored
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in
-                // Focus came back to the app still bound: keep its state; the next activity resumes the helper.
                 guard let self = self,
-                      NSWorkspace.shared.frontmostApplication?.processIdentifier != self.focusApplication?.processIdentifier
+                      !InputSourceSwitcher.isTemporaryInputWindowInProgress,
+                      self.focus.needsRefresh ||
+                        NSWorkspace.shared.frontmostApplication?.processIdentifier != self.focusApplication?.processIdentifier
                 else { return }
                 self.watchTextFocus()
             }
@@ -270,10 +290,9 @@ final class CaretPalette {
 
     private func receiveFocus(_ update: CaretFocusObserver.Update) {
         guard isEnabled, !suspension.isSuspended,
-              update.isCurrent(generation: focusGeneration, pid: focusApplication?.processIdentifier, since: focusedAt),
-              NSWorkspace.shared.frontmostApplication?.processIdentifier == update.pid
+              focus.receive(update, generation: focusGeneration, pid: focusApplication?.processIdentifier,
+                            since: focusedAt, frontmostPID: NSWorkspace.shared.frontmostApplication?.processIdentifier)
         else { return }
-        focus.resolve(update.state, pid: update.pid, at: update.uptime)
         focusedAt = update.uptime
         IndicatorDiagnostics.record("helper.focus pid=\(update.pid) kind=\(textFocus) focusedAt=\(focusedAt)")
         sample = nil

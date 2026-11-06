@@ -164,6 +164,112 @@ final class CaretPaletteTests: XCTestCase {
         XCTAssertFalse(update.isCurrent(generation: 3, pid: 42, since: 11))
     }
 
+    func testFocusReadDuringTemporaryActivationRefreshesOnRestoration() async {
+        let reading = expectation(description: "Initial focus read started")
+        let deferred = expectation(description: "Focus result rejected while temporary window is frontmost")
+        let restored = expectation(description: "Unchanged focus delivered after restoration")
+        let stopped = expectation(description: "Both observer connections stopped")
+        stopped.expectedFulfillmentCount = 2
+        let releaseRead = DispatchSemaphore(value: 0)
+        defer { releaseRead.signal() }
+        var focus = CaretPalette.FocusReadiness()
+        var generation = 1
+        var focusedAt = ProcessInfo.processInfo.systemUptime
+        var frontmostPID: pid_t = 42
+        var reads = 0
+        focus.begin(pid: 42, at: focusedAt)
+
+        var observer: CaretFocusObserver? = CaretFocusObserver(connect: { pid, _ in
+            XCTAssertEqual(pid, 42)
+            return CaretFocusObserver.Connection(read: {
+                reads += 1
+                if reads == 1 {
+                    reading.fulfill()
+                    XCTAssertEqual(releaseRead.wait(timeout: .now() + 5), .success)
+                }
+                return CaretFocusObserver.Focus(element: nil, state: .input)
+            }, stop: { stopped.fulfill() })
+        }, onChange: { update in
+            Task { @MainActor in
+                let accepted = focus.receive(
+                    update, generation: generation, pid: 42,
+                    since: focusedAt, frontmostPID: frontmostPID
+                )
+                if update.generation == 1 {
+                    XCTAssertFalse(accepted)
+                    XCTAssertEqual(focus.state, .pending)
+                    XCTAssertTrue(focus.needsRefresh)
+                    deferred.fulfill()
+                } else {
+                    XCTAssertEqual(update.generation, 2)
+                    XCTAssertTrue(accepted)
+                    XCTAssertEqual(focus.state, .input)
+                    XCTAssertFalse(focus.needsRefresh)
+                    restored.fulfill()
+                }
+            }
+        })
+        observer?.watch(pid: 42, generation: generation)
+        await fulfillment(of: [reading], timeout: 2)
+        frontmostPID = 1
+        releaseRead.signal()
+        await fulfillment(of: [deferred], timeout: 2)
+        XCTAssertFalse(focus.state.permitsCaret)
+
+        frontmostPID = 42
+        if focus.needsRefresh {
+            generation += 1
+            focusedAt = ProcessInfo.processInfo.systemUptime
+            focus.begin(pid: 42, at: focusedAt)
+            observer?.watch(pid: 42, generation: generation)
+        }
+        await fulfillment(of: [restored], timeout: 2)
+        XCTAssertTrue(focus.state.permitsCaret)
+        observer = nil
+        await fulfillment(of: [stopped], timeout: 2)
+    }
+
+    func testAcceptedFocusDoesNotRequireRestorationRefresh() {
+        var focus = CaretPalette.FocusReadiness()
+        focus.begin(pid: 42, at: 10)
+        let update = CaretFocusObserver.Update(pid: 42, generation: 1, state: .input, uptime: 10.1)
+
+        XCTAssertTrue(focus.receive(update, generation: 1, pid: 42, since: 10, frontmostPID: 42))
+        XCTAssertEqual(focus.state, .input)
+        XCTAssertFalse(focus.needsRefresh)
+    }
+
+    func testObsoleteFocusResultsDoNotRequireRestorationRefresh() {
+        let updates = [
+            CaretFocusObserver.Update(pid: 42, generation: 1, state: .input, uptime: 10.1),
+            CaretFocusObserver.Update(pid: 43, generation: 2, state: .input, uptime: 10.1),
+            CaretFocusObserver.Update(pid: 42, generation: 2, state: .input, uptime: 9.9),
+        ]
+        for update in updates {
+            var focus = CaretPalette.FocusReadiness()
+            focus.begin(pid: 42, at: 10)
+
+            XCTAssertFalse(focus.receive(update, generation: 2, pid: 42, since: 10, frontmostPID: 1))
+            XCTAssertEqual(focus.state, .pending)
+            XCTAssertFalse(focus.needsRefresh)
+        }
+    }
+
+    func testNewFocusBindingClearsRestorationRefresh() {
+        var focus = CaretPalette.FocusReadiness()
+        focus.begin(pid: 42, at: 10)
+        let update = CaretFocusObserver.Update(pid: 42, generation: 1, state: .input, uptime: 10.1)
+        XCTAssertFalse(focus.receive(update, generation: 1, pid: 42, since: 10, frontmostPID: 1))
+        XCTAssertTrue(focus.needsRefresh)
+
+        focus.begin(pid: 43, at: 11)
+
+        XCTAssertFalse(focus.needsRefresh)
+        XCTAssertEqual(focus.state, .pending)
+        XCTAssertEqual(focus.confirmation?.pid, 43)
+        XCTAssertEqual(focus.confirmation?.uptime, 11)
+    }
+
     func testFailedFocusConnectionRetriesWithoutAnAccessibilityNotification() async {
         let recovered = expectation(description: "Connection recovered after app startup")
         var attempts = 0
