@@ -15,6 +15,7 @@ private let floatingAppIdentifier: [(
     ("at.obdev.LaunchBar", 30, true, nil),
     ("com.raycast.macos", 30, true, nil),
     ("com.googlecode.iterm2", 30, false, nil),
+    ("com.mitchellh.ghostty", 30, false, nil),
     ("com.xunyong.hapigo", 30, true, nil),
     ("com.hezongyidev.Bob", 30, false, nil),
     ("com.ripperhe.Bob", 30, false, nil),
