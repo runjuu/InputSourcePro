@@ -25,6 +25,7 @@ final class AXWatchRetryTests: XCTestCase {
         /// When set, probe answers are held until `answerProbe()`.
         var holdsProbes = false
         var firesFirstDelaySynchronously = false
+        var initialDelay = AXWatchRetry.defaultInitialDelay
         private var pendingProbes: [(String?) -> Void] = []
         private var pendingTimers: [PassthroughSubject<Date, Never>] = []
         private var subscription: AnyCancellable?
@@ -39,6 +40,7 @@ final class AXWatchRetryTests: XCTestCase {
                     guard let self else { return }
                     if holdsProbes { pendingProbes.append(done) } else { done(probeReason) }
                 },
+                initialDelay: initialDelay,
                 attach: { [weak self] send -> AXWatchRetry.Attach in
                     guard let self else { return .notReady(reason: "gone") }
                     attachCount += 1
@@ -115,6 +117,18 @@ final class AXWatchRetryTests: XCTestCase {
         harness.send?(7)
         XCTAssertEqual(harness.received, [7])
         XCTAssertFalse(harness.completed)
+    }
+
+    func testInitialDelayOnlyReplacesTheFirstWait() {
+        let harness = Harness()
+        harness.initialDelay = 0
+        harness.failingAttempts = [1]
+        harness.subscribe()
+
+        harness.fireTimer()
+        harness.fireTimer()
+        XCTAssertEqual(harness.attachCount, 2)
+        XCTAssertEqual(harness.requestedDelays, [0, 1], "Retries keep the usual backoff")
     }
 
     func testKeepsRetryingAtCapWhileAttachFails() {

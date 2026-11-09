@@ -40,6 +40,8 @@ enum AXWatchRetry {
     static let messagingTimeout: Float = 0.25
     static let untrustedDelayCap: TimeInterval = 5
     static let notReadyDelayCap: TimeInterval = 30
+    /// The wait before the first attempt, unless the caller cannot afford to miss early events.
+    static let defaultInitialDelay: TimeInterval = delay(afterFailures: 0, cap: notReadyDelayCap)
 
     /// The wait before the next attempt, after `failures` consecutive failures of the same kind.
     static func delay(afterFailures failures: Int, cap: TimeInterval) -> TimeInterval {
@@ -114,6 +116,7 @@ enum AXWatchRetry {
         isAlive: @escaping () -> Bool,
         isTrusted: @escaping () -> Bool = { AXIsProcessTrusted() },
         probe: @escaping (pid_t, @escaping (String?) -> Void) -> Void = AXWatchRetry.probe,
+        initialDelay: TimeInterval = AXWatchRetry.defaultInitialDelay,
         attach: @escaping (_ send: @escaping (Output) -> Void) -> Attach,
         delay: @escaping (TimeInterval) -> AnyPublisher<Date, Never> = { Timer.delay(seconds: $0) },
         log: @escaping (String) -> Void = { IndicatorDiagnostics.record($0) }
@@ -189,7 +192,7 @@ enum AXWatchRetry {
                     attempt(n + 1, after: Self.delay(afterFailures: failureStreak, cap: retryCap))
                 }
             }
-            attempt(1, after: Self.delay(afterFailures: 0, cap: notReadyDelayCap))
+            attempt(1, after: initialDelay)
 
             return AnyCancellable {
                 // Close a logged run of failures; a watcher of the frontmost app usually ends this way.

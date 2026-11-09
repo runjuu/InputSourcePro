@@ -29,9 +29,12 @@ private func notify(
 extension NSRunningApplication {
     typealias WatchAXOutput = (runningApp: NSRunningApplication, notification: AXNotification)
 
+    /// `attachImmediately` skips the 0.5s wait before the first attempt (the attach still happens
+    /// asynchronously, after the readiness probe) for callers that cannot miss early events.
     func watchAX(
         _ notifications: [AXNotification],
-        _ validRoles: [Role]
+        _ validRoles: [Role],
+        attachImmediately: Bool = false
     ) -> AnyPublisher<WatchAXOutput, Never> {
         guard processIdentifier != ProcessInfo.processInfo.processIdentifier else {
             return Empty().eraseToAnyPublisher()
@@ -40,6 +43,7 @@ extension NSRunningApplication {
         return AXWatchRetry.publisher(
             pid: pid,
             isAlive: { [weak self] in self?.isTerminated == false },
+            initialDelay: attachImmediately ? 0 : AXWatchRetry.defaultInitialDelay,
             attach: { [weak self] send -> AXWatchRetry.Attach in
                 guard let runningApplication = self,
                       let app = Application(runningApplication)
