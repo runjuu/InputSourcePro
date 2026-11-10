@@ -30,9 +30,9 @@ import Combine
 /// `RunLoop.current`, and `CancelBag` is not thread-safe.
 enum AXWatchRetry {
     enum Attach {
-        /// The observer is live; `rejected` lists notifications the app refused for good.
-        case attached(AnyCancellable, rejected: [AXNotification])
-        /// Try again later; `reason` goes to the diagnostics log and must not contain spaces.
+        /// The observer is live; `registration` says what the application element accepted.
+        case attached(AnyCancellable, registration: Registration)
+        /// Try again later; `reason` goes to the diagnostics log.
         case notReady(reason: String)
     }
 
@@ -63,7 +63,8 @@ enum AXWatchRetry {
     /// initializing) and an empty registration for a role outside `validRoles`.
     /// A notification the element does not support is skipped, and one it refuses with any other
     /// permanent error is reported as rejected; the remaining notifications are still registered.
-    /// A transient error is rethrown so the whole attach is retried.
+    /// A transient error, or one that is not an `AXError`, is rethrown: the attach treats it as not ready
+    /// and retries, while a window that fails this way after the attach is simply not watched.
     static func register(
         role: String?,
         validRoles: [Role],
@@ -125,6 +126,8 @@ enum AXWatchRetry {
             var lastFailure: String?
             var failureStreak = 0
             var waitedSinceLog: TimeInterval = 0
+            var lastLoggedFailure: String?
+            var isFinished = false
 
             func attempt(_ n: Int, after wait: TimeInterval) {
                 latestAttempt = n
@@ -143,9 +146,12 @@ enum AXWatchRetry {
                                 return
                             }
                             switch attach(subscriber.send) {
-                            case let .attached(observer, rejected):
+                            case let .attached(observer, registration):
                                 observer.store(in: cancelBag)
-                                let detail = rejected.isEmpty ? "" : " rejected=" + rejected.map(\.rawValue).joined(separator: ",")
+                                var detail = registration.registered.isEmpty ? " registered=0" : ""
+                                if !registration.rejected.isEmpty {
+                                    detail += " rejected=" + registration.rejected.map(\.rawValue).joined(separator: ",")
+                                }
                                 finish(n, wait, result: "attached", detail: detail)
                             case let .notReady(reason):
                                 finish(n, wait, result: "not-ready", detail: " reason=\(reason)", retryCap: notReadyDelayCap)
@@ -159,13 +165,23 @@ enum AXWatchRetry {
 
             /// Logs the outcome of attempt `n` and schedules the next one when `retryCap` is set.
             func finish(_ n: Int, _ wait: TimeInterval, result: String, detail: String = "", retryCap: TimeInterval? = nil) {
-                // Stay silent on a clean first-attempt attach. Log anything else on the first attempt,
-                // the end of every retry sequence, and about once a minute while still failing.
+                // The log is split on spaces by whoever reads it.
+                let detail = detail.dropFirst().replacingOccurrences(of: " ", with: "_")
+                let outcome = detail.isEmpty ? result : "\(result) \(detail)"
+                // Stay silent on a clean first-attempt attach, the common case. While failing, log each
+                // new kind of failure and then about once a minute. Always log how the sequence ended.
                 waitedSinceLog += wait
-                let isNoteworthy = n == 1 ? result != "attached" || !detail.isEmpty : retryCap == nil
-                if isNoteworthy || waitedSinceLog >= 60 {
+                let isNoteworthy: Bool
+                if retryCap == nil {
+                    isFinished = true
+                    isNoteworthy = result != "attached" || n > 1 || !detail.isEmpty
+                } else {
+                    isNoteworthy = outcome != lastLoggedFailure || waitedSinceLog >= 60
+                    if isNoteworthy { lastLoggedFailure = outcome }
+                }
+                if isNoteworthy {
                     waitedSinceLog = 0
-                    log("ax.watch pid=\(pid) attempt=\(n) result=\(result)\(detail)")
+                    log("ax.watch pid=\(pid) attempt=\(n) result=\(outcome)")
                 }
                 if let retryCap {
                     failureStreak = result == lastFailure ? failureStreak + 1 : 1
@@ -176,6 +192,10 @@ enum AXWatchRetry {
             attempt(1, after: Self.delay(afterFailures: 0, cap: notReadyDelayCap))
 
             return AnyCancellable {
+                // Close a logged run of failures; a watcher of the frontmost app usually ends this way.
+                if !isCancelled, !isFinished, lastLoggedFailure != nil {
+                    log("ax.watch pid=\(pid) attempt=\(latestAttempt) result=cancelled")
+                }
                 isCancelled = true
                 timer = nil
                 cancelBag.cancel()
