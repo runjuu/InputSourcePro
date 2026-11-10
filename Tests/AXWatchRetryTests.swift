@@ -20,6 +20,11 @@ final class AXWatchRetryTests: XCTestCase {
         /// When set, attach succeeds only if this returns a non-nil registration.
         var registration: (([AXNotification]) throws -> AXWatchRetry.Registration?)?
         var logged: [String] = []
+        /// What the readiness probe answers; `nil` means the target is ready.
+        var probeReason: String?
+        /// When set, probe answers are held until `answerProbe()`.
+        var holdsProbes = false
+        private var pendingProbes: [(String?) -> Void] = []
         private var pendingTimers: [PassthroughSubject<Date, Never>] = []
         private var subscription: AnyCancellable?
 
@@ -28,6 +33,11 @@ final class AXWatchRetryTests: XCTestCase {
                 pid: 42,
                 isAlive: { [weak self] in self?.isAlive == true },
                 isTrusted: { [weak self] in self?.isTrusted == true },
+                probe: { [weak self] pid, done in
+                    XCTAssertEqual(pid, 42)
+                    guard let self else { return }
+                    if holdsProbes { pendingProbes.append(done) } else { done(probeReason) }
+                },
                 attach: { [weak self] send -> AXWatchRetry.Attach in
                     guard let self else { return .notReady(reason: "gone") }
                     attachCount += 1
@@ -60,6 +70,13 @@ final class AXWatchRetryTests: XCTestCase {
         }
 
         var pendingTimerCount: Int { pendingTimers.count }
+
+        var pendingProbeCount: Int { pendingProbes.count }
+
+        func answerProbe() {
+            XCTAssertFalse(pendingProbes.isEmpty, "No probe pending")
+            pendingProbes.removeFirst()(probeReason)
+        }
 
         func cancel() { subscription = nil }
     }
@@ -169,6 +186,63 @@ final class AXWatchRetryTests: XCTestCase {
         harness.fireTimer()
         XCTAssertEqual(harness.attachCount, 1)
         XCTAssertEqual(harness.pendingTimerCount, 0)
+    }
+
+    func testTargetThatFailsTheProbeIsRetriedWithoutAttaching() {
+        let harness = Harness()
+        harness.probeReason = "AXError.CannotComplete"
+        harness.subscribe()
+        for _ in 1...3 { harness.fireTimer() }
+        XCTAssertEqual(harness.attachCount, 0, "A target that does not answer must not reach the main-thread attach")
+        XCTAssertEqual(harness.requestedDelays, [0.5, 1, 2, 4])
+        XCTAssertEqual(harness.logged, ["ax.watch pid=42 attempt=1 result=not-ready reason=AXError.CannotComplete"])
+
+        harness.probeReason = nil
+        harness.fireTimer()
+        XCTAssertEqual(harness.attachCount, 1)
+        XCTAssertEqual(harness.pendingTimerCount, 0)
+        XCTAssertEqual(harness.logged.last, "ax.watch pid=42 attempt=4 result=attached")
+    }
+
+    func testCancelWhileProbingNeitherAttachesNorRetries() {
+        let harness = Harness()
+        harness.holdsProbes = true
+        harness.subscribe()
+        harness.fireTimer()
+        harness.cancel()
+
+        harness.answerProbe()
+        XCTAssertEqual(harness.attachCount, 0)
+        XCTAssertEqual(harness.pendingTimerCount, 0)
+        XCTAssertEqual(harness.logged, [])
+    }
+
+    func testProbeDoesNotRunWhileUntrustedOrAfterTermination() {
+        let harness = Harness()
+        harness.holdsProbes = true
+        harness.isTrusted = false
+        harness.subscribe()
+        harness.fireTimer()
+        harness.isAlive = false
+        harness.fireTimer()
+        XCTAssertTrue(harness.completed)
+        XCTAssertEqual(harness.pendingProbeCount, 0, "Neither outcome may message the target")
+        XCTAssertEqual(harness.attachCount, 0)
+        XCTAssertEqual(harness.logged, [
+            "ax.watch pid=42 attempt=1 result=untrusted",
+            "ax.watch pid=42 attempt=2 result=terminated",
+        ])
+    }
+
+    func testProbeAnswersOnTheMainThreadWithAReasonForAPidThatIsNotRunning() {
+        let answered = expectation(description: "Probe answered")
+        AXWatchRetry.probe(pid: pid_t.max) { reason in
+            XCTAssertTrue(Thread.isMainThread)
+            XCTAssertNotNil(reason)
+            XCTAssertEqual(reason?.contains(" "), false)
+            answered.fulfill()
+        }
+        wait(for: [answered], timeout: 5)
     }
 
     func testMissingRoleIsRetriedUntilTheAppReportsOne() {
