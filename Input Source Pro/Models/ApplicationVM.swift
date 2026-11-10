@@ -83,9 +83,9 @@ extension ApplicationVM {
                     .prepend(Date())
                     .compactMap { _ in app.focusedUIElement(preferencesVM: preferencesVM) }
                     .first()
-                    .flatMapLatest { _ -> AnyPublisher<NSRunningApplication, Never> in
-                        // ⌘L right after switching to the browser moves focus into the address bar; with the
-                        // default 0.5s attach delay nobody is listening yet, so attach now (the browser already answers AX).
+                    .flatMapLatest { _ in
+                        // ⌘L right after switching to the browser moves focus into the address bar. Skip the
+                        // default 0.5s attach delay (the browser already answers AX) and re-read once attached.
                         app.watchAX([
                             .focusedUIElementChanged,
                             .titleChanged,
@@ -93,9 +93,6 @@ extension ApplicationVM {
                         ], [.application, .window], attachImmediately: true)
                             .filter { $0.notification != .windowCreated }
                             .map { event in event.runningApp }
-                            // Read once more shortly after watching starts: focus may have moved before the observer was attached.
-                            .merge(with: Timer.delay(seconds: 0.1).map { _ in app })
-                            .eraseToAnyPublisher()
                     }
                     .prepend(app)
                     .compactMap { app -> AppKind? in .from(app, preferencesVM: preferencesVM) }
