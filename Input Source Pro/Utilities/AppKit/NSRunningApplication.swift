@@ -3,15 +3,15 @@ import AXSwift
 import Combine
 
 /// Registers `notifications` on `element` when its role is one of `validRoles`.
-/// Returns the cancellable that unregisters them (an empty one for roles we ignore) with the
-/// notifications the element refused for good, and `nil` when the element has no role yet.
+/// Returns the cancellable that unregisters them (an empty one for roles we ignore) with what the
+/// element accepted, and `nil` when the element has no role yet.
 /// Throws when the role could not be read or the registration should be retried.
 private func notify(
     _ observer: Observer,
     _ validRoles: [Role],
     _ element: UIElement,
     _ notifications: [AXNotification]
-) throws -> (cancellable: AnyCancellable, rejected: [AXNotification])? {
+) throws -> (cancellable: AnyCancellable, registration: AXWatchRetry.Registration)? {
     guard let registration = try AXWatchRetry.register(
         role: try element.attribute(.role),
         validRoles: validRoles,
@@ -23,7 +23,7 @@ private func notify(
             try? observer.removeNotification(notification, forElement: element)
         }
     }
-    return (cancellable, registration.rejected)
+    return (cancellable, registration)
 }
 
 extension NSRunningApplication {
@@ -64,12 +64,12 @@ extension NSRunningApplication {
                     return .notReady(reason: "observer-\(error)")
                 }
 
-                let rejected: [AXNotification]
+                let registration: AXWatchRetry.Registration
                 do {
                     guard let watch = try notify(appObserver, validRoles, app, notifications)
                     else { return .notReady(reason: "no-role") }
                     watch.cancellable.store(in: cancelBag)
-                    rejected = watch.rejected
+                    registration = watch.registration
                 } catch {
                     return .notReady(reason: "\(error)")
                 }
@@ -78,7 +78,7 @@ extension NSRunningApplication {
                 return .attached(AnyCancellable {
                     cancelBag.cancel()
                     appObserver.stop()
-                }, rejected: rejected)
+                }, registration: registration)
             }
         )
     }

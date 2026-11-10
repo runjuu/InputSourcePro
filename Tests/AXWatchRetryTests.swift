@@ -14,7 +14,7 @@ final class AXWatchRetryTests: XCTestCase {
         var completed = false
         var isAlive = true
         var isTrusted = true
-        /// Attempts (1-based) that fail; every other attempt attaches.
+        /// Attach calls (1-based, counted by `attachCount`) that fail; every other call attaches.
         var failingAttempts: Set<Int> = []
         var send: ((Int) -> Void)?
         /// When set, attach succeeds only if this returns a non-nil registration.
@@ -24,6 +24,7 @@ final class AXWatchRetryTests: XCTestCase {
         var probeReason: String?
         /// When set, probe answers are held until `answerProbe()`.
         var holdsProbes = false
+        var firesFirstDelaySynchronously = false
         private var pendingProbes: [(String?) -> Void] = []
         private var pendingTimers: [PassthroughSubject<Date, Never>] = []
         private var subscription: AnyCancellable?
@@ -42,17 +43,20 @@ final class AXWatchRetryTests: XCTestCase {
                     guard let self else { return .notReady(reason: "gone") }
                     attachCount += 1
                     guard !failingAttempts.contains(attachCount) else { return .notReady(reason: "failing") }
-                    var rejected: [AXNotification] = []
+                    var accepted = AXWatchRetry.Registration(registered: [.windowCreated])
                     if let registration {
-                        guard let result = try? registration([.windowCreated]) else { return .notReady(reason: "no-role") }
-                        rejected = result.rejected
+                        guard let result = try? registration([.windowCreated]) else { return .notReady(reason: "no role") }
+                        accepted = result
                     }
                     self.send = send
-                    return .attached(AnyCancellable { [weak self] in self?.liveCancelled += 1 }, rejected: rejected)
+                    return .attached(AnyCancellable { [weak self] in self?.liveCancelled += 1 }, registration: accepted)
                 },
                 delay: { [weak self] seconds in
                     let timer = PassthroughSubject<Date, Never>()
                     self?.requestedDelays.append(seconds)
+                    if self?.firesFirstDelaySynchronously == true, self?.requestedDelays.count == 1 {
+                        return Just(Date()).eraseToAnyPublisher()
+                    }
                     self?.pendingTimers.append(timer)
                     return timer.eraseToAnyPublisher()
                 },
@@ -281,6 +285,12 @@ final class AXWatchRetryTests: XCTestCase {
         XCTAssertEqual(registration?.rejected, [.focusedUIElementChanged])
     }
 
+    func testRegisterReportsAMissingRoleWithoutTouchingTheElement() throws {
+        XCTAssertNil(
+            try AXWatchRetry.register(role: nil, validRoles: [.application], notifications: [.windowCreated], add: { _ in XCTFail("must not register") })
+        )
+    }
+
     func testRegisterIgnoresExcludedRoles() throws {
         for role in ["AXButton", "AXCustomThing"] {
             XCTAssertEqual(
@@ -322,11 +332,119 @@ final class AXWatchRetryTests: XCTestCase {
 
     func testLogsRejectedNotificationsEvenOnAFirstAttemptAttach() {
         let harness = Harness()
-        harness.registration = { _ in AXWatchRetry.Registration(registered: [], rejected: [.titleChanged, .windowCreated]) }
+        harness.registration = { _ in
+            AXWatchRetry.Registration(registered: [.focusedUIElementChanged], rejected: [.titleChanged, .windowCreated])
+        }
         harness.subscribe()
         harness.fireTimer()
         XCTAssertNotNil(harness.send)
         XCTAssertEqual(harness.logged, ["ax.watch pid=42 attempt=1 result=attached rejected=AXTitleChanged,AXWindowCreated"])
+    }
+
+    func testLogsRejectedNotificationsOnALateAttach() {
+        let harness = Harness()
+        harness.failingAttempts = [1]
+        harness.registration = { _ in AXWatchRetry.Registration(registered: [.windowCreated], rejected: [.titleChanged]) }
+        harness.subscribe()
+        harness.fireTimer()
+        harness.fireTimer()
+        XCTAssertEqual(harness.logged.last, "ax.watch pid=42 attempt=2 result=attached rejected=AXTitleChanged")
+    }
+
+    func testLogsAnAttachThatRegisteredNothing() {
+        let harness = Harness()
+        harness.registration = { _ in AXWatchRetry.Registration() }
+        harness.subscribe()
+        harness.fireTimer()
+        XCTAssertNotNil(harness.send, "Nothing to retry: the app answered every notification")
+        XCTAssertEqual(harness.logged, ["ax.watch pid=42 attempt=1 result=attached registered=0"])
+    }
+
+    func testLogsEachNewKindOfFailureWithoutWaitingForTheMinute() {
+        let harness = Harness()
+        harness.isTrusted = false
+        harness.probeReason = "AXError.CannotComplete"
+        harness.subscribe()
+        harness.fireTimer()
+        harness.fireTimer()
+        harness.isTrusted = true
+        harness.fireTimer()
+        harness.fireTimer()
+        harness.probeReason = "no-role"
+        harness.fireTimer()
+        harness.probeReason = nil
+        harness.fireTimer()
+        XCTAssertEqual(harness.logged, [
+            "ax.watch pid=42 attempt=1 result=untrusted",
+            "ax.watch pid=42 attempt=3 result=not-ready reason=AXError.CannotComplete",
+            "ax.watch pid=42 attempt=5 result=not-ready reason=no-role",
+            "ax.watch pid=42 attempt=6 result=attached",
+        ])
+    }
+
+    func testLogReasonsNeverContainSpaces() {
+        let harness = Harness()
+        harness.registration = { _ in nil }
+        harness.subscribe()
+        harness.fireTimer()
+        XCTAssertEqual(harness.logged, ["ax.watch pid=42 attempt=1 result=not-ready reason=no_role"])
+    }
+
+    func testLogsACancelThatEndsARunOfFailures() {
+        let harness = Harness()
+        harness.failingAttempts = [1]
+        harness.subscribe()
+        harness.fireTimer()
+        harness.cancel()
+        XCTAssertEqual(harness.logged, [
+            "ax.watch pid=42 attempt=1 result=not-ready reason=failing",
+            "ax.watch pid=42 attempt=2 result=cancelled",
+        ])
+    }
+
+    func testCancelLogsNothingWithoutAFailureOrAfterTheSequenceEnded() {
+        let pending = Harness()
+        pending.subscribe()
+        pending.cancel()
+        XCTAssertEqual(pending.logged, [])
+
+        let attached = Harness()
+        attached.failingAttempts = [1]
+        attached.subscribe()
+        attached.fireTimer()
+        attached.fireTimer()
+        attached.cancel()
+        XCTAssertEqual(attached.logged.last, "ax.watch pid=42 attempt=2 result=attached")
+
+        let terminated = Harness()
+        terminated.isAlive = false
+        terminated.subscribe()
+        terminated.fireTimer()
+        terminated.cancel()
+        XCTAssertEqual(terminated.logged, ["ax.watch pid=42 attempt=1 result=terminated"])
+    }
+
+    func testSynchronousDelayDoesNotDropTheNextAttempt() {
+        let harness = Harness()
+        harness.firesFirstDelaySynchronously = true
+        harness.failingAttempts = [1]
+        harness.subscribe()
+        XCTAssertEqual(harness.attachCount, 1, "The first delay fired during subscribe")
+        XCTAssertEqual(harness.pendingTimerCount, 1)
+
+        harness.fireTimer()
+        XCTAssertEqual(harness.attachCount, 2, "The second attempt's timer must still be alive")
+        XCTAssertNotNil(harness.send)
+    }
+
+    func testEventsSentAfterCancelAreNotDelivered() {
+        let harness = Harness()
+        harness.subscribe()
+        harness.fireTimer()
+        let send = harness.send
+        harness.cancel()
+        send?(7)
+        XCTAssertEqual(harness.received, [])
     }
 
     func testLogsTerminationThatEndsARetrySequence() {
