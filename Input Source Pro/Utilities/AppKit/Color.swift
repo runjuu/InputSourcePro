@@ -82,9 +82,11 @@ extension NSColor {
      - Returns: A new string with `String` with the color's hexidecimal value.
      */
     func hexDescription(_ includeAlpha: Bool = false) -> String {
-        guard cgColor.numberOfComponents == 4,
-              let a = cgColor.components?.map({ Int($0 * CGFloat(255)) })
-        else { return "Color not RGB." }
+        // Grayscale, CMYK and wide-gamut colors have different component layouts or
+        // meanings, so convert to sRGB before reading r/g/b/a. Out-of-gamut values are clamped.
+        guard let rgb = usingColorSpace(.sRGB) else { return "Color not RGB." }
+        let a = [rgb.redComponent, rgb.greenComponent, rgb.blueComponent, rgb.alphaComponent]
+            .map { Int(min(max($0, 0), 1) * CGFloat(255)) }
 
         let color = String(format: "%02x%02x%02x", a[0], a[1], a[2])
 
