@@ -23,6 +23,7 @@
 		4A09307D285F32B100232089 /* PreferencesWindowController+NSToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A09307C285F32B100232089 /* PreferencesWindowController+NSToolbar.swift */; };
 		4A09307F286359F800232089 /* Accessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A09307E286359F800232089 /* Accessibility.swift */; };
 		4A0930812866BC4A00232089 /* AXSwift.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A0930802866BC4A00232089 /* AXSwift.swift */; };
+		DA1000050000000000000005 /* AXWatchRetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1000060000000000000006 /* AXWatchRetry.swift */; };
 		4A0930892867E91100232089 /* AppsDiff.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A0930882867E91100232089 /* AppsDiff.swift */; };
 		4A09308B28680A3200232089 /* NSViewHoverable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A09308A28680A3200232089 /* NSViewHoverable.swift */; };
 		4A0930952868780600232089 /* ApplicationVM+AXNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A0930942868780600232089 /* ApplicationVM+AXNotification.swift */; };
@@ -253,6 +254,7 @@
 		4A09307C285F32B100232089 /* PreferencesWindowController+NSToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesWindowController+NSToolbar.swift"; sourceTree = "<group>"; };
 		4A09307E286359F800232089 /* Accessibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Accessibility.swift; sourceTree = "<group>"; };
 		4A0930802866BC4A00232089 /* AXSwift.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXSwift.swift; sourceTree = "<group>"; };
+		DA1000060000000000000006 /* AXWatchRetry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXWatchRetry.swift; sourceTree = "<group>"; };
 		4A0930882867E91100232089 /* AppsDiff.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppsDiff.swift; sourceTree = "<group>"; };
 		4A09308A28680A3200232089 /* NSViewHoverable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NSViewHoverable.swift; sourceTree = "<group>"; };
 		4A0930942868780600232089 /* ApplicationVM+AXNotification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ApplicationVM+AXNotification.swift"; sourceTree = "<group>"; };
@@ -747,6 +749,7 @@
 				4A09307E286359F800232089 /* Accessibility.swift */,
 				4A0930802866BC4A00232089 /* AXSwift.swift */,
 				D56A7CFB28A4D5C0002F356A /* AXSwift+Browser.swift */,
+				DA1000060000000000000006 /* AXWatchRetry.swift */,
 				D51625FD2A2077AE00BB8735 /* QueryWebAreaService.swift */,
 				D51625FF2A2077FC00BB8735 /* Element.swift */,
 			);
@@ -1039,6 +1042,7 @@
 				D5F1A1B33A4B5C6D7E8F9012 /* RuleSettingIcon.swift in Sources */,
 				D525609E29B58448009EB7BA /* LoadingView.swift in Sources */,
 				4A0930812866BC4A00232089 /* AXSwift.swift in Sources */,
+				DA1000050000000000000005 /* AXWatchRetry.swift in Sources */,
 				4A2A177F280BA7FA00E13249 /* StatusItemController.swift in Sources */,
 				4A1F25222830C3E400001BAB /* Bundle+Version.swift in Sources */,
 				4AC5738528411B33000BF10B /* AppKeyboardCache.swift in Sources */,
