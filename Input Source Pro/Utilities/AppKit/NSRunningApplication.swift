@@ -3,25 +3,27 @@ import AXSwift
 import Combine
 
 /// Registers `notifications` on `element` when its role is one of `validRoles`.
-/// Returns the cancellable that unregisters them, an empty cancellable for roles we ignore,
-/// and `nil` when the element could not be watched yet (no role, role unreadable or registration failed).
+/// Returns the cancellable that unregisters them (an empty one for roles we ignore) with the
+/// notifications the element refused for good, and `nil` when the element has no role yet.
+/// Throws when the role could not be read or the registration should be retried.
 private func notify(
     _ observer: Observer,
     _ validRoles: [Role],
     _ element: UIElement,
     _ notifications: [AXNotification]
-) -> AnyCancellable? {
-    guard let registration = try? AXWatchRetry.register(
+) throws -> (cancellable: AnyCancellable, rejected: [AXNotification])? {
+    guard let registration = try AXWatchRetry.register(
         role: try element.attribute(.role),
         validRoles: validRoles,
         notifications: notifications,
         add: { try observer.addNotification($0, forElement: element) }
     ) else { return nil }
-    return AnyCancellable {
+    let cancellable = AnyCancellable {
         for notification in registration.registered {
             try? observer.removeNotification(notification, forElement: element)
         }
     }
+    return (cancellable, registration.rejected)
 }
 
 extension NSRunningApplication {
@@ -38,10 +40,10 @@ extension NSRunningApplication {
         return AXWatchRetry.publisher(
             pid: pid,
             isAlive: { [weak self] in self?.isTerminated == false },
-            attach: { [weak self] send -> AnyCancellable? in
+            attach: { [weak self] send -> AXWatchRetry.Attach in
                 guard let runningApplication = self,
                       let app = Application(runningApplication)
-                else { return nil }
+                else { return .notReady(reason: "gone") }
                 // A hung target would otherwise block the main thread for the global 0.5s AX timeout on
                 // every retry; 0.25s matches CaretFocusObserver and is still far above a live app's reply.
                 app.messagingTimeout = 0.25
@@ -52,23 +54,30 @@ extension NSRunningApplication {
                     appObserver = try Observer(processID: pid) { (_ appObserver: Observer, _ element: UIElement, _ event: AXNotification) in
                         // Watch events on new windows
                         if event == .windowCreated {
-                            notify(appObserver, validRoles, element, notifications)?.store(in: cancelBag)
+                            (try? notify(appObserver, validRoles, element, notifications))?
+                                .cancellable.store(in: cancelBag)
                         }
                         send((runningApplication, event))
                     }
                 } catch {
-                    return nil
+                    return .notReady(reason: "observer-\(error)")
                 }
 
-                guard let registration = notify(appObserver, validRoles, app, notifications)
-                else { return nil }
-                registration.store(in: cancelBag)
+                let rejected: [AXNotification]
+                do {
+                    guard let watch = try notify(appObserver, validRoles, app, notifications)
+                    else { return .notReady(reason: "no-role") }
+                    watch.cancellable.store(in: cancelBag)
+                    rejected = watch.rejected
+                } catch {
+                    return .notReady(reason: "\(error)")
+                }
                 runningApplication.activateAccessibilities()
 
-                return AnyCancellable {
+                return .attached(AnyCancellable {
                     cancelBag.cancel()
                     appObserver.stop()
-                }
+                }, rejected: rejected)
             }
         )
     }
@@ -96,6 +105,13 @@ extension NSRunningApplication {
 /// the main run loop, `Observer.stop()` uses `RunLoop.current`, and `CancelBag` is not thread-safe. The
 /// `delay` publisher must emit asynchronously (as `Timer.delay` does).
 enum AXWatchRetry {
+    enum Attach {
+        /// The observer is live; `rejected` lists notifications the app refused for good.
+        case attached(AnyCancellable, rejected: [AXNotification])
+        /// Try again later; `reason` goes to the diagnostics log and must not contain spaces.
+        case notReady(reason: String)
+    }
+
     static let untrustedDelayCap: TimeInterval = 5
     static let notReadyDelayCap: TimeInterval = 30
 
@@ -148,8 +164,9 @@ enum AXWatchRetry {
         pid: pid_t,
         isAlive: @escaping () -> Bool,
         isTrusted: @escaping () -> Bool = { AXIsProcessTrusted() },
-        attach: @escaping (_ send: @escaping (Output) -> Void) -> AnyCancellable?,
-        delay: @escaping (TimeInterval) -> AnyPublisher<Date, Never> = { Timer.delay(seconds: $0) }
+        attach: @escaping (_ send: @escaping (Output) -> Void) -> Attach,
+        delay: @escaping (TimeInterval) -> AnyPublisher<Date, Never> = { Timer.delay(seconds: $0) },
+        log: @escaping (String) -> Void = { IndicatorDiagnostics.record($0) }
     ) -> AnyPublisher<Output, Never> {
         AnyPublisher.create { subscriber in
             let cancelBag = CancelBag()
@@ -165,6 +182,7 @@ enum AXWatchRetry {
                 let pending = delay(wait).sink { _ in
                     guard !isCancelled else { return }
                     let result: String
+                    var detail = ""
                     var retryCap: TimeInterval?
                     if !isAlive() {
                         result = "terminated"
@@ -172,19 +190,27 @@ enum AXWatchRetry {
                     } else if !isTrusted() {
                         result = "untrusted"
                         retryCap = untrustedDelayCap
-                    } else if let observer = attach(subscriber.send) {
-                        result = "attached"
-                        observer.store(in: cancelBag)
                     } else {
-                        result = "not-ready"
-                        retryCap = notReadyDelayCap
+                        switch attach(subscriber.send) {
+                        case let .attached(observer, rejected):
+                            result = "attached"
+                            observer.store(in: cancelBag)
+                            if !rejected.isEmpty {
+                                detail = " rejected=" + rejected.map(\.rawValue).joined(separator: ",")
+                            }
+                        case let .notReady(reason):
+                            result = "not-ready"
+                            detail = " reason=\(reason)"
+                            retryCap = notReadyDelayCap
+                        }
                     }
-                    // Log first-attempt failures, late successes, then about once a minute while failing.
+                    // Stay silent on a clean first-attempt attach. Log anything else on the first attempt,
+                    // the end of every retry sequence, and about once a minute while still failing.
                     waitedSinceLog += wait
-                    let isNoteworthy = n == 1 ? result != "attached" : result == "attached"
+                    let isNoteworthy = n == 1 ? result != "attached" || !detail.isEmpty : retryCap == nil
                     if isNoteworthy || waitedSinceLog >= 60 {
                         waitedSinceLog = 0
-                        IndicatorDiagnostics.record("ax.watch pid=\(pid) attempt=\(n) result=\(result)")
+                        log("ax.watch pid=\(pid) attempt=\(n) result=\(result)\(detail)")
                     }
                     if let retryCap {
                         failureStreak = result == lastFailure ? failureStreak + 1 : 1

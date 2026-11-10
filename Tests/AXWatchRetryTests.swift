@@ -19,6 +19,7 @@ final class AXWatchRetryTests: XCTestCase {
         var send: ((Int) -> Void)?
         /// When set, attach succeeds only if this returns a non-nil registration.
         var registration: (([AXNotification]) throws -> AXWatchRetry.Registration?)?
+        var logged: [String] = []
         private var pendingTimers: [PassthroughSubject<Date, Never>] = []
         private var subscription: AnyCancellable?
 
@@ -27,20 +28,25 @@ final class AXWatchRetryTests: XCTestCase {
                 pid: 42,
                 isAlive: { [weak self] in self?.isAlive == true },
                 isTrusted: { [weak self] in self?.isTrusted == true },
-                attach: { [weak self] send -> AnyCancellable? in
-                    guard let self else { return nil }
+                attach: { [weak self] send -> AXWatchRetry.Attach in
+                    guard let self else { return .notReady(reason: "gone") }
                     attachCount += 1
-                    guard !failingAttempts.contains(attachCount) else { return nil }
-                    if let registration, (try? registration([.windowCreated])) == nil { return nil }
+                    guard !failingAttempts.contains(attachCount) else { return .notReady(reason: "failing") }
+                    var rejected: [AXNotification] = []
+                    if let registration {
+                        guard let result = try? registration([.windowCreated]) else { return .notReady(reason: "no-role") }
+                        rejected = result.rejected
+                    }
                     self.send = send
-                    return AnyCancellable { [weak self] in self?.liveCancelled += 1 }
+                    return .attached(AnyCancellable { [weak self] in self?.liveCancelled += 1 }, rejected: rejected)
                 },
                 delay: { [weak self] seconds in
                     let timer = PassthroughSubject<Date, Never>()
                     self?.requestedDelays.append(seconds)
                     self?.pendingTimers.append(timer)
                     return timer.eraseToAnyPublisher()
-                }
+                },
+                log: { [weak self] in self?.logged.append($0) }
             )
             .sink(
                 receiveCompletion: { [weak self] _ in self?.completed = true },
@@ -219,6 +225,55 @@ final class AXWatchRetryTests: XCTestCase {
                 "\(error)"
             )
         }
+    }
+
+    func testLogsNothingWhenTheFirstAttemptAttachesCleanly() {
+        let harness = Harness()
+        harness.subscribe()
+        harness.fireTimer()
+        XCTAssertNotNil(harness.send)
+        XCTAssertEqual(harness.logged, [])
+    }
+
+    func testLogsTheFailureReasonAndTheLateAttach() {
+        let harness = Harness()
+        harness.failingAttempts = [1, 2]
+        harness.subscribe()
+        for _ in 1...3 { harness.fireTimer() }
+        XCTAssertEqual(harness.logged, [
+            "ax.watch pid=42 attempt=1 result=not-ready reason=failing",
+            "ax.watch pid=42 attempt=3 result=attached",
+        ])
+    }
+
+    func testLogsRejectedNotificationsEvenOnAFirstAttemptAttach() {
+        let harness = Harness()
+        harness.registration = { _ in AXWatchRetry.Registration(registered: [], rejected: [.titleChanged, .windowCreated]) }
+        harness.subscribe()
+        harness.fireTimer()
+        XCTAssertNotNil(harness.send)
+        XCTAssertEqual(harness.logged, ["ax.watch pid=42 attempt=1 result=attached rejected=AXTitleChanged,AXWindowCreated"])
+    }
+
+    func testLogsTerminationThatEndsARetrySequence() {
+        let harness = Harness()
+        harness.failingAttempts = [1]
+        harness.subscribe()
+        harness.fireTimer()
+        harness.isAlive = false
+        harness.fireTimer()
+        XCTAssertTrue(harness.completed)
+        XCTAssertEqual(harness.logged.last, "ax.watch pid=42 attempt=2 result=terminated")
+    }
+
+    func testLogsAboutOnceAMinuteWhileStillFailing() {
+        let harness = Harness()
+        harness.failingAttempts = Set(1...12)
+        harness.subscribe()
+        // Attempt 1 is logged as a first-attempt failure. The waits that follow are 1, 2, 4, 8, 16, 30
+        // (61s, logged at attempt 7), then 30 and 30 (60s, logged at attempt 9).
+        for _ in 1...10 { harness.fireTimer() }
+        XCTAssertEqual(harness.logged.map { $0.components(separatedBy: " ")[2] }, ["attempt=1", "attempt=7", "attempt=9"])
     }
 
     func testTerminatedAppCompletesWithoutRetry() {
