@@ -77,11 +77,18 @@ extension NSRunningApplication {
 /// Retry policy for attaching AX observers.
 ///
 /// An attach fails when the target app is not serving Accessibility yet (boot race, app still launching)
-/// or when this process is not trusted yet. Attempts are made after 0.5s, 1s, 2s, 4s, then every 5s:
-/// the 0.5s first delay is what `watchAX` has always used (initial commit, no recorded reason beyond
-/// letting a freshly activated app settle), the doubling catches an app that finishes launching within a
-/// few seconds, and the 5s cap keeps a permanently denied permission at one cheap `AXIsProcessTrusted`
-/// call per five seconds per app instead of a retry storm.
+/// or when this process is not trusted yet. The first attempt is made after 0.5s, which is what
+/// `watchAX` has always used (initial commit, no recorded reason beyond letting a freshly activated app
+/// settle). Each failure doubles the wait, up to a cap that depends on what the failure costs:
+///
+/// - Not trusted: 5s. The check is one `AXIsProcessTrusted` call and no AX message, so a permission
+///   granted later is picked up within five seconds for free.
+/// - Target not ready: 30s. Every attempt messages the target on the main thread and blocks for the
+///   messaging timeout when the target is hung, so a permanently unresponsive app must not be probed
+///   every few seconds. The doubling still catches an app that finishes launching within seconds.
+///
+/// The doubling restarts when the kind of failure changes, so an app first probed after a long wait
+/// for the permission is retried quickly again.
 ///
 /// Contract: retries until the first successful attach; a later loss of the observer (while the pid stays
 /// alive) is not detected. Retries stop when the app terminates (publisher completes) or the subscription
@@ -89,8 +96,12 @@ extension NSRunningApplication {
 /// the main run loop, `Observer.stop()` uses `RunLoop.current`, and `CancelBag` is not thread-safe. The
 /// `delay` publisher must emit asynchronously (as `Timer.delay` does).
 enum AXWatchRetry {
-    static func delay(forAttempt attempt: Int) -> TimeInterval {
-        min(0.5 * pow(2, Double(attempt - 1)), 5)
+    static let untrustedDelayCap: TimeInterval = 5
+    static let notReadyDelayCap: TimeInterval = 30
+
+    /// The wait before the next attempt, after `failures` consecutive failures of the same kind.
+    static func delay(afterFailures failures: Int, cap: TimeInterval) -> TimeInterval {
+        min(0.5 * pow(2, Double(failures)), cap)
     }
 
     /// Registers `notifications` one by one on an element with the given raw role.
@@ -132,36 +143,46 @@ enum AXWatchRetry {
             var timer: AnyCancellable?
             var latestAttempt = 0
             var isCancelled = false
+            var lastFailure: String?
+            var failureStreak = 0
+            var waitedSinceLog: TimeInterval = 0
 
-            func attempt(_ n: Int) {
+            func attempt(_ n: Int, after wait: TimeInterval) {
                 latestAttempt = n
-                let pending = delay(Self.delay(forAttempt: n)).sink { _ in
+                let pending = delay(wait).sink { _ in
                     guard !isCancelled else { return }
                     let result: String
+                    var retryCap: TimeInterval?
                     if !isAlive() {
                         result = "terminated"
                         subscriber.send(completion: .finished)
                     } else if !isTrusted() {
                         result = "untrusted"
+                        retryCap = untrustedDelayCap
                     } else if let observer = attach(subscriber.send) {
                         result = "attached"
                         observer.store(in: cancelBag)
                     } else {
                         result = "not-ready"
+                        retryCap = notReadyDelayCap
                     }
                     // Log first-attempt failures, late successes, then about once a minute while failing.
+                    waitedSinceLog += wait
                     let isNoteworthy = n == 1 ? result != "attached" : result == "attached"
-                    if isNoteworthy || n % 12 == 0 {
+                    if isNoteworthy || waitedSinceLog >= 60 {
+                        waitedSinceLog = 0
                         IndicatorDiagnostics.record("ax.watch pid=\(pid) attempt=\(n) result=\(result)")
                     }
-                    if result == "untrusted" || result == "not-ready" {
-                        attempt(n + 1)
+                    if let retryCap {
+                        failureStreak = result == lastFailure ? failureStreak + 1 : 1
+                        lastFailure = result
+                        attempt(n + 1, after: Self.delay(afterFailures: failureStreak, cap: retryCap))
                     }
                 }
                 // A synchronous emission would already have scheduled the next attempt; keep that timer.
                 if latestAttempt == n { timer = pending }
             }
-            attempt(1)
+            attempt(1, after: Self.delay(afterFailures: 0, cap: notReadyDelayCap))
 
             return AnyCancellable {
                 isCancelled = true
