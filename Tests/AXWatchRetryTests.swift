@@ -59,7 +59,14 @@ final class AXWatchRetryTests: XCTestCase {
     }
 
     func testBackoffSchedule() {
-        XCTAssertEqual((1...7).map(AXWatchRetry.delay(forAttempt:)), [0.5, 1, 2, 4, 5, 5, 5])
+        XCTAssertEqual(
+            (0...6).map { AXWatchRetry.delay(afterFailures: $0, cap: AXWatchRetry.untrustedDelayCap) },
+            [0.5, 1, 2, 4, 5, 5, 5]
+        )
+        XCTAssertEqual(
+            (0...7).map { AXWatchRetry.delay(afterFailures: $0, cap: AXWatchRetry.notReadyDelayCap) },
+            [0.5, 1, 2, 4, 8, 16, 30, 30]
+        )
     }
 
     func testRetriesUntilAttachSucceedsThenDeliversEvents() {
@@ -90,8 +97,34 @@ final class AXWatchRetryTests: XCTestCase {
         for _ in 1...8 { harness.fireTimer() }
 
         XCTAssertEqual(harness.attachCount, 8)
-        XCTAssertEqual(harness.requestedDelays, [0.5, 1, 2, 4, 5, 5, 5, 5, 5])
+        XCTAssertEqual(harness.requestedDelays, [0.5, 1, 2, 4, 8, 16, 30, 30, 30])
         XCTAssertEqual(harness.pendingTimerCount, 1)
+    }
+
+    func testKeepsCheckingTrustEveryFiveSeconds() {
+        let harness = Harness()
+        harness.isTrusted = false
+        harness.subscribe()
+        for _ in 1...6 { harness.fireTimer() }
+
+        XCTAssertEqual(harness.attachCount, 0)
+        XCTAssertEqual(harness.requestedDelays, [0.5, 1, 2, 4, 5, 5, 5])
+    }
+
+    func testBackoffRestartsWhenTheKindOfFailureChanges() {
+        let harness = Harness()
+        harness.isTrusted = false
+        harness.failingAttempts = [1, 2]
+        harness.subscribe()
+        for _ in 1...6 { harness.fireTimer() }
+        XCTAssertEqual(harness.requestedDelays.last, 5)
+
+        // Trusted at last, but the target is not ready: probe it quickly again instead of at the cap.
+        harness.isTrusted = true
+        harness.fireTimer()
+        harness.fireTimer()
+        XCTAssertEqual(harness.attachCount, 2)
+        XCTAssertEqual(Array(harness.requestedDelays.suffix(2)), [1, 2])
     }
 
     func testCancelMidRetryStopsFurtherAttempts() {
