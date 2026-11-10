@@ -5,9 +5,11 @@ import Combine
 /// Retry policy for attaching AX observers.
 ///
 /// An attach fails when the target app is not serving Accessibility yet (boot race, app still launching)
-/// or when this process is not trusted yet. The first attempt is made after 0.5s, which is what
-/// `watchAX` has always used (initial commit, no recorded reason beyond letting a freshly activated app
-/// settle). Each failure doubles the wait, up to a cap that depends on what the failure costs:
+/// or when this process is not trusted yet. The first attempt is made after `initialDelay`: 0.5s by
+/// default, which is what `watchAX` has always used (initial commit, no recorded reason beyond letting a
+/// freshly activated app settle), or at once for callers that cannot miss early events. Retries start
+/// at 0.5s (1s when the first attempt already waited 0.5s) and each failure doubles the wait, up to a
+/// cap that depends on what the failure costs:
 ///
 /// - Not trusted: 5s. The check is one `AXIsProcessTrusted` call and no AX message, so a permission
 ///   granted later is picked up within five seconds for free.
@@ -22,6 +24,9 @@ import Combine
 ///
 /// The doubling restarts when the kind of failure changes, so an app first probed after a long wait
 /// for the permission is retried quickly again.
+///
+/// A caller that derives state from the events can pass `attachedOutput`: it is delivered once, right
+/// after the observer is registered, so the caller re-reads whatever changed before anyone was listening.
 ///
 /// Contract: retries until the first successful attach; a later loss of the observer (while the pid stays
 /// alive) is not detected. Retries stop when the app terminates (publisher completes) or the subscription
@@ -117,6 +122,7 @@ enum AXWatchRetry {
         isTrusted: @escaping () -> Bool = { AXIsProcessTrusted() },
         probe: @escaping (pid_t, @escaping (String?) -> Void) -> Void = AXWatchRetry.probe,
         initialDelay: TimeInterval = AXWatchRetry.defaultInitialDelay,
+        attachedOutput: Output? = nil,
         attach: @escaping (_ send: @escaping (Output) -> Void) -> Attach,
         delay: @escaping (TimeInterval) -> AnyPublisher<Date, Never> = { Timer.delay(seconds: $0) },
         log: @escaping (String) -> Void = { IndicatorDiagnostics.record($0) }
@@ -156,6 +162,8 @@ enum AXWatchRetry {
                                     detail += " rejected=" + registration.rejected.map(\.rawValue).joined(separator: ",")
                                 }
                                 finish(n, wait, result: "attached", detail: detail)
+                                // Sent after the observer is stored, so a cancel from downstream releases it.
+                                if let attachedOutput { subscriber.send(attachedOutput) }
                             case let .notReady(reason):
                                 finish(n, wait, result: "not-ready", detail: " reason=\(reason)", retryCap: notReadyDelayCap)
                             }
@@ -189,6 +197,8 @@ enum AXWatchRetry {
                 if let retryCap {
                     failureStreak = result == lastFailure ? failureStreak + 1 : 1
                     lastFailure = result
+                    // An attempt made without the usual wait does not count towards the backoff.
+                    if n == 1, initialDelay < Self.defaultInitialDelay { failureStreak = 0 }
                     attempt(n + 1, after: Self.delay(afterFailures: failureStreak, cap: retryCap))
                 }
             }

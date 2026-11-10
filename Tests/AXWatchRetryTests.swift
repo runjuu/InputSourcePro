@@ -26,6 +26,9 @@ final class AXWatchRetryTests: XCTestCase {
         var holdsProbes = false
         var firesFirstDelaySynchronously = false
         var initialDelay = AXWatchRetry.defaultInitialDelay
+        var attachedOutput: Int?
+        /// Cancels the subscription as soon as a value arrives.
+        var cancelsOnReceive = false
         private var pendingProbes: [(String?) -> Void] = []
         private var pendingTimers: [PassthroughSubject<Date, Never>] = []
         private var subscription: AnyCancellable?
@@ -41,6 +44,7 @@ final class AXWatchRetryTests: XCTestCase {
                     if holdsProbes { pendingProbes.append(done) } else { done(probeReason) }
                 },
                 initialDelay: initialDelay,
+                attachedOutput: attachedOutput,
                 attach: { [weak self] send -> AXWatchRetry.Attach in
                     guard let self else { return .notReady(reason: "gone") }
                     attachCount += 1
@@ -66,7 +70,10 @@ final class AXWatchRetryTests: XCTestCase {
             )
             .sink(
                 receiveCompletion: { [weak self] _ in self?.completed = true },
-                receiveValue: { [weak self] in self?.received.append($0) }
+                receiveValue: { [weak self] in
+                    self?.received.append($0)
+                    if self?.cancelsOnReceive == true { self?.cancel() }
+                }
             )
         }
 
@@ -119,16 +126,41 @@ final class AXWatchRetryTests: XCTestCase {
         XCTAssertFalse(harness.completed)
     }
 
-    func testInitialDelayOnlyReplacesTheFirstWait() {
+    func testImmediateFirstAttemptDoesNotCountTowardsTheBackoff() {
         let harness = Harness()
         harness.initialDelay = 0
+        harness.failingAttempts = [1, 2, 3]
+        harness.subscribe()
+
+        (1...4).forEach { _ in harness.fireTimer() }
+        XCTAssertEqual(harness.attachCount, 4)
+        XCTAssertEqual(harness.requestedDelays, [0, 0.5, 1, 2])
+    }
+
+    func testAttachedOutputIsDeliveredOnceAfterTheAttachThatSucceeds() {
+        let harness = Harness()
+        harness.attachedOutput = -1
         harness.failingAttempts = [1]
         harness.subscribe()
 
         harness.fireTimer()
+        XCTAssertEqual(harness.received, [], "Nothing is listening yet")
+
         harness.fireTimer()
-        XCTAssertEqual(harness.attachCount, 2)
-        XCTAssertEqual(harness.requestedDelays, [0, 1], "Retries keep the usual backoff")
+        XCTAssertEqual(harness.received, [-1])
+        harness.send?(7)
+        XCTAssertEqual(harness.received, [-1, 7])
+    }
+
+    func testCancelOnAttachedOutputReleasesTheObserver() {
+        let harness = Harness()
+        harness.attachedOutput = -1
+        harness.cancelsOnReceive = true
+        harness.subscribe()
+
+        harness.fireTimer()
+        XCTAssertEqual(harness.received, [-1])
+        XCTAssertEqual(harness.liveCancelled, 1)
     }
 
     func testKeepsRetryingAtCapWhileAttachFails() {

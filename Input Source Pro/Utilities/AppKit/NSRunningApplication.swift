@@ -29,8 +29,10 @@ private func notify(
 extension NSRunningApplication {
     typealias WatchAXOutput = (runningApp: NSRunningApplication, notification: AXNotification)
 
-    /// `attachImmediately` skips the 0.5s wait before the first attempt (the attach still happens
-    /// asynchronously, after the readiness probe) for callers that cannot miss early events.
+    /// `attachImmediately` is for callers that cannot miss early events: it skips the 0.5s wait before
+    /// the first attempt (the attach still happens asynchronously, after the readiness probe) and emits
+    /// one `.focusedUIElementChanged` once the observer is registered, so the caller re-reads focus that
+    /// moved before anyone was listening.
     func watchAX(
         _ notifications: [AXNotification],
         _ validRoles: [Role],
@@ -44,6 +46,7 @@ extension NSRunningApplication {
             pid: pid,
             isAlive: { [weak self] in self?.isTerminated == false },
             initialDelay: attachImmediately ? 0 : AXWatchRetry.defaultInitialDelay,
+            attachedOutput: attachImmediately ? (self, .focusedUIElementChanged) : nil,
             attach: { [weak self] send -> AXWatchRetry.Attach in
                 guard let runningApplication = self,
                       let app = Application(runningApplication)
