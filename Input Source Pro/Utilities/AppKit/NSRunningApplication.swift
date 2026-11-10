@@ -44,9 +44,10 @@ extension NSRunningApplication {
                 guard let runningApplication = self,
                       let app = Application(runningApplication)
                 else { return .notReady(reason: "gone") }
-                // A hung target would otherwise block the main thread for the global 0.5s AX timeout on
-                // every retry; 0.25s matches CaretFocusObserver and is still far above a live app's reply.
-                app.messagingTimeout = 0.25
+                // The probe has just seen the target answer, so this only bounds the block when it hangs
+                // in between. It covers the role read and registration on `app`; elements of windows
+                // created later and the warm-up below still use the global AX timeout.
+                app.messagingTimeout = AXWatchRetry.messagingTimeout
 
                 let cancelBag = CancelBag()
                 let appObserver: Observer
