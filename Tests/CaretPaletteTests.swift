@@ -749,6 +749,54 @@ final class CaretPaletteTests: XCTestCase {
         XCTAssertFalse(focus.isAwaitingConfirmation(for: 42, now: 10.04, focusedAt: 10.02))
     }
 
+    func testMissingCaretAfterFloatingPanelWaitsForNextHelperSample() {
+        // The session is not an input: the report from the helper session the refocused app starts counts.
+        for state in [CaretPalette.TextFocus.input, .unknown] {
+            var focus = CaretPalette.FocusReadiness()
+            focus.begin(pid: 42, at: 10)
+            focus.resolve(state, pid: 42, at: 10.02)
+
+            XCTAssertTrue(focus.receiveMissingCaret(
+                at: 12, after: 11, isTemporaryInputWindowInProgress: false, pid: 42
+            ))
+            XCTAssertEqual(focus.confirmation?.pid, 42)
+            XCTAssertEqual(focus.confirmation?.uptime, 12)
+            XCTAssertTrue(focus.isAwaitingConfirmation(for: 42, now: 12.7, focusedAt: 10.02))
+            XCTAssertFalse(focus.isAwaitingConfirmation(for: 42, now: 12.75, focusedAt: 10.02))
+        }
+    }
+
+    func testMissingCaretOutsideInputDoesNotWait() {
+        var nonInput = CaretPalette.FocusReadiness()
+        nonInput.begin(pid: 42, at: 10)
+        nonInput.resolve(.nonInput, pid: 42, at: 10.02)
+        XCTAssertTrue(nonInput.receiveMissingCaret(
+            at: 12, after: 11, isTemporaryInputWindowInProgress: false, pid: 42
+        ))
+        XCTAssertNil(nonInput.confirmation)
+
+        var pending = CaretPalette.FocusReadiness()
+        pending.begin(pid: 42, at: 10)
+        XCTAssertTrue(pending.receiveMissingCaret(
+            at: 10.1, after: 10, isTemporaryInputWindowInProgress: false, pid: 42
+        ))
+        // The focus query's own wait is left as it was.
+        XCTAssertEqual(pending.confirmation?.uptime, 10)
+    }
+
+    func testStaleOrTemporaryWindowMissingCaretIsIgnored() {
+        for (uptime, inProgress) in [(10.9, false), (12, true)] {
+            var focus = CaretPalette.FocusReadiness()
+            focus.begin(pid: 42, at: 10)
+            focus.resolve(.input, pid: 42, at: 10.02)
+
+            XCTAssertFalse(focus.receiveMissingCaret(
+                at: uptime, after: 11, isTemporaryInputWindowInProgress: inProgress, pid: 42
+            ))
+            XCTAssertEqual(focus.confirmation?.uptime, 10.02)
+        }
+    }
+
     func testDefaultIndicatorFallsBackOnceIfHelperNeverConfirms() {
         let updates = PassthroughSubject<Void, Never>()
         let timeout = PassthroughSubject<Void, Never>()
