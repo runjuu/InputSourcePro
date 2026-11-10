@@ -11,14 +11,14 @@ private func notify(
     _ element: UIElement,
     _ notifications: [AXNotification]
 ) -> AnyCancellable? {
-    guard let registered = try? AXWatchRetry.register(
+    guard let registration = try? AXWatchRetry.register(
         role: try element.attribute(.role),
         validRoles: validRoles,
         notifications: notifications,
         add: { try observer.addNotification($0, forElement: element) }
     ) else { return nil }
     return AnyCancellable {
-        for notification in registered {
+        for notification in registration.registered {
             try? observer.removeNotification(notification, forElement: element)
         }
     }
@@ -104,31 +104,44 @@ enum AXWatchRetry {
         min(0.5 * pow(2, Double(failures)), cap)
     }
 
+    struct Registration: Equatable {
+        var registered: [AXNotification] = []
+        /// Notifications the element refused with an error that retrying would not clear.
+        var rejected: [AXNotification] = []
+    }
+
+    /// Whether `error` means the target could not be reached, so the same call may succeed later.
+    /// Everything else is the target's answer to the request and would be the same on every retry.
+    static func isTransient(_ error: AXError) -> Bool {
+        error == .cannotComplete || error == .apiDisabled || error == .invalidUIElement
+    }
+
     /// Registers `notifications` one by one on an element with the given raw role.
     /// Returns `nil` when the element is not ready yet (no role: AXSwift documents this for elements still
-    /// initializing), `[]` for a role outside `validRoles`, otherwise the notifications that registered.
-    /// Notifications the element does not support are skipped; any other error is rethrown so the attach
-    /// is retried instead of keeping a partial registration.
+    /// initializing) and an empty registration for a role outside `validRoles`.
+    /// A notification the element does not support is skipped, and one it refuses with any other
+    /// permanent error is reported as rejected; the remaining notifications are still registered.
+    /// A transient error is rethrown so the whole attach is retried.
     static func register(
         role: String?,
         validRoles: [Role],
         notifications: [AXNotification],
         add: (AXNotification) throws -> Void
-    ) throws -> [AXNotification]? {
+    ) throws -> Registration? {
         guard let role else { return nil }
-        guard let role = Role(rawValue: role), validRoles.contains(role) else { return [] }
-        var registered: [AXNotification] = []
+        var registration = Registration()
+        guard let role = Role(rawValue: role), validRoles.contains(role) else { return registration }
         for notification in notifications {
             do {
                 try add(notification)
-                registered.append(notification)
+                registration.registered.append(notification)
             } catch AXError.notificationUnsupported {
                 continue
-            } catch AXError.notificationAlreadyRegistered {
-                registered.append(notification)
+            } catch let error as AXError where !isTransient(error) {
+                registration.rejected.append(notification)
             }
         }
-        return registered
+        return registration
     }
 
     static func publisher<Output>(

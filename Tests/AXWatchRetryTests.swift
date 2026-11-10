@@ -18,7 +18,7 @@ final class AXWatchRetryTests: XCTestCase {
         var failingAttempts: Set<Int> = []
         var send: ((Int) -> Void)?
         /// When set, attach succeeds only if this returns a non-nil registration.
-        var registration: (([AXNotification]) throws -> [AXNotification]?)?
+        var registration: (([AXNotification]) throws -> AXWatchRetry.Registration?)?
         private var pendingTimers: [PassthroughSubject<Date, Never>] = []
         private var subscription: AnyCancellable?
 
@@ -187,34 +187,38 @@ final class AXWatchRetryTests: XCTestCase {
         XCTAssertEqual(harness.pendingTimerCount, 0)
     }
 
-    func testRegisterSkipsUnsupportedNotificationsAndKeepsTheRest() throws {
-        var added: [AXNotification] = []
-        let registered = try AXWatchRetry.register(
+    func testRegisterSkipsRefusedNotificationsAndKeepsTheRest() throws {
+        let registration = try AXWatchRetry.register(
             role: "AXApplication",
             validRoles: [.application],
-            notifications: [.windowCreated, .titleChanged, .focusedUIElementChanged],
+            notifications: [.windowCreated, .titleChanged, .focusedUIElementChanged, .selectedTextChanged],
             add: { notification in
                 if notification == .titleChanged { throw AXError.notificationUnsupported }
-                if notification == .focusedUIElementChanged { throw AXError.notificationAlreadyRegistered }
-                added.append(notification)
+                if notification == .focusedUIElementChanged { throw AXError.failure }
             }
         )
-        XCTAssertEqual(added, [.windowCreated])
-        XCTAssertEqual(registered, [.windowCreated, .focusedUIElementChanged])
+        XCTAssertEqual(registration?.registered, [.windowCreated, .selectedTextChanged])
+        XCTAssertEqual(registration?.rejected, [.focusedUIElementChanged])
     }
 
-    func testRegisterIgnoresExcludedRolesAndRethrowsOtherErrors() throws {
-        XCTAssertEqual(
-            try AXWatchRetry.register(role: "AXButton", validRoles: [.window], notifications: [.windowCreated], add: { _ in XCTFail("must not register") }),
-            []
-        )
-        XCTAssertEqual(
-            try AXWatchRetry.register(role: "AXCustomThing", validRoles: [.window], notifications: [.windowCreated], add: { _ in XCTFail("must not register") }),
-            []
-        )
-        XCTAssertThrowsError(
-            try AXWatchRetry.register(role: "AXWindow", validRoles: [.window], notifications: [.windowCreated], add: { _ in throw AXError.cannotComplete })
-        )
+    func testRegisterIgnoresExcludedRoles() throws {
+        for role in ["AXButton", "AXCustomThing"] {
+            XCTAssertEqual(
+                try AXWatchRetry.register(role: role, validRoles: [.window], notifications: [.windowCreated], add: { _ in XCTFail("must not register") }),
+                AXWatchRetry.Registration()
+            )
+        }
+    }
+
+    func testRegisterRethrowsErrorsThatARetryCanClear() {
+        struct Unrelated: Error {}
+        let errors: [Error] = [AXError.cannotComplete, AXError.apiDisabled, AXError.invalidUIElement, Unrelated()]
+        for error in errors {
+            XCTAssertThrowsError(
+                try AXWatchRetry.register(role: "AXWindow", validRoles: [.window], notifications: [.windowCreated], add: { _ in throw error }),
+                "\(error)"
+            )
+        }
     }
 
     func testTerminatedAppCompletesWithoutRetry() {
