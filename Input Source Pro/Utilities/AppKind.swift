@@ -24,7 +24,7 @@ enum AppKind {
         isFocusOnInputContainer: Bool,
 
         program: TerminalProgram,
-        rule: TerminalRule
+        rule: TerminalRule?
     )
 
     case normal(app: NSRunningApplication, info: NormalInfo)
@@ -48,7 +48,7 @@ enum AppKind {
             }
         case let .terminal(app, info):
             guard let bundleId = app.bundleId() else { return nil }
-            return "\(bundleId)_\(info.rule.id.uuidString)"
+            return "\(bundleId)_\(info.rule?.id.uuidString ?? info.program.id)"
         }
     }
 
@@ -197,21 +197,24 @@ extension AppKind {
 
         // Only a program a rule matches is its own context. A shell prompt, a program
         // not yet known and a program without a rule stay the terminal's App Rule
-        // context, so running a command does not re-apply the app's keyboard.
+        // context, so running a command does not re-apply the app's keyboard. A pane an
+        // `isp:` program controls is its own context too, rule or not.
         if let terminal = Terminal(app),
            preferencesVM.isTerminalEnabled(terminal),
-           let program = preferencesVM.terminalPrograms[terminal],
-           let rule = preferencesVM.getTerminalRule(program: program)
+           let program = preferencesVM.terminalPrograms[terminal]
         {
-            return .terminal(
-                app: app,
-                info: (
-                    focusedElement: focusedElement,
-                    isFocusOnInputContainer: isFocusOnInputContainer,
-                    program: program,
-                    rule: rule
+            let rule = preferencesVM.getTerminalRule(program: program)
+            if rule != nil || program.tty.map { preferencesVM.terminalControl.isControlled($0) } == true {
+                return .terminal(
+                    app: app,
+                    info: (
+                        focusedElement: focusedElement,
+                        isFocusOnInputContainer: isFocusOnInputContainer,
+                        program: program,
+                        rule: rule
+                    )
                 )
-            )
+            }
         }
 
         return .normal(

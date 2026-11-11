@@ -1,9 +1,15 @@
 import AppKit
 
 extension PreferencesVM {
+    /// The tty of the pane a program controls, which skips rules and the cache.
+    func controlledTerminalTTY(_ appKind: AppKind) -> String? {
+        appKind.getTerminalInfo()?.program.tty.flatMap { terminalControl.isControlled($0) ? $0 : nil }
+    }
+
     func appNeedCacheKeyboard(_ appKind: AppKind) -> Bool {
         // A program rule is a forced default: switching by hand inside claude
         // must not be remembered, or the rule stops working after one use.
+        // A controlled pane keeps its own source instead (`TerminalControlTracker`).
         if appKind.getTerminalInfo() != nil {
             return false
         }
@@ -37,6 +43,14 @@ extension PreferencesVM {
     }
 
     func cacheKeyboardFor(_ appKind: AppKind, keyboard: InputSource) {
+        // The pane has focus, so this is what it uses now, however it got there.
+        // A pane showing a shell for a moment (a program just started) counts too.
+        let focusedTTY = controlledTerminalTTY(appKind) ?? Terminal(appKind.getApp()).flatMap(focusedTerminalTTY)
+        if let tty = focusedTTY, terminalControl.isControlled(tty) {
+            terminalControl.follow(keyboard, on: tty)
+            return
+        }
+
         let defaultKeyboard = getAppDefaultKeyboard(appKind)
 
         if appNeedCacheKeyboard(appKind),
@@ -70,6 +84,11 @@ extension PreferencesVM {
     func getAppAutoSwitchKeyboard(
         _ appKind: AppKind
     ) -> AppAutoSwitchKeyboardStatus? {
+        // A controlled pane goes back to its own source, or stays as it is.
+        if let tty = controlledTerminalTTY(appKind) {
+            return terminalControl.current(on: tty).map { .specified($0) }
+        }
+
         if let cachedKeyboard = getAppCachedKeyboard(appKind) {
             return .cached(cachedKeyboard)
         }
@@ -104,7 +123,7 @@ extension PreferencesVM {
             return inputSource
         }
 
-        if let inputSource = appKind.getTerminalInfo()?.rule.forcedKeyboard {
+        if let inputSource = appKind.getTerminalInfo()?.rule?.forcedKeyboard {
             return inputSource
         }
 

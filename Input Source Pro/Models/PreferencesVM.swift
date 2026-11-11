@@ -57,6 +57,12 @@ final class PreferencesVM: ObservableObject {
     /// stands in for the frontmost app.
     var terminalPanel: NSRunningApplication?
 
+    /// The tty of the latest reading of each terminal's focused pane, shell readings included.
+    var terminalTTYs: [Terminal: String] = [:]
+
+    /// Panes whose program controls the input source (`isp:` commands); runtime only.
+    var terminalControl = TerminalControlTracker<InputSource>()
+
     let runtimeRuleChangeNotifier = RuntimeRuleChangeNotifier()
 
     var runtimeRuleChanges: AnyPublisher<Void, Never> {

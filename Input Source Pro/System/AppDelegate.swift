@@ -14,6 +14,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var feedbackVM: FeedbackVM!
     var indicatorWindowController: IndicatorWindowController!
     var statusItemController: StatusItemController!
+    private var terminalControlPipe: TerminalControlPipe?
 
     /// `false` until the view models are ready in `applicationDidFinishLaunching`.
     /// URLs that arrive before then are queued in `pendingURLs` and drained once.
@@ -68,6 +69,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             inputSourceVM: inputSourceVM
         )
 
+        terminalControlPipe = TerminalControlPipe { [weak self] lines in
+            self?.applicationVM.receiveTerminalControl(lines: lines)
+        }
+
         statusItemController = StatusItemController(
             navigationVM: navigationVM,
             permissionsVM: permissionsVM,
@@ -90,6 +95,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let queuedURLs = pendingURLs
         pendingURLs.removeAll()
         queuedURLs.forEach(handleIncomingURL)
+    }
+
+    func applicationWillTerminate(_: Notification) {
+        terminalControlPipe?.remove()
     }
 
     func applicationDidBecomeActive(_: Notification) {
