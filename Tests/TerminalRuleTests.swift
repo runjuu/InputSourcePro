@@ -142,6 +142,14 @@ final class TerminalProcessTests: XCTestCase {
             XCTAssertEqual(Terminal.ghostty.focusedProgram(onTTY: nil), TerminalReading(program: nil, pane: nil))
         }
     }
+
+    func testGhosttyPanelIsTheOnlyTerminalOutsideEveryWindow() {
+        let windows = ["/dev/ttys001", "/dev/ttys002"]
+        XCTAssertEqual(TerminalProbe.panelTTY(all: windows + ["/dev/ttys009"], inWindows: windows), "/dev/ttys009")
+        XCTAssertEqual(TerminalProbe.panelTTY(all: ["/dev/ttys009"], inWindows: []), "/dev/ttys009")
+        XCTAssertNil(TerminalProbe.panelTTY(all: windows, inWindows: windows), "No panel")
+        XCTAssertNil(TerminalProbe.panelTTY(all: windows + ["/dev/ttys008", "/dev/ttys009"], inWindows: windows), "A split panel: focus unknown")
+    }
 }
 
 @MainActor

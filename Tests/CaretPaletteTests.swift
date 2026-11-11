@@ -912,6 +912,18 @@ final class CaretPaletteTests: XCTestCase {
         XCTAssertFalse(caret.isContainer)
     }
 
+    func testIndicatorPointOffEveryScreenIsDropped() {
+        let screens = [CGRect(x: 0, y: 0, width: 1512, height: 982), CGRect(x: 1512, y: 0, width: 1920, height: 1080)]
+        // Ghostty's quick terminal read 35ms into its slide-in: only its bottom 77pt are on screen.
+        let sliding = CursorRectInfo(rect: CGRect(x: 0, y: 905, width: 1512, height: 400), kind: .container)
+        XCTAssertNil(sliding.indicatorPoint(on: screens))
+        let settled = CursorRectInfo(rect: CGRect(x: 0, y: 545, width: 1512, height: 400), kind: .container)
+        XCTAssertEqual(settled.indicatorPoint(on: screens), CGPoint(x: 0, y: 951))
+        let secondScreen = CursorRectInfo(rect: CGRect(x: 2000, y: 1000, width: 2, height: 20), kind: .caret)
+        XCTAssertEqual(secondScreen.indicatorPoint(on: screens), CGPoint(x: 2001, y: 1026))
+        XCTAssertNil(secondScreen.indicatorPoint(on: []))
+    }
+
     func testTextMarkerSelectionsAreNotMistakenForNarrowCarets() {
         for length: Int? in [nil, -1, 1, 12] {
             let selection = CursorRectInfo.textMarker(
@@ -1128,6 +1140,15 @@ final class CaretPaletteTests: XCTestCase {
         XCTAssertNil(sample.point(for: 42, now: 9, focusedAt: 9, screens: [screen]))
         XCTAssertNil(sample.point(for: 42, now: 10.1, focusedAt: 10.05, screens: [screen]))
         XCTAssertNil(sample.point(for: 99, now: 10.1, focusedAt: 9, screens: [screen]))
+    }
+
+    func testRejectsASampleWhosePointIsAboveTheScreen() {
+        // Ghostty's quick terminal sliding in: the caret's top is on screen, the point 6pt above it is not.
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let sliding = CaretPalette.Sample(rect: CGRect(x: 30, y: 957, width: 1, height: 20), pid: 42, uptime: 10)
+        XCTAssertNil(sliding.point(for: 42, now: 10.1, focusedAt: 9, screens: [screen]))
+        let settled = CaretPalette.Sample(rect: CGRect(x: 30, y: 843, width: 1, height: 20), pid: 42, uptime: 10)
+        XCTAssertEqual(settled.point(for: 42, now: 10.1, focusedAt: 9, screens: [screen]), CGPoint(x: 30.5, y: 869))
     }
 
     func testRejectsInvalidAndOffscreenGeometry() {

@@ -127,7 +127,9 @@ final class CaretPalette {
                   screens.contains(where: { $0.intersects(rect.insetBy(dx: -1, dy: 0)) })
             else { return nil }
             // IMK returns AppKit screen coordinates, already bottom-left based.
-            return CGPoint(x: rect.midX, y: rect.maxY + 6)
+            let point = CGPoint(x: rect.midX, y: rect.maxY + 6)
+            // A window sliding in (Ghostty's quick terminal) can put the caret on screen but the point above it.
+            return screens.contains { $0.insetBy(dx: -1, dy: 0).contains(point) } ? point : nil
         }
     }
 

@@ -160,6 +160,7 @@
 		D57925922A1ACA0B003B83EA /* AppKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57925912A1ACA0B003B83EA /* AppKind.swift */; };
 		54D9D403E3A421FFE427F8C8 /* TerminalProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CFDABF3459DF656586E55FF /* TerminalProbe.swift */; };
 		AC1000010000000000000001 /* TerminalWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC1000020000000000000002 /* TerminalWatcher.swift */; };
+		AC1000050000000000000005 /* TerminalPanelFocus.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC1000060000000000000006 /* TerminalPanelFocus.swift */; };
 		F58F25E12BBB1E9EAAB3CC23 /* Terminal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D1EEFEEB99D21AF61ABDECC /* Terminal.swift */; };
 		D58168CA28943A5400E84058 /* Indicator-Near-Cursor-Demo-Dark.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = D58168C828943A5300E84058 /* Indicator-Near-Cursor-Demo-Dark.mp4 */; };
 		D58168CB28943A5400E84058 /* Indicator-Near-Cursor-Demo-Light.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = D58168C928943A5300E84058 /* Indicator-Near-Cursor-Demo-Light.mp4 */; };
@@ -215,6 +216,7 @@
 		DA1000010000000000000001 /* CaretFocusObserverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1000020000000000000002 /* CaretFocusObserverTests.swift */; };
 		DA1000030000000000000003 /* AXWatchRetryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1000040000000000000004 /* AXWatchRetryTests.swift */; };
 		AC1000030000000000000003 /* TerminalWatcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC1000040000000000000004 /* TerminalWatcherTests.swift */; };
+		AC1000070000000000000007 /* TerminalPanelFocusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC1000080000000000000008 /* TerminalPanelFocusTests.swift */; };
 		D70000052F20000000000005 /* CaretPollingSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70000062F20000000000006 /* CaretPollingSchedule.swift */; };
 		D70000072F20000000000007 /* CaretGeometryFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70000082F20000000000008 /* CaretGeometryFilter.swift */; };
 		D71000012F20000000000001 /* CaretHelperManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71000022F20000000000001 /* CaretHelperManager.swift */; };
@@ -400,6 +402,7 @@
 		D57925912A1ACA0B003B83EA /* AppKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKind.swift; sourceTree = "<group>"; };
 		5CFDABF3459DF656586E55FF /* TerminalProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalProbe.swift; sourceTree = "<group>"; };
 		AC1000020000000000000002 /* TerminalWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalWatcher.swift; sourceTree = "<group>"; };
+		AC1000060000000000000006 /* TerminalPanelFocus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPanelFocus.swift; sourceTree = "<group>"; };
 		7D1EEFEEB99D21AF61ABDECC /* Terminal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Terminal.swift; sourceTree = "<group>"; };
 		D58168C828943A5300E84058 /* Indicator-Near-Cursor-Demo-Dark.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Indicator-Near-Cursor-Demo-Dark.mp4"; sourceTree = "<group>"; };
 		D58168C928943A5300E84058 /* Indicator-Near-Cursor-Demo-Light.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Indicator-Near-Cursor-Demo-Light.mp4"; sourceTree = "<group>"; };
@@ -458,6 +461,7 @@
 		DA1000020000000000000002 /* CaretFocusObserverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaretFocusObserverTests.swift; sourceTree = "<group>"; };
 		DA1000040000000000000004 /* AXWatchRetryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXWatchRetryTests.swift; sourceTree = "<group>"; };
 		AC1000040000000000000004 /* TerminalWatcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalWatcherTests.swift; sourceTree = "<group>"; };
+		AC1000080000000000000008 /* TerminalPanelFocusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPanelFocusTests.swift; sourceTree = "<group>"; };
 		D70000062F20000000000006 /* CaretPollingSchedule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CaretPollingSchedule.swift; path = Tools/CaretPalette/CaretPollingSchedule.swift; sourceTree = SOURCE_ROOT; };
 		D70000082F20000000000008 /* CaretGeometryFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CaretGeometryFilter.swift; path = Tools/CaretPalette/CaretGeometryFilter.swift; sourceTree = SOURCE_ROOT; };
 		D71000022F20000000000001 /* CaretHelperManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaretHelperManager.swift; sourceTree = "<group>"; };
@@ -599,6 +603,7 @@
 				5CFDABF3459DF656586E55FF /* TerminalProbe.swift */,
 				7D1EEFEEB99D21AF61ABDECC /* Terminal.swift */,
 				AC1000020000000000000002 /* TerminalWatcher.swift */,
+				AC1000060000000000000006 /* TerminalPanelFocus.swift */,
 				4A0930882867E91100232089 /* AppsDiff.swift */,
 				4A2A1761280BA7FA00E13249 /* UserDefault.swift */,
 				4A2A1763280BA7FA00E13249 /* CancelBag.swift */,
@@ -887,6 +892,7 @@
 				DA1000020000000000000002 /* CaretFocusObserverTests.swift */,
 				DA1000040000000000000004 /* AXWatchRetryTests.swift */,
 				AC1000040000000000000004 /* TerminalWatcherTests.swift */,
+				AC1000080000000000000008 /* TerminalPanelFocusTests.swift */,
 				D71000082F20000000000001 /* CaretHelperSetupTests.swift */,
 				D73000042F20000000000001 /* CaretChannelTests.swift */,
 				D71000062F20000000000001 /* Tools/CaretPalette/CaretHelperFiles.swift */,
@@ -1204,6 +1210,7 @@
 				54D9D403E3A421FFE427F8C8 /* TerminalProbe.swift in Sources */,
 				F58F25E12BBB1E9EAAB3CC23 /* Terminal.swift in Sources */,
 				AC1000010000000000000001 /* TerminalWatcher.swift in Sources */,
+				AC1000050000000000000005 /* TerminalPanelFocus.swift in Sources */,
 				4A4E035C2DB97534008E5C2F /* PromotionBadge.swift in Sources */,
 				4A09307B285F31E800232089 /* NSToolbarItem+Identifier.swift in Sources */,
 				4A2A1788280BA7FA00E13249 /* NSImage+Extension.swift in Sources */,
@@ -1272,6 +1279,7 @@
 				DA1000010000000000000001 /* CaretFocusObserverTests.swift in Sources */,
 				DA1000030000000000000003 /* AXWatchRetryTests.swift in Sources */,
 				AC1000030000000000000003 /* TerminalWatcherTests.swift in Sources */,
+				AC1000070000000000000007 /* TerminalPanelFocusTests.swift in Sources */,
 				D71000072F20000000000001 /* CaretHelperSetupTests.swift in Sources */,
 				D73000032F20000000000001 /* CaretChannelTests.swift in Sources */,
 				D71000052F20000000000001 /* Tools/CaretPalette/CaretHelperFiles.swift in Sources */,

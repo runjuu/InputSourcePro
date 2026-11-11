@@ -308,10 +308,12 @@ private extension PreferencesVM {
                             return promise(.success(nil))
                         }
 
-                        return promise(.success((
-                            rectInfo.indicatorPoint,
-                            rectInfo.isContainer
-                        )))
+                        guard let point = rectInfo.indicatorPoint(on: NSScreen.screens.map(\.frame)) else {
+                            IndicatorDiagnostics.record("AX.rejected id=\(traceID) reason=offscreen-point point=\(rectInfo.indicatorPoint)")
+                            return promise(.success(nil))
+                        }
+
+                        return promise(.success((point, rectInfo.isContainer)))
                     }
                 }
                 .receive(on: DispatchQueue.main)

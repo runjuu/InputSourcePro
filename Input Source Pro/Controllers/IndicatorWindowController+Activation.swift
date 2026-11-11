@@ -32,7 +32,7 @@ extension IndicatorWindowController {
                         self.moveIndicator(position: $0)
                     }
                     .flatMapLatest { _ -> AnyPublisher<Bool, Never> in
-                        Publishers.Merge(
+                        let hidden = Publishers.Merge(
                             Timer.delay(seconds: 1).handleEvents(receiveOutput: { _ in IndicatorDiagnostics.record("show.hide id=\(traceID) reason=timeout") }).mapToVoid(),
                             // hover event
                             self.indicatorVC.hoverableView.hoverdPublisher
@@ -45,13 +45,30 @@ extension IndicatorWindowController {
                                 .mapToVoid()
                         )
                         .first()
-                        .mapTo(false)
-                        .prepend(true)
-                        .tap { isActive in
-                            IndicatorDiagnostics.record("show.visibility id=\(traceID) active=\(isActive)")
-                            self.isActive = isActive
+                        .share()
+                        let visibility = hidden
+                            .mapTo(false)
+                            .prepend(true)
+                            .tap { isActive in
+                                IndicatorDiagnostics.record("show.visibility id=\(traceID) active=\(isActive)")
+                                self.isActive = isActive
+                            }
+                            .eraseToAnyPublisher()
+                        let app = appKind.getApp()
+                        guard self.preferencesVM.terminalPanel == app else { return visibility }
+
+                        let followed = Self.panelCaretPublisher(
+                            changes: CaretPalette.shared.changes,
+                            point: { CaretPalette.shared.point(for: app) },
+                            until: hidden.eraseToAnyPublisher()
+                        )
+                        .tap { point in
+                            IndicatorDiagnostics.record("show.follow id=\(traceID) point=\(point)")
+                            self.moveIndicator(position: (.inputCursor, point))
                         }
-                        .eraseToAnyPublisher()
+                        .ignoreOutput()
+                        .map { _ in true }
+                        return visibility.merge(with: followed).eraseToAnyPublisher()
                     }
                     .mapToVoid()
                     .eraseToAnyPublisher()
@@ -122,6 +139,22 @@ extension IndicatorWindowController {
             .prepend(initialEvent)
             .compactMap { $0 }
             .flatMapLatest { show($0) }
+            .eraseToAnyPublisher()
+    }
+}
+
+extension IndicatorWindowController {
+    /// Each new caret point while the indicator shows over a terminal's floating panel: the panel
+    /// (Ghostty's quick terminal) slides in after taking focus, so the first point is mid-slide.
+    static func panelCaretPublisher(
+        changes: AnyPublisher<Void, Never>,
+        point: @escaping () -> CGPoint?,
+        until hidden: AnyPublisher<Void, Never>
+    ) -> AnyPublisher<CGPoint, Never> {
+        changes
+            .compactMap { point() }
+            .removeDuplicates()
+            .prefix(untilOutputFrom: hidden)
             .eraseToAnyPublisher()
     }
 }

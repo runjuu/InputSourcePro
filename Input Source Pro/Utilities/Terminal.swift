@@ -43,6 +43,22 @@ extension Terminal {
     /// terminal. Confined to `TerminalProcess.queue`, which orders it with the
     /// reads that use it.
     private static var focusedTTYs: [Terminal: String] = [:]
+    /// Terminals whose floating panel has focus (`TerminalPanelFocus`), so
+    /// `TerminalProbe` asks for the panel's pane. Confined to `TerminalProcess.queue`.
+    private static var focusedPanels: Set<Terminal> = []
+
+    var isPanelFocused: Bool { Self.focusedPanels.contains(self) }
+
+    /// Marks whether this terminal's floating panel has focus and forgets the
+    /// focused tty, which belonged to the other side. Call on `TerminalProcess.queue`.
+    func setPanelFocused(_ isFocused: Bool) {
+        Self.focusedTTYs[self] = nil
+        if isFocused {
+            Self.focusedPanels.insert(self)
+        } else {
+            Self.focusedPanels.remove(self)
+        }
+    }
 
     /// What `tty` runs, which becomes this terminal's focused tty; nil forgets
     /// it and reads nothing, in no known pane. Call on `TerminalProcess.queue`.
