@@ -50,6 +50,9 @@ final class PreferencesVM: ObservableObject {
 
     var appKeyboardCache = AppKeyboardCache()
 
+    /// The latest program seen in each terminal's focused pane, kept for runtime only.
+    var terminalPrograms: [Terminal: TerminalProgram] = [:]
+
     let runtimeRuleChangeNotifier = RuntimeRuleChangeNotifier()
 
     var runtimeRuleChanges: AnyPublisher<Void, Never> {
@@ -354,6 +357,9 @@ struct Preferences {
         static let isEnableURLSwitchForAside = "isEnableURLSwitchForAside"
         static let isEnableURLSwitchForWhale = "isEnableURLSwitchForWhale"
 
+        static let terminalRules = "terminalRules"
+        static let enabledTerminals = "enabledTerminals"
+
         static let shortcutTriggerMode = "shortcutTriggerMode"
         static let singleModifierTrigger = "singleModifierTrigger"
         static let shortcutModeInputSourceMapping = "shortcutModeInputSourceMapping"
@@ -557,6 +563,15 @@ struct Preferences {
 
     @UserDefault(Preferences.Key.isEnableURLSwitchForWhale)
     var isEnableURLSwitchForWhale = false
+
+    // MARK: - Terminal Rules
+
+    @CodableUserDefault(Preferences.Key.terminalRules)
+    var terminalRules = [TerminalRule]()
+
+    /// Bundle identifiers of the terminals Terminal Rules apply to.
+    @UserDefault(Preferences.Key.enabledTerminals)
+    var enabledTerminals = [String]()
 
     // MARK: - Appearance
 

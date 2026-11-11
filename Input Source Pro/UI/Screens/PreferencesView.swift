@@ -125,6 +125,9 @@ extension NavigationVM.Nav {
         case .browserRules:
             return "safari"
 
+        case .terminalRules:
+            return "terminal"
+
         case .position:
             return "arrow.up.and.down.and.arrow.left.and.right"
 
@@ -162,6 +165,9 @@ extension NavigationVM.Nav {
 
         case .browserRules:
             BrowserRulesSettingsView()
+
+        case .terminalRules:
+            TerminalRulesSettingsView()
 
         case .position:
             PositionSettingsView()

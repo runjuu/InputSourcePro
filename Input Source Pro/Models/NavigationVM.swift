@@ -9,6 +9,7 @@ class NavigationVM: ObservableObject {
 
         case appRules = "App Rules"
         case browserRules = "Browser Rules"
+        case terminalRules = "Terminal Rules"
 
         case position = "Position"
         case appearance = "Appearance"
@@ -21,7 +22,7 @@ class NavigationVM: ObservableObject {
         static var grouped: [(id: String, title: String, nav: [Nav])] {
             [
                 ("general", "", [.general]),
-                ("rule", "Rules", [.appRules, .browserRules]),
+                ("rule", "Rules", [.appRules, .browserRules, .terminalRules]),
                 ("theme", "Indicator", [.position, .appearance]),
                 ("keyboard", "Keyboard", [.inputSourcesColorScheme, .keyboardShortcut]),
                 ("others", "Others", [.troubleshooting]),

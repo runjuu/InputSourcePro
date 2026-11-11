@@ -79,7 +79,9 @@ extension IndicatorWindowController {
         let needActivateAtFirstTime = event.shouldActivateInitially(
             onAppSwitch: preferencesVM.preferences.isActiveWhenSwitchApp,
             onInputFocus: preferencesVM.preferences.isActiveWhenFocusedElementChangesEnabled,
-            isInputFocused: UIElement.isInputContainer(app.focuedUIElement(application: application))
+            // A terminal with Terminal Rules on is always typing into its focused pane.
+            isInputFocused: Terminal(app).map(preferencesVM.isTerminalEnabled) == true
+                || UIElement.isInputContainer(app.focuedUIElement(application: application))
         )
 
         IndicatorDiagnostics.record("focus.watch pid=\(app.processIdentifier) activateInitially=\(needActivateAtFirstTime)")
@@ -94,6 +96,8 @@ extension IndicatorWindowController {
             .filter { UIElement.isInputContainer($0) }
             .handleEvents(receiveOutput: { _ in IndicatorDiagnostics.record("focus.inputChanged pid=\(app.processIdentifier)") })
             .mapToVoid()
+            // Another terminal pane taking focus counts as another field.
+            .merge(with: applicationVM.terminalPaneFocusChanges.filter { $0 == Terminal(app) }.mapToVoid())
             .eraseToAnyPublisher()
 
         return Self.focusTriggeredIndicatorPublisher(

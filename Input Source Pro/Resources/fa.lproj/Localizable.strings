@@ -21,6 +21,7 @@
 "Rules" = "قوانین";
 "App Rules" = "قوانین برنامه";
 "Browser Rules" = "قوانین مرورگر";
+"Terminal Rules" = "قوانین ترمینال";
 "Hot Keys" = "کلیدهای میان‌بر";
 "Others" = "سایر موارد";
 "About" = "درباره";
@@ -154,6 +155,7 @@
 "Sample URL" = "نمونهٔ URL";
 "Rule Type" = "نوع قانون";
 "Domain" = "دامنه";
+"Program Name" = "نام برنامه";
 "Restore Strategy" = "راهبرد بازیابی";
 "Keyboard" = "صفحه‌کلید";
 "Cancel" = "لغو";

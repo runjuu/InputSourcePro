@@ -21,6 +21,7 @@
 "Rules" = "Rules";
 "App Rules" = "App Rules";
 "Browser Rules" = "Browser Rules";
+"Terminal Rules" = "Terminal Rules";
 "Hot Keys" = "Hot Keys";
 "Others" = "Others";
 "About" = "About";
@@ -154,6 +155,7 @@
 "Sample URL" = "Sample URL";
 "Rule Type" = "Rule Type";
 "Domain" = "Domain";
+"Program Name" = "Program Name";
 "Restore Strategy" = "Restore Strategy";
 "Keyboard" = "Keyboard";
 "Cancel" = "Cancel";

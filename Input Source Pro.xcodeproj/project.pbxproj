@@ -76,10 +76,15 @@
 		4A35D55A2819834600DDC108 /* NSRunningApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A35D5592819834600DDC108 /* NSRunningApplication.swift */; };
 		4A39D1CB281F7E650050F115 /* PermissionsVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A39D1CA281F7E650050F115 /* PermissionsVM.swift */; };
 		4A4167282813A61F00CCC28C /* BrowserRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4167272813A61F00CCC28C /* BrowserRule.swift */; };
+		4454143922CD16866B9ED380 /* TerminalRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52759A3045B369DFB82D8AB8 /* TerminalRule.swift */; };
 		4A41672A2813A6CB00CCC28C /* BrowserRulesSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4167292813A6CB00CCC28C /* BrowserRulesSettingsView.swift */; };
+		4CA883C6D2F94B575DA2BDEF /* TerminalRulesSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D81AFA3544D4FEB7A8CA6DE1 /* TerminalRulesSettingsView.swift */; };
 		4A41672C2813ADF200CCC28C /* BrowserRuleRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A41672B2813ADF200CCC28C /* BrowserRuleRow.swift */; };
+		627334DAF0FE8E1EEF7958BD /* TerminalRuleRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19A1F1944DCBD93C2CB77703 /* TerminalRuleRow.swift */; };
 		4A41672E2813BBC000CCC28C /* BrowserRuleEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A41672D2813BBC000CCC28C /* BrowserRuleEditView.swift */; };
+		E62F02B8B50340B7D68AB655 /* TerminalRuleEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331D3BCA88CE5D451C42C43C /* TerminalRuleEditView.swift */; };
 		4A4167302813CAE600CCC28C /* PreferencesVM+BrowserRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A41672F2813CAE600CCC28C /* PreferencesVM+BrowserRule.swift */; };
+		3EC6560A53A9F39FCFB20C73 /* PreferencesVM+TerminalRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0BC39B1793AAD09C957CCF0 /* PreferencesVM+TerminalRule.swift */; };
 		4A4167322813D9FA00CCC28C /* NSRegularExpression.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4167312813D9FA00CCC28C /* NSRegularExpression.swift */; };
 		4A4167342814086E00CCC28C /* IndicatorPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4167332814086E00CCC28C /* IndicatorPosition.swift */; };
 		4A4E035C2DB97534008E5C2F /* PromotionBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4E035B2DB97534008E5C2F /* PromotionBadge.swift */; };
@@ -153,6 +158,9 @@
 		D579258C2A1AB0A4003B83EA /* NSRunningApplication+WindowInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = D579258B2A1AB0A4003B83EA /* NSRunningApplication+WindowInfo.swift */; };
 		D57925902A1AB1DA003B83EA /* NSRunningApplication+FloatingApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D579258F2A1AB1DA003B83EA /* NSRunningApplication+FloatingApp.swift */; };
 		D57925922A1ACA0B003B83EA /* AppKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57925912A1ACA0B003B83EA /* AppKind.swift */; };
+		54D9D403E3A421FFE427F8C8 /* TerminalProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CFDABF3459DF656586E55FF /* TerminalProbe.swift */; };
+		AC1000010000000000000001 /* TerminalWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC1000020000000000000002 /* TerminalWatcher.swift */; };
+		F58F25E12BBB1E9EAAB3CC23 /* Terminal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D1EEFEEB99D21AF61ABDECC /* Terminal.swift */; };
 		D58168CA28943A5400E84058 /* Indicator-Near-Cursor-Demo-Dark.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = D58168C828943A5300E84058 /* Indicator-Near-Cursor-Demo-Dark.mp4 */; };
 		D58168CB28943A5400E84058 /* Indicator-Near-Cursor-Demo-Light.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = D58168C928943A5300E84058 /* Indicator-Near-Cursor-Demo-Light.mp4 */; };
 		D58168CE2894408200E84058 /* Always-On-Indicator-Demo-Dark.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = D58168CC2894408200E84058 /* Always-On-Indicator-Demo-Dark.mp4 */; };
@@ -187,6 +195,8 @@
 		B85000000000000000000004 /* PrivateInputSourceSelectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B85000000000000000000003 /* PrivateInputSourceSelectorTests.swift */; };
 		D60000622F20000000000062 /* AppURLAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000612F20000000000061 /* AppURLAction.swift */; };
 		D60000722F20000000000072 /* AppURLActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000712F20000000000071 /* AppURLActionTests.swift */; };
+		B2B47B303FC2E0E3F112FE83 /* TerminalRuleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72E7D43758A68D8E4428ADFB /* TerminalRuleTests.swift */; };
+		AC10000D000000000000000D /* ApplicationVMTerminalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC10000E000000000000000E /* ApplicationVMTerminalTests.swift */; };
 		D60000822F20000000000082 /* AppLaunchBehaviorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000812F20000000000081 /* AppLaunchBehaviorTests.swift */; };
 		D60001022F20000000000102 /* AppKindComparisonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60001012F20000000000101 /* AppKindComparisonTests.swift */; };
 		D60001922F20000000000192 /* ActivateEventInputSourceChangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60001912F20000000000191 /* ActivateEventInputSourceChangeTests.swift */; };
@@ -204,6 +214,7 @@
 		D70000032F20000000000003 /* CaretPaletteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70000042F20000000000004 /* CaretPaletteTests.swift */; };
 		DA1000010000000000000001 /* CaretFocusObserverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1000020000000000000002 /* CaretFocusObserverTests.swift */; };
 		DA1000030000000000000003 /* AXWatchRetryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1000040000000000000004 /* AXWatchRetryTests.swift */; };
+		AC1000030000000000000003 /* TerminalWatcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC1000040000000000000004 /* TerminalWatcherTests.swift */; };
 		D70000052F20000000000005 /* CaretPollingSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70000062F20000000000006 /* CaretPollingSchedule.swift */; };
 		D70000072F20000000000007 /* CaretGeometryFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70000082F20000000000008 /* CaretGeometryFilter.swift */; };
 		D71000012F20000000000001 /* CaretHelperManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71000022F20000000000001 /* CaretHelperManager.swift */; };
@@ -310,10 +321,15 @@
 		4A35D5592819834600DDC108 /* NSRunningApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NSRunningApplication.swift; sourceTree = "<group>"; };
 		4A39D1CA281F7E650050F115 /* PermissionsVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsVM.swift; sourceTree = "<group>"; };
 		4A4167272813A61F00CCC28C /* BrowserRule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserRule.swift; sourceTree = "<group>"; };
+		52759A3045B369DFB82D8AB8 /* TerminalRule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalRule.swift; sourceTree = "<group>"; };
 		4A4167292813A6CB00CCC28C /* BrowserRulesSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserRulesSettingsView.swift; sourceTree = "<group>"; };
+		D81AFA3544D4FEB7A8CA6DE1 /* TerminalRulesSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalRulesSettingsView.swift; sourceTree = "<group>"; };
 		4A41672B2813ADF200CCC28C /* BrowserRuleRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserRuleRow.swift; sourceTree = "<group>"; };
+		19A1F1944DCBD93C2CB77703 /* TerminalRuleRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalRuleRow.swift; sourceTree = "<group>"; };
 		4A41672D2813BBC000CCC28C /* BrowserRuleEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserRuleEditView.swift; sourceTree = "<group>"; };
+		331D3BCA88CE5D451C42C43C /* TerminalRuleEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalRuleEditView.swift; sourceTree = "<group>"; };
 		4A41672F2813CAE600CCC28C /* PreferencesVM+BrowserRule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesVM+BrowserRule.swift"; sourceTree = "<group>"; };
+		D0BC39B1793AAD09C957CCF0 /* PreferencesVM+TerminalRule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesVM+TerminalRule.swift"; sourceTree = "<group>"; };
 		4A4167312813D9FA00CCC28C /* NSRegularExpression.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NSRegularExpression.swift; sourceTree = "<group>"; };
 		4A4167332814086E00CCC28C /* IndicatorPosition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndicatorPosition.swift; sourceTree = "<group>"; };
 		4A4E035B2DB97534008E5C2F /* PromotionBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromotionBadge.swift; sourceTree = "<group>"; };
@@ -382,6 +398,9 @@
 		D579258B2A1AB0A4003B83EA /* NSRunningApplication+WindowInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSRunningApplication+WindowInfo.swift"; sourceTree = "<group>"; };
 		D579258F2A1AB1DA003B83EA /* NSRunningApplication+FloatingApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSRunningApplication+FloatingApp.swift"; sourceTree = "<group>"; };
 		D57925912A1ACA0B003B83EA /* AppKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKind.swift; sourceTree = "<group>"; };
+		5CFDABF3459DF656586E55FF /* TerminalProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalProbe.swift; sourceTree = "<group>"; };
+		AC1000020000000000000002 /* TerminalWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalWatcher.swift; sourceTree = "<group>"; };
+		7D1EEFEEB99D21AF61ABDECC /* Terminal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Terminal.swift; sourceTree = "<group>"; };
 		D58168C828943A5300E84058 /* Indicator-Near-Cursor-Demo-Dark.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Indicator-Near-Cursor-Demo-Dark.mp4"; sourceTree = "<group>"; };
 		D58168C928943A5300E84058 /* Indicator-Near-Cursor-Demo-Light.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Indicator-Near-Cursor-Demo-Light.mp4"; sourceTree = "<group>"; };
 		D58168CC2894408200E84058 /* Always-On-Indicator-Demo-Dark.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Always-On-Indicator-Demo-Dark.mp4"; sourceTree = "<group>"; };
@@ -419,6 +438,8 @@
 		B85000000000000000000003 /* PrivateInputSourceSelectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateInputSourceSelectorTests.swift; sourceTree = "<group>"; };
 		D60000612F20000000000061 /* AppURLAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppURLAction.swift; sourceTree = "<group>"; };
 		D60000712F20000000000071 /* AppURLActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppURLActionTests.swift; sourceTree = "<group>"; };
+		72E7D43758A68D8E4428ADFB /* TerminalRuleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalRuleTests.swift; sourceTree = "<group>"; };
+		AC10000E000000000000000E /* ApplicationVMTerminalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationVMTerminalTests.swift; sourceTree = "<group>"; };
 		D60000812F20000000000081 /* AppLaunchBehaviorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLaunchBehaviorTests.swift; sourceTree = "<group>"; };
 		D60001012F20000000000101 /* AppKindComparisonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKindComparisonTests.swift; sourceTree = "<group>"; };
 		D60001912F20000000000191 /* ActivateEventInputSourceChangeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivateEventInputSourceChangeTests.swift; sourceTree = "<group>"; };
@@ -436,6 +457,7 @@
 		D70000042F20000000000004 /* CaretPaletteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaretPaletteTests.swift; sourceTree = "<group>"; };
 		DA1000020000000000000002 /* CaretFocusObserverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaretFocusObserverTests.swift; sourceTree = "<group>"; };
 		DA1000040000000000000004 /* AXWatchRetryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXWatchRetryTests.swift; sourceTree = "<group>"; };
+		AC1000040000000000000004 /* TerminalWatcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalWatcherTests.swift; sourceTree = "<group>"; };
 		D70000062F20000000000006 /* CaretPollingSchedule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CaretPollingSchedule.swift; path = Tools/CaretPalette/CaretPollingSchedule.swift; sourceTree = SOURCE_ROOT; };
 		D70000082F20000000000008 /* CaretGeometryFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CaretGeometryFilter.swift; path = Tools/CaretPalette/CaretGeometryFilter.swift; sourceTree = SOURCE_ROOT; };
 		D71000022F20000000000001 /* CaretHelperManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaretHelperManager.swift; sourceTree = "<group>"; };
@@ -537,6 +559,7 @@
 			children = (
 				4A2A174C280BA7FA00E13249 /* AppRule.swift */,
 				4A4167272813A61F00CCC28C /* BrowserRule.swift */,
+				52759A3045B369DFB82D8AB8 /* TerminalRule.swift */,
 				4A881A90288BC50B00B76498 /* KeyboardConfig.swift */,
 				4A2A174D280BA7FA00E13249 /* Main.xcdatamodeld */,
 				4ACC9B822D2641C30002B8CE /* HotKeyGroup.swift */,
@@ -573,6 +596,9 @@
 				D598C7E728B79E22004747D1 /* Log */,
 				4AC5738428411B33000BF10B /* AppKeyboardCache.swift */,
 				D57925912A1ACA0B003B83EA /* AppKind.swift */,
+				5CFDABF3459DF656586E55FF /* TerminalProbe.swift */,
+				7D1EEFEEB99D21AF61ABDECC /* Terminal.swift */,
+				AC1000020000000000000002 /* TerminalWatcher.swift */,
 				4A0930882867E91100232089 /* AppsDiff.swift */,
 				4A2A1761280BA7FA00E13249 /* UserDefault.swift */,
 				4A2A1763280BA7FA00E13249 /* CancelBag.swift */,
@@ -622,6 +648,7 @@
 				4A093072285E166E00232089 /* PreferencesVM+AppKeyboardCache.swift */,
 				D5DEFF6F28A3A47D005B2B15 /* PreferencesVM+BrowserAddress.swift */,
 				4A41672F2813CAE600CCC28C /* PreferencesVM+BrowserRule.swift */,
+				D0BC39B1793AAD09C957CCF0 /* PreferencesVM+TerminalRule.swift */,
 				4A881A92288BC55E00B76498 /* PreferencesVM+KeyboardConfig.swift */,
 				4A0C1CD0284B249D00833A16 /* PreferencesVM+IndicatorPosition.swift */,
 				4AD6B06A2D2653C000B829CC /* PreferencesVM+HotKeyGroup.swift */,
@@ -658,6 +685,7 @@
 				D5CC44972A340409007FF839 /* InputSourcesAppearanceSettingsView.swift */,
 				4A2A1777280BA7FA00E13249 /* RulesSettingsView.swift */,
 				4A4167292813A6CB00CCC28C /* BrowserRulesSettingsView.swift */,
+				D81AFA3544D4FEB7A8CA6DE1 /* TerminalRulesSettingsView.swift */,
 			);
 			path = Screens;
 			sourceTree = "<group>";
@@ -673,7 +701,9 @@
 				D5115A1D2A33D57A00D94E51 /* ItemSection.swift */,
 				4A5EAA6D280C0DE800A9E332 /* PopUpButtonPicker.swift */,
 				4A41672B2813ADF200CCC28C /* BrowserRuleRow.swift */,
+				19A1F1944DCBD93C2CB77703 /* TerminalRuleRow.swift */,
 				4A41672D2813BBC000CCC28C /* BrowserRuleEditView.swift */,
+				331D3BCA88CE5D451C42C43C /* TerminalRuleEditView.swift */,
 				4AB1B191281F971B0081D94C /* AccessibilityPermissionRequestView.swift */,
 				4AB1B193281FDB1A0081D94C /* BrowserPermissionRequestView.swift */,
 				4A0C1CC4284A121B00833A16 /* IndicatorPositionEditor.swift */,
@@ -845,6 +875,8 @@
 				D60000022F20000000000002 /* TestHarnessTests.swift */,
 				D60003232F20000000000323 /* ShortcutTriggerManagerTests.swift */,
 				D60000712F20000000000071 /* AppURLActionTests.swift */,
+				72E7D43758A68D8E4428ADFB /* TerminalRuleTests.swift */,
+				AC10000E000000000000000E /* ApplicationVMTerminalTests.swift */,
 				D60000812F20000000000081 /* AppLaunchBehaviorTests.swift */,
 				D60001912F20000000000191 /* ActivateEventInputSourceChangeTests.swift */,
 				D60003112F20000000000311 /* ScreenLockStateTests.swift */,
@@ -854,6 +886,7 @@
 				D70000042F20000000000004 /* CaretPaletteTests.swift */,
 				DA1000020000000000000002 /* CaretFocusObserverTests.swift */,
 				DA1000040000000000000004 /* AXWatchRetryTests.swift */,
+				AC1000040000000000000004 /* TerminalWatcherTests.swift */,
 				D71000082F20000000000001 /* CaretHelperSetupTests.swift */,
 				D73000042F20000000000001 /* CaretChannelTests.swift */,
 				D71000062F20000000000001 /* Tools/CaretPalette/CaretHelperFiles.swift */,
@@ -1064,6 +1097,7 @@
 				4A2A178C280BA7FA00E13249 /* CancelBag.swift in Sources */,
 				4A881A9A2F14C62000B76498 /* SettingsBackup.swift in Sources */,
 				4A4167302813CAE600CCC28C /* PreferencesVM+BrowserRule.swift in Sources */,
+				3EC6560A53A9F39FCFB20C73 /* PreferencesVM+TerminalRule.swift in Sources */,
 				4A09308B28680A3200232089 /* NSViewHoverable.swift in Sources */,
 				D5115A1C2A33D0F700D94E51 /* IndicatorInfo.swift in Sources */,
 				4A9B8A1D2881AE94007D23BB /* ButtonStyle.swift in Sources */,
@@ -1087,6 +1121,7 @@
 				4AD6B06B2D2653C000B829CC /* PreferencesVM+HotKeyGroup.swift in Sources */,
 				B7F201B136534D7A8A40F340 /* PreferencesVM+ShortcutTrigger.swift in Sources */,
 				4A41672E2813BBC000CCC28C /* BrowserRuleEditView.swift in Sources */,
+				E62F02B8B50340B7D68AB655 /* TerminalRuleEditView.swift in Sources */,
 				D5CC44982A340409007FF839 /* InputSourcesAppearanceSettingsView.swift in Sources */,
 				D5FC8F552A4134B5002AE1F2 /* IndicatorSize.swift in Sources */,
 				4A9B8A202883CCA3007D23BB /* AlignedWidth.swift in Sources */,
@@ -1106,6 +1141,7 @@
 				D51626002A2077FC00BB8735 /* Element.swift in Sources */,
 				4A7C9AFA283399E700BD245E /* Data+MD5.swift in Sources */,
 				4A41672C2813ADF200CCC28C /* BrowserRuleRow.swift in Sources */,
+				627334DAF0FE8E1EEF7958BD /* TerminalRuleRow.swift in Sources */,
 				4AC26157287AA11D0032AAFE /* IndicatorWindowController+Activation.swift in Sources */,
 				4A4167342814086E00CCC28C /* IndicatorPosition.swift in Sources */,
 				D60002222F20000000000222 /* SpotlightIndicatorPosition.swift in Sources */,
@@ -1165,12 +1201,16 @@
 				4A881A98288CDDD500B76498 /* MainStorage.swift in Sources */,
 				4A09307D285F32B100232089 /* PreferencesWindowController+NSToolbar.swift in Sources */,
 				D57925922A1ACA0B003B83EA /* AppKind.swift in Sources */,
+				54D9D403E3A421FFE427F8C8 /* TerminalProbe.swift in Sources */,
+				F58F25E12BBB1E9EAAB3CC23 /* Terminal.swift in Sources */,
+				AC1000010000000000000001 /* TerminalWatcher.swift in Sources */,
 				4A4E035C2DB97534008E5C2F /* PromotionBadge.swift in Sources */,
 				4A09307B285F31E800232089 /* NSToolbarItem+Identifier.swift in Sources */,
 				4A2A1788280BA7FA00E13249 /* NSImage+Extension.swift in Sources */,
 				4A20AD65289283C600620D14 /* LoopingPlayerNSView.swift in Sources */,
 				D57334262A84B40B00C8438F /* IconMap.swift in Sources */,
 				4A41672A2813A6CB00CCC28C /* BrowserRulesSettingsView.swift in Sources */,
+				4CA883C6D2F94B575DA2BDEF /* TerminalRulesSettingsView.swift in Sources */,
 				4A0930952868780600232089 /* ApplicationVM+AXNotification.swift in Sources */,
 				4A0930892867E91100232089 /* AppsDiff.swift in Sources */,
 				4AC450BF281D841300DA0329 /* PreferenceSection.swift in Sources */,
@@ -1184,6 +1224,7 @@
 				4A8E49912F0AF69300424D11 /* FKeyManager.swift in Sources */,
 				D525609929B56843009EB7BA /* ISPTextEditor.swift in Sources */,
 				4A4167282813A61F00CCC28C /* BrowserRule.swift in Sources */,
+				4454143922CD16866B9ED380 /* TerminalRule.swift in Sources */,
 				4A2A1799280BA7FA00E13249 /* IndicatorVM.swift in Sources */,
 				D56A7CFC28A4D5C0002F356A /* AXSwift+Browser.swift in Sources */,
 				D58C184428A6ABBC00F52845 /* NSRunningApplication+FocusedElement.swift in Sources */,
@@ -1219,6 +1260,8 @@
 				D60000032F20000000000003 /* TestHarnessTests.swift in Sources */,
 				D60003242F20000000000324 /* ShortcutTriggerManagerTests.swift in Sources */,
 				D60000722F20000000000072 /* AppURLActionTests.swift in Sources */,
+				B2B47B303FC2E0E3F112FE83 /* TerminalRuleTests.swift in Sources */,
+				AC10000D000000000000000D /* ApplicationVMTerminalTests.swift in Sources */,
 				D60000822F20000000000082 /* AppLaunchBehaviorTests.swift in Sources */,
 				D60001922F20000000000192 /* ActivateEventInputSourceChangeTests.swift in Sources */,
 				D60003122F20000000000312 /* ScreenLockStateTests.swift in Sources */,
@@ -1228,6 +1271,7 @@
 				D70000032F20000000000003 /* CaretPaletteTests.swift in Sources */,
 				DA1000010000000000000001 /* CaretFocusObserverTests.swift in Sources */,
 				DA1000030000000000000003 /* AXWatchRetryTests.swift in Sources */,
+				AC1000030000000000000003 /* TerminalWatcherTests.swift in Sources */,
 				D71000072F20000000000001 /* CaretHelperSetupTests.swift in Sources */,
 				D73000032F20000000000001 /* CaretChannelTests.swift in Sources */,
 				D71000052F20000000000001 /* Tools/CaretPalette/CaretHelperFiles.swift in Sources */,

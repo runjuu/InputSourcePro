@@ -21,6 +21,7 @@
 "Rules" = "规则";
 "App Rules" = "应用规则";
 "Browser Rules" = "浏览器规则";
+"Terminal Rules" = "终端规则";
 "Hot Keys" = "快捷键";
 "Others" = "其他";
 "About" = "关于";
@@ -156,6 +157,7 @@
 "Sample URL" = "测试链接";
 "Rule Type" = "类型";
 "Domain" = "域名";
+"Program Name" = "程序名";
 "Restore Strategy" = "恢复策略";
 "Keyboard" = "输入法";
 "Cancel" = "取消";

@@ -21,6 +21,7 @@
 "Rules" = "規則";
 "App Rules" = "應用程式規則";
 "Browser Rules" = "瀏覽器規則";
+"Terminal Rules" = "終端機規則";
 "Hot Keys" = "快速鍵";
 "Others" = "其他";
 "About" = "關於";
@@ -156,6 +157,7 @@
 "Sample URL" = "測試連結";
 "Rule Type" = "類型";
 "Domain" = "網域";
+"Program Name" = "程式名稱";
 "Restore Strategy" = "復原模式";
 "Keyboard" = "輸入法";
 "Cancel" = "取消";
