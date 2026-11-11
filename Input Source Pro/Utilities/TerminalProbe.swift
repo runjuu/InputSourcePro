@@ -22,8 +22,12 @@ enum TerminalProbe {
     private static func focusedTTY(of terminal: Terminal) -> String? {
         switch terminal {
         case .ghostty:
-            // tty of focused terminal of selected tab of front window
-            return askTTY(terminal, property("Gtty", of: property("GTfT", of: property("GWsT", of: property("GFWn")))))
+            // The quick terminal belongs to no window, so `front window` names the window behind it.
+            guard terminal.isPanelFocused else {
+                // tty of focused terminal of selected tab of front window
+                return askTTY(terminal, property("Gtty", of: property("GTfT", of: property("GWsT", of: property("GFWn")))))
+            }
+            return ghosttyPanelTTY()
         case .iterm:
             // tty of current session of current tab of current window
             return askTTY(terminal, property("Stty", of: property("Wcsn", of: property("Crtb", of: property("Crwn")))))
@@ -43,6 +47,21 @@ enum TerminalProbe {
     private static func askTTY(_ terminal: Terminal, _ specifier: NSAppleEventDescriptor) -> String? {
         guard let tty = ask(terminal, specifier)?.stringValue, tty.hasPrefix("/dev/") else { return nil }
         return tty
+    }
+
+    /// The quick terminal's tty: Ghostty's one terminal outside every window.
+    private static func ghosttyPanelTTY() -> String? {
+        let ttys = { (terminals: NSAppleEventDescriptor) in ask(.ghostty, property("Gtty", of: terminals)).map(strings) }
+        guard let all = ttys(every("Gtrm")), let inWindows = ttys(every("Gtrm", of: every("Gwnd"))) else { return nil }
+        return panelTTY(all: all, inWindows: inWindows)
+    }
+
+    /// The only tty in `all` that no window holds; nil when there is none, or
+    /// several (a split quick terminal), since which one has focus is unknown.
+    static func panelTTY(all: [String], inWindows: [String]) -> String? {
+        let outside = all.filter { !inWindows.contains($0) }
+        guard outside.count == 1, outside[0].hasPrefix("/dev/") else { return nil }
+        return outside[0]
     }
 
     /// `specifier`'s value, asked of the running `terminal` (never launched)
@@ -87,6 +106,13 @@ enum TerminalProbe {
         specifier(want: fourCharCode(code), form: DescType(formAbsolutePosition), data: NSAppleEventDescriptor(int32: index), from: .null())
     }
 
+    /// Every element of class `code` of `container`, the app by default.
+    private static func every(_ code: String, of container: NSAppleEventDescriptor = .null()) -> NSAppleEventDescriptor {
+        var all = OSType(kAEAll)
+        let data = NSAppleEventDescriptor(descriptorType: DescType(typeAbsoluteOrdinal), bytes: &all, length: MemoryLayout<OSType>.size)!
+        return specifier(want: fourCharCode(code), form: DescType(formAbsolutePosition), data: data, from: container)
+    }
+
     private static func specifier(want: DescType, form: DescType, data: NSAppleEventDescriptor, from container: NSAppleEventDescriptor) -> NSAppleEventDescriptor {
         let specifier = NSAppleEventDescriptor.record().coerce(toDescriptorType: DescType(typeObjectSpecifier))!
         specifier.setDescriptor(NSAppleEventDescriptor(typeCode: want), forKeyword: AEKeyword(keyAEDesiredClass))
@@ -98,6 +124,12 @@ enum TerminalProbe {
 
     private static func fourCharCode(_ code: String) -> FourCharCode {
         code.utf8.reduce(0) { $0 << 8 | FourCharCode($1) }
+    }
+
+    /// The strings in `descriptor`, nested lists flattened (one list per window).
+    private static func strings(_ descriptor: NSAppleEventDescriptor) -> [String] {
+        guard descriptor.descriptorType == DescType(typeAEList) else { return descriptor.stringValue.map { [$0] } ?? [] }
+        return (0 ..< descriptor.numberOfItems).flatMap { descriptor.atIndex($0 + 1).map(strings) ?? [] }
     }
 
     // MARK: - WezTerm

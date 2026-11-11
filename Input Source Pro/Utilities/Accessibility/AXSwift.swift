@@ -12,6 +12,12 @@ struct CursorRectInfo {
         CGPoint(x: kind == .caret ? rect.midX : rect.minX, y: rect.maxY + 6)
     }
 
+    /// `indicatorPoint`, or nil when it is on no screen: a window still sliding in
+    /// (Ghostty's quick terminal) reports a frame that is mostly off screen.
+    func indicatorPoint(on screens: [CGRect]) -> CGPoint? {
+        screens.contains { $0.contains(indicatorPoint) } ? indicatorPoint : nil
+    }
+
     static func insertionPoint(rect: CGRect, zeroWidthCaretWidth: CGFloat? = nil) -> CursorRectInfo? {
         guard [rect.origin.x, rect.origin.y, rect.width, rect.height].allSatisfy(\.isFinite),
               rect.width >= 0, rect.width <= 10, rect.height > 0, rect.height <= 200

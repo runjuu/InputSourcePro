@@ -53,6 +53,10 @@ final class PreferencesVM: ObservableObject {
     /// The latest program seen in each terminal's focused pane, kept for runtime only.
     var terminalPrograms: [Terminal: TerminalProgram] = [:]
 
+    /// The terminal whose floating panel has focus (`TerminalPanelFocus`); it
+    /// stands in for the frontmost app.
+    var terminalPanel: NSRunningApplication?
+
     let runtimeRuleChangeNotifier = RuntimeRuleChangeNotifier()
 
     var runtimeRuleChanges: AnyPublisher<Void, Never> {
@@ -762,8 +766,10 @@ extension PreferencesVM {
 
         let strategy = preferences.cJKVFixStrategy
 
+        // The window's activation would take key focus from a panel, and a
+        // terminal's panel hides on losing it.
         if strategy == .temporaryInputWindow,
-           NSApplication.isFloatingApp(app?.bundleIdentifier)
+           NSApplication.isFloatingApp(app?.bundleIdentifier) || (app != nil && app == terminalPanel)
         {
             return nil
         }

@@ -60,8 +60,12 @@ final class ApplicationVMTerminalTests: XCTestCase {
         let environment = ApplicationVM.Environment(
             frontmostApplication: { ghostty },
             focusedApplication: { nil },
+            runningApplications: Just([ghostty]).eraseToAnyPublisher(),
             isTerminalEnabled: { terminal in state.lock.withLock { terminal == .ghostty && state.isEnabled } },
-            probedProgram: { _ in state.lock.withLock { state.reading } }
+            probedProgram: { _ in state.lock.withLock { state.reading } },
+            terminalPanelFocus: TerminalPanelFocus.Environment(
+                read: { _, _ in AnyCancellable {} }
+            )
         )
         let preferencesVM = try Self.inMemoryPreferencesVM()
         let applicationVM = ApplicationVM(preferencesVM: preferencesVM, environment: environment)
@@ -87,12 +91,12 @@ final class ApplicationVMTerminalTests: XCTestCase {
                 }
                 preferencesVM.runtimeRuleChangeNotifier.notify()
             }
-            waitUntil("\(key ?? "shell") in \(pane ?? "no pane") is read") {
+            Self.waitUntil("\(key ?? "shell") in \(pane ?? "no pane") is read") {
                 preferencesVM.terminalPrograms[.ghostty] == program
             }
         }
 
-        waitUntil("the first probe reads pane A") { preferencesVM.terminalPrograms[.ghostty]?.pane == "A" }
+        Self.waitUntil("the first probe reads pane A") { preferencesVM.terminalPrograms[.ghostty]?.pane == "A" }
         XCTAssertEqual(shows, 1)
 
         read("vim", pane: "A")
@@ -106,7 +110,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
         XCTAssertEqual(shows, 2, "A read without a pane neither shows nor forgets the pane")
     }
 
-    private func waitUntil(_ what: String, timeout: TimeInterval = 5, _ condition: () -> Bool, file: StaticString = #filePath, line: UInt = #line) {
+    static func waitUntil(_ what: String, timeout: TimeInterval = 5, _ condition: () -> Bool, file: StaticString = #filePath, line: UInt = #line) {
         let deadline = Date().addingTimeInterval(timeout)
         while !condition() {
             guard Date() < deadline else { return XCTFail("Timed out: \(what)", file: file, line: line) }
@@ -114,7 +118,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
         }
     }
 
-    private static func inMemoryPreferencesVM() throws -> PreferencesVM {
+    static func inMemoryPreferencesVM() throws -> PreferencesVM {
         let container = NSPersistentContainer(name: "Main", managedObjectModel: PreferencesVM.managedObjectModel)
         let description = NSPersistentStoreDescription()
         description.type = NSInMemoryStoreType
@@ -129,7 +133,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
     }
 
     /// An app that isn't running: AX on its pid answers nothing.
-    private final class FakeApp: NSRunningApplication, @unchecked Sendable {
+    final class FakeApp: NSRunningApplication, @unchecked Sendable {
         private let fakeBundleIdentifier: String
         private let pid: pid_t
 

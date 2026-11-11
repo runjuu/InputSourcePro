@@ -27,6 +27,12 @@ final class ApplicationVM: ObservableObject {
         Timer.delay(seconds: ApplicationVM.terminalShellConfirmationDelay).mapToVoid().eraseToAnyPublisher()
     }
     private lazy var terminalWatcher = TerminalWatcher { [weak self] in self?.requestTerminalRefresh() }
+    private lazy var terminalPanelFocus = TerminalPanelFocus(environment: environment.terminalPanelFocus) { [weak self] in
+        self?.receiveTerminalPanel($0)
+    }
+    private let terminalPanelChanges = PassthroughSubject<Void, Never>()
+    /// Fallbacks for a panel that hides without a notification, while one has focus.
+    private var terminalPanelRecheck: AnyCancellable?
 
     lazy var windowAXNotificationPublisher = ApplicationVM
         .createWindowAXNotificationPublisher(preferencesVM: preferencesVM)
@@ -36,9 +42,11 @@ final class ApplicationVM: ObservableObject {
         var frontmostApplication: () -> NSRunningApplication?
         /// The system-wide focused app when enhanced mode is on, else nil.
         var focusedApplication: () -> NSRunningApplication?
+        var runningApplications: AnyPublisher<[NSRunningApplication], Never>
         var isTerminalEnabled: (Terminal) -> Bool
         /// Asks a terminal for its focused pane; runs off the main thread.
         var probedProgram: (Terminal) -> TerminalReading
+        var terminalPanelFocus: TerminalPanelFocus.Environment
 
         @MainActor static func live(_ preferencesVM: PreferencesVM) -> Self {
             Self(
@@ -50,13 +58,17 @@ final class ApplicationVM: ObservableObject {
                     else { return nil }
                     return NSRunningApplication(processIdentifier: pid)
                 },
+                runningApplications: NSWorkspace.shared.publisher(for: \.runningApplications).eraseToAnyPublisher(),
                 isTerminalEnabled: preferencesVM.isTerminalEnabled,
-                probedProgram: TerminalProbe.program
+                probedProgram: TerminalProbe.program,
+                terminalPanelFocus: .live
             )
         }
     }
 
     private let environment: Environment
+    /// The running terminals `terminalPanelFocus` watches.
+    private var panelTerminals: [NSRunningApplication] = []
 
     init(preferencesVM: PreferencesVM, environment: Environment? = nil) {
         self.preferencesVM = preferencesVM
@@ -65,6 +77,7 @@ final class ApplicationVM: ObservableObject {
 
         activateAccessibilitiesForCurrentApp()
         watchApplicationChange()
+        watchTerminalPanels()
         watchRuntimeRuleChange()
         watchAppsDiffChange()
     }
@@ -99,6 +112,7 @@ extension ApplicationVM {
                 axNotificationBurst.eraseToAnyPublisher(),
                 didActivateAppNotification.eraseToAnyPublisher(),
                 activeSpaceDidChangeNotification.eraseToAnyPublisher(),
+                terminalPanelChanges.eraseToAnyPublisher(),
                 // A terminal's switch flipped while it is in front starts or stops its watch.
                 preferencesVM.runtimeRuleChanges,
             ])
@@ -107,11 +121,12 @@ extension ApplicationVM {
         Self.frontmostSubscriptions(
             evaluations: evaluations,
             ruledApp: { () -> NSRunningApplication? in
-                // ISP's own window when it is in front, else the focused app.
                 let frontmost = environment.frontmostApplication()
-                let app = frontmost?.processIdentifier == ProcessInfo.processInfo.processIdentifier
-                    ? frontmost
-                    : environment.focusedApplication() ?? frontmost
+                let app = Self.ruledApp(
+                    front: frontmost,
+                    isOwn: frontmost?.processIdentifier == ProcessInfo.processInfo.processIdentifier,
+                    panel: preferencesVM.terminalPanel
+                ) { environment.focusedApplication() ?? frontmost }
                 guard let app, !InputSourceSwitcher.isTemporaryInputWindowApplicationActivation(app) else { return nil }
                 return app
             },
@@ -154,6 +169,13 @@ extension ApplicationVM {
 }
 
 extension ApplicationVM {
+    /// The app rules apply to: ISP's own window when it is in front, else a
+    /// terminal's focused floating panel, else the focused app.
+    static func ruledApp<App>(front: App?, isOwn: Bool, panel: App?, focused: () -> App?) -> App? {
+        if isOwn { return front }
+        return panel ?? focused()
+    }
+
     /// One subscription for the app rules apply to, picked again on each
     /// evaluation. It is rebuilt when the app changes, or when whether Terminal
     /// Rules watch it does (its switch flipped while it is in front).
@@ -180,6 +202,67 @@ extension ApplicationVM {
 }
 
 extension ApplicationVM {
+    /// Watches every running terminal with Terminal Rules on for a floating
+    /// panel taking focus (Ghostty's quick terminal); see `TerminalPanelFocus`.
+    private func watchTerminalPanels() {
+        let environment = environment
+        let enabledTerminals = preferencesVM.runtimeRuleChanges
+            .prepend(())
+            .map { Terminal.allCases.filter(environment.isTerminalEnabled) }
+
+        environment.runningApplications
+            .combineLatest(enabledTerminals) { apps, enabled in
+                apps.filter { Terminal($0).map(enabled.contains) == true }
+            }
+            .removeDuplicates()
+            .flatMapLatest { [weak self] apps -> AnyPublisher<pid_t, Never> in
+                self?.panelTerminals = apps
+                self?.terminalPanelFocus.watch(Set(apps.map(\.processIdentifier)))
+                return Publishers.MergeMany(apps.map { app in
+                    app.watchAX(TerminalPanelFocus.notifications, [.application, .window])
+                        .mapToVoid()
+                        // Once on watch too: ISP may start with the panel up.
+                        .prepend(())
+                        .throttle(for: .milliseconds(100), scheduler: DispatchQueue.main, latest: true)
+                        .map { app.processIdentifier }
+                })
+                .eraseToAnyPublisher()
+            }
+            .sink { [weak self] in self?.terminalPanelFocus.evaluate($0) }
+            .store(in: cancelBag)
+    }
+
+    private func receiveTerminalPanel(_ pid: pid_t?) {
+        let panel = pid.flatMap { pid in panelTerminals.first { $0.processIdentifier == pid } }
+        IndicatorDiagnostics.record("terminal.panel bundle=\((panel ?? preferencesVM.terminalPanel)?.bundleIdentifier ?? "-") focused=\(panel != nil)")
+        // The program last read belongs to the other side of the panel: forget it, and
+        // probe this side next (in order with the reads on the queue).
+        let terminals = [(preferencesVM.terminalPanel, false), (panel, true)].compactMap { app, isFocused in
+            app.flatMap { Terminal($0) }.map { (terminal: $0, isFocused: isFocused) }
+        }
+        for (terminal, isFocused) in terminals {
+            TerminalProcess.queue.async { terminal.setPanelFocused(isFocused) }
+            preferencesVM.terminalPrograms[terminal] = nil
+        }
+        preferencesVM.terminalPanel = panel
+        // Re-evaluates the frontmost app, which the panel now stands in for or hands back to.
+        terminalPanelChanges.send(())
+        // A terminal still picked (its panel gave focus to its window) drops the old program too.
+        terminals.forEach { terminalProgramChanges.send($0.terminal) }
+
+        // While the panel has focus, another app's activation and a slow poll
+        // re-evaluate too, in case it hides without a notification.
+        terminalPanelRecheck = pid.map { pid in
+            NSWorkspace.shared.notificationCenter
+                .publisher(for: NSWorkspace.didActivateApplicationNotification, object: NSWorkspace.shared)
+                .mapToVoid()
+                .merge(with: Timer.interval(seconds: Self.terminalPanelRecheckInterval).mapToVoid())
+                .sink { [weak self] _ in self?.terminalPanelFocus.evaluate(pid) }
+        }
+    }
+
+    static let terminalPanelRecheckInterval: TimeInterval = 0.5
+
     private func requestTerminalRefresh() {
         // The pane may have changed; the helper's resample usually lands before the lookup resolves.
         CaretPalette.shared.markSampleStale()
@@ -239,6 +322,8 @@ extension ApplicationVM {
             .filter { $0.notification != .windowCreated }
             .mapToVoid()
             .throttle(for: .milliseconds(300), scheduler: DispatchQueue.main, latest: true)
+            // The terminal in front can gain or lose its panel without being picked again.
+            .merge(with: terminalPanelChanges)
             .prepend(())
             .map { () -> TerminalLookup in { TerminalProcess.onQueue { probedProgram(terminal) } } }
 
