@@ -118,6 +118,7 @@ enum AXWatchRetry {
 
     static func publisher<Output>(
         pid: pid_t,
+        notReadyDelayCap: TimeInterval = AXWatchRetry.notReadyDelayCap,
         isAlive: @escaping () -> Bool,
         isTrusted: @escaping () -> Bool = { AXIsProcessTrusted() },
         probe: @escaping (pid_t, @escaping (String?) -> Void) -> Void = AXWatchRetry.probe,

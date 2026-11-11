@@ -160,6 +160,7 @@
 		D57925902A1AB1DA003B83EA /* NSRunningApplication+FloatingApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D579258F2A1AB1DA003B83EA /* NSRunningApplication+FloatingApp.swift */; };
 		D57925922A1ACA0B003B83EA /* AppKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57925912A1ACA0B003B83EA /* AppKind.swift */; };
 		54D9D403E3A421FFE427F8C8 /* TerminalProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CFDABF3459DF656586E55FF /* TerminalProbe.swift */; };
+		D5DD82216C37A46B1739400B /* Multiplexer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6612B0C1D9C5EB324D20E57 /* Multiplexer.swift */; };
 		AC1000010000000000000001 /* TerminalWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC1000020000000000000002 /* TerminalWatcher.swift */; };
 		AC1000050000000000000005 /* TerminalPanelFocus.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC1000060000000000000006 /* TerminalPanelFocus.swift */; };
 		F58F25E12BBB1E9EAAB3CC23 /* Terminal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D1EEFEEB99D21AF61ABDECC /* Terminal.swift */; };
@@ -403,6 +404,7 @@
 		D579258F2A1AB1DA003B83EA /* NSRunningApplication+FloatingApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSRunningApplication+FloatingApp.swift"; sourceTree = "<group>"; };
 		D57925912A1ACA0B003B83EA /* AppKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKind.swift; sourceTree = "<group>"; };
 		5CFDABF3459DF656586E55FF /* TerminalProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalProbe.swift; sourceTree = "<group>"; };
+		A6612B0C1D9C5EB324D20E57 /* Multiplexer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Multiplexer.swift; sourceTree = "<group>"; };
 		AC1000020000000000000002 /* TerminalWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalWatcher.swift; sourceTree = "<group>"; };
 		AC1000060000000000000006 /* TerminalPanelFocus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPanelFocus.swift; sourceTree = "<group>"; };
 		7D1EEFEEB99D21AF61ABDECC /* Terminal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Terminal.swift; sourceTree = "<group>"; };
@@ -603,6 +605,7 @@
 				4AC5738428411B33000BF10B /* AppKeyboardCache.swift */,
 				D57925912A1ACA0B003B83EA /* AppKind.swift */,
 				5CFDABF3459DF656586E55FF /* TerminalProbe.swift */,
+				A6612B0C1D9C5EB324D20E57 /* Multiplexer.swift */,
 				7D1EEFEEB99D21AF61ABDECC /* Terminal.swift */,
 				AC1000020000000000000002 /* TerminalWatcher.swift */,
 				AC1000060000000000000006 /* TerminalPanelFocus.swift */,
@@ -1211,6 +1214,7 @@
 				4A09307D285F32B100232089 /* PreferencesWindowController+NSToolbar.swift in Sources */,
 				D57925922A1ACA0B003B83EA /* AppKind.swift in Sources */,
 				54D9D403E3A421FFE427F8C8 /* TerminalProbe.swift in Sources */,
+				D5DD82216C37A46B1739400B /* Multiplexer.swift in Sources */,
 				F58F25E12BBB1E9EAAB3CC23 /* Terminal.swift in Sources */,
 				AC1000010000000000000001 /* TerminalWatcher.swift in Sources */,
 				AC1000050000000000000005 /* TerminalPanelFocus.swift in Sources */,

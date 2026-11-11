@@ -152,6 +152,16 @@ final class TerminalProcessTests: XCTestCase {
     }
 }
 
+final class MultiplexerTests: XCTestCase {
+    func testTmuxClientsNameThePaneTTYOfTheAskedClient() {
+        // Each client's line carries its own session's pane; a control-mode client has no tty.
+        let clients = "/dev/ttys092 /dev/ttys010\n/dev/ttys091 /dev/ttys016\n /dev/ttys039\n"
+        XCTAssertEqual(Multiplexer.paneTTY(fromTmuxClients: clients, clientTTY: "/dev/ttys091"), "/dev/ttys016")
+        XCTAssertNil(Multiplexer.paneTTY(fromTmuxClients: clients, clientTTY: "/dev/ttys999"))
+        XCTAssertNil(Multiplexer.paneTTY(fromTmuxClients: "", clientTTY: "/dev/ttys091"))
+    }
+}
+
 @MainActor
 final class AppKindTerminalTests: XCTestCase {
     private let app = NSRunningApplication.current
