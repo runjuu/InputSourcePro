@@ -2,6 +2,12 @@ import AppKit
 
 extension PreferencesVM {
     func appNeedCacheKeyboard(_ appKind: AppKind) -> Bool {
+        // A program rule is a forced default: switching by hand inside claude
+        // must not be remembered, or the rule stops working after one use.
+        if appKind.getTerminalInfo()?.rule != nil {
+            return false
+        }
+
         if let browserRule = appKind.getBrowserInfo()?.rule,
            let keyboardRestoreStrategy = browserRule.keyboardRestoreStrategy
         {
@@ -95,6 +101,10 @@ extension PreferencesVM {
         }
 
         if let inputSource = appKind.getBrowserInfo()?.rule?.forcedKeyboard {
+            return inputSource
+        }
+
+        if let inputSource = appKind.getTerminalInfo()?.rule?.forcedKeyboard {
             return inputSource
         }
 

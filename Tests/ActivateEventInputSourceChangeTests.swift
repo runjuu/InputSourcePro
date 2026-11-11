@@ -172,6 +172,29 @@ final class ActivateEventInputSourceChangeTests: XCTestCase {
         }
     }
 
+    func testSameProgramInAnotherPaneIsAFocusChange() {
+        func state(pane: String) -> IndicatorVM.State {
+            .init(
+                appKind: .terminal(
+                    app: app,
+                    info: (focusedElement: nil, isFocusOnInputContainer: true, program: TerminalProgram(key: "claude", pane: pane), rule: nil)
+                ),
+                inputSource: TestInputSource("EN"),
+                inputSourceChangeReason: .noChanges
+            )
+        }
+
+        let event = activationEvent(previous: state(pane: "A"), current: state(pane: "B"), onInputFocus: true)
+        guard case let .appChanges(_, _, inputSourceDidChange) = event else {
+            return XCTFail("Another pane must count as landing in a new field")
+        }
+        XCTAssertFalse(inputSourceDidChange)
+        XCTAssertEqual(IndicatorWindowController.activationMode(event: event, focusedField: true), .autoShow)
+
+        XCTAssertTrue(activationEvent(previous: state(pane: "A"), current: state(pane: "B")).isJustHide)
+        XCTAssertTrue(activationEvent(previous: state(pane: "A"), current: state(pane: "A"), onInputFocus: true).isJustHide)
+    }
+
     func testRuleDrivenSourceChangesPreserveForcedKeyboardHiding() {
         let previous = state(source: "EN", host: "before.example")
         let forcedSource = TestInputSource("RU")

@@ -19,8 +19,17 @@ enum AppKind {
         isFocusOnInputContainer: Bool
     )
 
+    typealias TerminalInfo = (
+        focusedElement: UIElement?,
+        isFocusOnInputContainer: Bool,
+
+        program: TerminalProgram,
+        rule: TerminalRule?
+    )
+
     case normal(app: NSRunningApplication, info: NormalInfo)
     case browser(app: NSRunningApplication, info: BrowserInfo)
+    case terminal(app: NSRunningApplication, info: TerminalInfo)
 
     func getId() -> String? {
         switch self {
@@ -37,6 +46,9 @@ enum AppKind {
             } else {
                 return nil
             }
+        case let .terminal(app, info):
+            guard let bundleId = app.bundleId() else { return nil }
+            return "\(bundleId)_\(info.rule?.id.uuidString ?? info.program.id)"
         }
     }
 
@@ -46,14 +58,25 @@ enum AppKind {
             return app
         case let .browser(app, _):
             return app
+        case let .terminal(app, _):
+            return app
         }
     }
 
     func getBrowserInfo() -> BrowserInfo? {
         switch self {
-        case .normal:
+        case .normal, .terminal:
             return nil
         case let .browser(_, info):
+            return info
+        }
+    }
+
+    func getTerminalInfo() -> TerminalInfo? {
+        switch self {
+        case .normal, .browser:
+            return nil
+        case let .terminal(_, info):
             return info
         }
     }
@@ -64,6 +87,8 @@ enum AppKind {
             return info.isFocusOnInputContainer
         case let .browser(_, info):
             return info.isFocusOnInputContainer
+        case let .terminal(_, info):
+            return info.isFocusOnInputContainer
         }
     }
 
@@ -73,12 +98,15 @@ enum AppKind {
             return info.focusedElement
         case let .browser(_, info):
             return info.focusedElement
+        case let .terminal(_, info):
+            return info.focusedElement
         }
     }
 
     func isSameAppOrWebsite(with otherKind: AppKind?, detectAddressBar: Bool = false) -> Bool {
         guard let otherKind = otherKind else { return false }
         guard getApp() == otherKind.getApp() else { return false }
+        guard getTerminalInfo()?.program == otherKind.getTerminalInfo()?.program else { return false }
 
         switch (getBrowserInfo(), otherKind.getBrowserInfo()) {
         case (nil, nil):
@@ -165,6 +193,22 @@ extension AppKind {
                     info: browserInfo
                 )
             }
+        }
+
+        // A shell prompt, or a program not yet known, falls back to the terminal's App Rule.
+        if let terminal = Terminal(app),
+           preferencesVM.isTerminalEnabled(terminal),
+           let program = preferencesVM.terminalPrograms[terminal]
+        {
+            return .terminal(
+                app: app,
+                info: (
+                    focusedElement: focusedElement,
+                    isFocusOnInputContainer: isFocusOnInputContainer,
+                    program: program,
+                    rule: preferencesVM.getTerminalRule(program: program)
+                )
+            )
         }
 
         return .normal(

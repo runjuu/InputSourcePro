@@ -21,6 +21,7 @@
 "Rules" = "규칙";
 "App Rules" = "앱 규칙";
 "Browser Rules" = "브라우저 규칙";
+"Terminal Rules" = "터미널 규칙";
 "Hot Keys" = "단축키";
 "Others" = "기타";
 "About" = "소개";
@@ -154,6 +155,7 @@
 "Sample URL" = "샘플 URL";
 "Rule Type" = "규칙 유형";
 "Domain" = "도메인";
+"Program Name" = "프로그램 이름";
 "Restore Strategy" = "복원 전략";
 "Keyboard" = "키보드";
 "Cancel" = "취소";

@@ -185,6 +185,13 @@ extension IndicatorVM {
             }
         }
 
+        // Another pane running the same program keeps the id but is a new
+        // context; with focus hints on, show it like landing in a new field.
+        if onInputFocus, current.appKind?.getTerminalInfo() != nil,
+           current.appKind?.isSameAppOrWebsite(with: previous?.appKind) == false {
+            return .appChanges(current: current.appKind, prev: previous?.appKind, inputSourceDidChange: false)
+        }
+
         return .justHide
     }
 }

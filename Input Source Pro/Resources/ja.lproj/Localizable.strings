@@ -21,6 +21,7 @@
 "Rules" = "ルール";
 "App Rules" = "アプリルール";
 "Browser Rules" = "ブラウザルール";
+"Terminal Rules" = "ターミナルルール";
 "Hot Keys" = "ホットキー";
 "Others" = "その他";
 "About" = "約";
@@ -154,6 +155,7 @@
 "Sample URL" = "サンプルURL";
 "Rule Type" = "ルールタイプ";
 "Domain" = "ドメイン";
+"Program Name" = "プログラム名";
 "Restore Strategy" = "復元戦略";
 "Keyboard" = "キーボード";
 "Cancel" = "キャンセル";

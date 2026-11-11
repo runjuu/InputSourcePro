@@ -140,6 +140,8 @@ struct SettingsBackupPreferences: Codable {
     var isEnableURLSwitchForComet: Bool?
     var isEnableURLSwitchForAside: Bool?
     var isEnableURLSwitchForWhale: Bool?
+    var terminalRules: [TerminalRule]?
+    var enabledTerminals: [String]?
     var isShowCapsLockStatus: Bool?
     var indicatorInfo: IndicatorInfo?
     var indicatorSize: IndicatorSize?
@@ -203,6 +205,8 @@ struct SettingsBackupPreferences: Codable {
         isEnableURLSwitchForComet = preferences.isEnableURLSwitchForComet
         isEnableURLSwitchForAside = preferences.isEnableURLSwitchForAside
         isEnableURLSwitchForWhale = preferences.isEnableURLSwitchForWhale
+        terminalRules = preferences.terminalRules
+        enabledTerminals = preferences.enabledTerminals
         isShowCapsLockStatus = preferences.isShowCapsLockStatus
         indicatorInfo = preferences.indicatorInfo
         indicatorSize = preferences.indicatorSize
@@ -295,6 +299,8 @@ struct SettingsBackupPreferences: Codable {
         if let isEnableURLSwitchForComet { preferences.isEnableURLSwitchForComet = isEnableURLSwitchForComet }
         if let isEnableURLSwitchForAside { preferences.isEnableURLSwitchForAside = isEnableURLSwitchForAside }
         if let isEnableURLSwitchForWhale { preferences.isEnableURLSwitchForWhale = isEnableURLSwitchForWhale }
+        if let terminalRules { preferences.terminalRules = terminalRules }
+        if let enabledTerminals { preferences.enabledTerminals = enabledTerminals }
         if let isShowCapsLockStatus { preferences.isShowCapsLockStatus = isShowCapsLockStatus }
         if let indicatorInfo { preferences.indicatorInfo = indicatorInfo }
         if let indicatorSize { preferences.indicatorSize = indicatorSize }
