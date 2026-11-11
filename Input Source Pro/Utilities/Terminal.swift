@@ -97,7 +97,8 @@ struct TerminalReading: Equatable {
 /// The program running in the focused terminal pane. `key` is the terminal's
 /// identifier for it (the process's `argv[0]`); `name` is an alternative label
 /// (the kernel's process name when it differs, e.g. Claude Code's `2.1.318`).
-/// `pane` names the terminal instance (the pane's tty path), so
+/// `pane` names the terminal instance (the pane's tty path, or, inside a
+/// multiplexer, the inner pane's tty), so
 /// moving to another pane running the same program is a new context.
 struct TerminalProgram: Equatable {
     let key: String
@@ -201,15 +202,25 @@ struct TerminalProcess: Equatable {
 // MARK: - Process table
 
 extension TerminalProcess {
-    /// Runs probes one at a time and off the main thread: `TerminalProbe`
-    /// spawns processes.
+    /// Runs probes one at a time and off the main thread: multiplexer lookups
+    /// spawn processes, and `TerminalProbe` runs here too.
     static let queue = DispatchQueue(label: "dev.inputsourcepro.terminal-probe", qos: .userInitiated)
 
     /// The foreground program on the tty at `path` (e.g. `/dev/ttys008`), nil
     /// for a shell prompt or an unreadable tty. Its pane is the tty path.
+    /// A multiplexer (tmux) is looked through to the program in its focused
+    /// pane, nested up to `Multiplexer.maxDepth`; when it can't be asked, the
+    /// multiplexer itself is the program. Spawns processes then, so call it on
+    /// `queue`.
     static func foregroundProgram(onTTY path: String) -> TerminalReading {
-        let processes = processes(onTTY: path)
         var trail = TerminalTrail()
+        var reading = foregroundProgram(onTTY: path, depth: 0, trail: &trail)
+        reading.trail = trail
+        return reading
+    }
+
+    private static func foregroundProgram(onTTY path: String, depth: Int, trail: inout TerminalTrail) -> TerminalReading {
+        let processes = processes(onTTY: path)
         if let tty = TerminalTrail.TTY(watching: processes, foregroundPgid: TerminalTrail.foregroundPgid(ofPID:)) {
             trail.ttys.append(tty)
         }
@@ -218,11 +229,17 @@ extension TerminalProcess {
             if processes.contains(where: { !$0.isShell }) {
                 IndicatorDiagnostics.record("terminal.tty tty=\(path) tpgid=\(processes.first?.foregroundPgid ?? 0) procs=\(processes.map { "\($0.comm):\($0.pgid)" }.joined(separator: ","))")
             }
-            return TerminalReading(program: nil, pane: path, trail: trail)
+            return TerminalReading(program: nil, pane: path)
         }
         let arguments = arguments(pid: process.pid)
         let found = program(comm: process.comm, arguments: arguments)
-        return TerminalReading(program: TerminalProgram(key: found.key, name: found.name, pane: path), pane: path, trail: trail)
+        let reading = TerminalReading(program: TerminalProgram(key: found.key, name: found.name, pane: path), pane: path)
+        guard depth < Multiplexer.maxDepth, let multiplexer = Multiplexer(rawValue: found.key) else { return reading }
+
+        let paneTTY = multiplexer.focusedPaneTTY(clientTTY: path, trail: &trail)
+        let inner = paneTTY.map { foregroundProgram(onTTY: $0, depth: depth + 1, trail: &trail) } ?? reading
+        IndicatorDiagnostics.record("terminal.mux kind=\(multiplexer.rawValue) client=\(path) pane=\(inner.pane ?? "-") paneTTY=\(paneTTY ?? "-") program=\(inner.program?.id ?? "shell")")
+        return inner
     }
 
     /// Runs `body` on `queue` and delivers its result on the main queue.
