@@ -156,9 +156,66 @@ final class MultiplexerTests: XCTestCase {
     func testTmuxClientsNameThePaneTTYOfTheAskedClient() {
         // Each client's line carries its own session's pane; a control-mode client has no tty.
         let clients = "/dev/ttys092 /dev/ttys010\n/dev/ttys091 /dev/ttys016\n /dev/ttys039\n"
-        XCTAssertEqual(Multiplexer.paneTTY(fromTmuxClients: clients, clientTTY: "/dev/ttys091"), "/dev/ttys016")
-        XCTAssertNil(Multiplexer.paneTTY(fromTmuxClients: clients, clientTTY: "/dev/ttys999"))
-        XCTAssertNil(Multiplexer.paneTTY(fromTmuxClients: "", clientTTY: "/dev/ttys091"))
+        XCTAssertEqual(
+            Multiplexer.pane(fromTmuxClients: clients, clientTTY: "/dev/ttys091"),
+            .tty("/dev/ttys016", label: "/dev/ttys016")
+        )
+        XCTAssertNil(Multiplexer.pane(fromTmuxClients: clients, clientTTY: "/dev/ttys999"))
+        XCTAssertNil(Multiplexer.pane(fromTmuxClients: "", clientTTY: "/dev/ttys091"))
+    }
+
+    func testZellijSessionFromClientArguments() {
+        XCTAssertEqual(Multiplexer.zellijSession(fromArguments: ["zellij", "-s", "work"]), "work")
+        XCTAssertEqual(Multiplexer.zellijSession(fromArguments: ["zellij", "--session", "work"]), "work")
+        XCTAssertEqual(Multiplexer.zellijSession(fromArguments: ["zellij", "--session=work"]), "work")
+        XCTAssertEqual(Multiplexer.zellijSession(fromArguments: ["zellij", "attach", "work"]), "work")
+        XCTAssertEqual(Multiplexer.zellijSession(fromSocketPeers: ["/var/folders/x/T/zellij-501/contract_version_1/zippy-panda"]), "zippy-panda")
+        XCTAssertNil(Multiplexer.zellijSession(fromSocketPeers: ["/tmp/tmux-501/default", ""]))
+        XCTAssertEqual(Multiplexer.zellijSession(fromArguments: ["/opt/homebrew/bin/zellij", "a", "-c", "work"]), "work")
+        XCTAssertNil(Multiplexer.zellijSession(fromArguments: ["zellij"]))
+        XCTAssertNil(Multiplexer.zellijSession(fromArguments: ["zellij", "-l", "compact"]))
+        XCTAssertNil(Multiplexer.zellijSession(fromArguments: ["zellij", "-s"]))
+        XCTAssertNil(Multiplexer.zellijSession(fromArguments: []))
+    }
+
+    func testZellijOnlySessionNeedsExactlyOne() {
+        XCTAssertEqual(Multiplexer.onlySession(fromList: "work [Created 2m 31s ago] \n"), "work")
+        XCTAssertNil(Multiplexer.onlySession(fromList: "work [Created 1s ago] \nplay [Created 2s ago] \n"))
+        XCTAssertNil(Multiplexer.onlySession(fromList: ""))
+        // An exited session stays listed for days while it can be resurrected.
+        XCTAssertEqual(Multiplexer.onlySession(fromList: "old [Created 2days 7h ago] (EXITED - attach to resurrect)\nwork [Created 2m ago] \n"), "work")
+        XCTAssertNil(Multiplexer.onlySession(fromList: "old [Created 2days ago] (EXITED - attach to resurrect)\n"))
+    }
+
+    func testZellijClientsNameTheRunningCommand() {
+        let clients = """
+        CLIENT_ID ZELLIJ_PANE_ID RUNNING_COMMAND
+        1         terminal_0     claude 60
+        2         terminal_3     nvim
+        """
+        XCTAssertEqual(
+            Multiplexer.pane(fromZellijClients: clients, session: "work"),
+            .program(TerminalProgram(key: "claude", pane: "zellij:work/terminal_0"), label: "zellij:work/terminal_0")
+        )
+        XCTAssertEqual(
+            Multiplexer.pane(fromZellijClients: "CLIENT_ID ZELLIJ_PANE_ID RUNNING_COMMAND\n1 terminal_2 /opt/homebrew/bin/nvim x.txt\n", session: "work"),
+            .program(TerminalProgram(key: "nvim", pane: "zellij:work/terminal_2"), label: "zellij:work/terminal_2")
+        )
+    }
+
+    func testZellijShellOrPluginPaneMeansNoProgram() {
+        let header = "CLIENT_ID ZELLIJ_PANE_ID RUNNING_COMMAND\n"
+        XCTAssertEqual(Multiplexer.pane(fromZellijClients: header + "1 terminal_0 /bin/zsh\n", session: "s"), .program(nil, label: "zellij:s/terminal_0"))
+        XCTAssertEqual(Multiplexer.pane(fromZellijClients: header + "1 terminal_0 -zsh\n", session: "s"), .program(nil, label: "zellij:s/terminal_0"))
+        XCTAssertEqual(Multiplexer.pane(fromZellijClients: header + "1 plugin_2 zellij:strider\n", session: "s"), .program(nil, label: "zellij:s/plugin_2"))
+        XCTAssertEqual(Multiplexer.pane(fromZellijClients: header + "1 terminal_0\n", session: "s"), .program(nil, label: "zellij:s/terminal_0"))
+        XCTAssertEqual(Multiplexer.pane(fromZellijClients: header + "2 terminal_1 N/A\n", session: "s"), .program(nil, label: "zellij:s/terminal_1"))
+    }
+
+    func testZellijUnreadableClientsAreUnknown() {
+        XCTAssertNil(Multiplexer.pane(fromZellijClients: "", session: "s"))
+        XCTAssertNil(Multiplexer.pane(fromZellijClients: "CLIENT_ID ZELLIJ_PANE_ID RUNNING_COMMAND\n", session: "s"))
+        XCTAssertNil(Multiplexer.pane(fromZellijClients: "Session not found\n1 terminal_0 claude\n", session: "s"))
     }
 }
 

@@ -13,9 +13,16 @@ struct TerminalTrail: Equatable {
         let foregroundPgid: pid_t
     }
 
+    /// The zellij session asked, and the focused pane it answered.
+    struct Zellij: Equatable {
+        let session: String
+        let pane: Multiplexer.Pane
+    }
+
     var ttys: [TTY] = []
     /// The default tmux server answered.
     var tmux = false
+    var zellij: Zellij?
 
     /// The foreground process group of `pid`'s controlling tty, from libproc;
     /// nil when `pid` is gone or can't be read (another user's, e.g. root's `login`).
@@ -43,7 +50,8 @@ extension TerminalTrail.TTY {
 /// Notices changes in the frontmost terminal's focused pane without shell
 /// hooks or plugins, and calls `refresh` so the pane is read again:
 /// - libproc: each tty the last lookup read, for a job starting or ending;
-/// - tmux: a control-mode client, for pane, window and session switches.
+/// - tmux: a control-mode client, for pane, window and session switches;
+/// - zellij: its client list, polled, since it has neither ttys nor events.
 ///
 /// Watches only while a terminal with Terminal Rules is frontmost (`watching`).
 /// Each lookup's trail is handed to `follow`, which replaces the polls with
@@ -72,12 +80,14 @@ final class TerminalWatcher {
         /// on the main thread.
         var poll: (_ interval: TimeInterval, _ check: @escaping () -> String?, _ fire: @escaping (String) -> Void) -> AnyCancellable
         var foregroundPgid: (pid_t) -> pid_t?
+        var zellijPane: (_ session: String) -> Multiplexer.Pane?
         /// Opens a connection without waiting on it, or nil when its server can't be reached.
         var connect: (Connection, _ send: @escaping (ConnectionEvent) -> Void) -> AnyCancellable?
         var delay: (TimeInterval) -> AnyPublisher<Date, Never>
     }
 
     static let libprocInterval: TimeInterval = 0.1
+    static let zellijInterval: TimeInterval = 0.5
     static let connectionGrace: TimeInterval = 10
 
     private let environment: Environment
@@ -92,6 +102,7 @@ final class TerminalWatcher {
     /// Counts poll sets, so a change fired by a replaced poll is ignored.
     private var pollGeneration = 0
     private var watchedPIDs: [pid_t] = []
+    private var watchedZellij: String?
     private var connections: [Connection: AnyCancellable] = [:]
     /// Attaches dropped in a row since a connection's last handshake; each one waits longer.
     private var drops: [Connection: Int] = [:]
@@ -157,6 +168,17 @@ final class TerminalWatcher {
             let check = Self.libprocCheck(trail.ttys, foregroundPgid: environment.foregroundPgid)
             polls.append(environment.poll(Self.libprocInterval, check) { [weak self] change in
                 self?.trigger(src: "libproc", change, generation: generation)
+            })
+        }
+
+        if trail.zellij?.session != watchedZellij {
+            record(src: "zellij-poll", trail.zellij.map { "start session=\($0.session)" } ?? "stop")
+            watchedZellij = trail.zellij?.session
+        }
+        if let zellij = trail.zellij {
+            let check = Self.zellijCheck(zellij, pane: environment.zellijPane)
+            polls.append(environment.poll(Self.zellijInterval, check) { [weak self] change in
+                self?.trigger(src: "zellij-poll", change, generation: generation)
             })
         }
 
@@ -245,6 +267,17 @@ final class TerminalWatcher {
         }
     }
 
+    /// zellij's focused pane when it answers with another one than `zellij`'s baseline.
+    nonisolated static func zellijCheck(_ zellij: TerminalTrail.Zellij, pane: @escaping (String) -> Multiplexer.Pane?) -> () -> String? {
+        {
+            guard let now = pane(zellij.session), now != zellij.pane else { return nil }
+            switch now {
+            case let .tty(_, label), let .program(_, label):
+                return "pane=\(label)"
+            }
+        }
+    }
+
     private func record(src: String, _ message: String) {
         IndicatorDiagnostics.record("terminal.watch src=\(src) \(message)")
     }
@@ -311,6 +344,7 @@ extension TerminalWatcher.Environment {
         Self(
             poll: poll,
             foregroundPgid: TerminalTrail.foregroundPgid(ofPID:),
+            zellijPane: Multiplexer.zellijPane(session:),
             connect: { connection, send in
                 switch connection {
                 case .tmux:

@@ -98,7 +98,7 @@ struct TerminalReading: Equatable {
 /// identifier for it (the process's `argv[0]`); `name` is an alternative label
 /// (the kernel's process name when it differs, e.g. Claude Code's `2.1.318`).
 /// `pane` names the terminal instance (the pane's tty path, or, inside a
-/// multiplexer, the inner pane's tty), so
+/// multiplexer, the inner pane's tty or `zellij:<session>/<pane>`), so
 /// moving to another pane running the same program is a new context.
 struct TerminalProgram: Equatable {
     let key: String
@@ -208,18 +208,19 @@ extension TerminalProcess {
 
     /// The foreground program on the tty at `path` (e.g. `/dev/ttys008`), nil
     /// for a shell prompt or an unreadable tty. Its pane is the tty path.
-    /// A multiplexer (tmux) is looked through to the program in its focused
-    /// pane, nested up to `Multiplexer.maxDepth`; when it can't be asked, the
-    /// multiplexer itself is the program. Spawns processes then, so call it on
-    /// `queue`.
+    /// A multiplexer (tmux, zellij) is looked through to the program in its
+    /// focused pane, nested up to `Multiplexer.maxDepth`; when it can't be asked,
+    /// the multiplexer itself is the program. Spawns processes then, so call it
+    /// on `queue`.
     static func foregroundProgram(onTTY path: String) -> TerminalReading {
         var trail = TerminalTrail()
-        var reading = foregroundProgram(onTTY: path, depth: 0, trail: &trail)
+        var reading = foregroundProgram(onTTY: path, pane: nil, depth: 0, trail: &trail)
         reading.trail = trail
         return reading
     }
 
-    private static func foregroundProgram(onTTY path: String, depth: Int, trail: inout TerminalTrail) -> TerminalReading {
+    private static func foregroundProgram(onTTY path: String, pane: String?, depth: Int, trail: inout TerminalTrail) -> TerminalReading {
+        let pane = pane ?? path
         let processes = processes(onTTY: path)
         if let tty = TerminalTrail.TTY(watching: processes, foregroundPgid: TerminalTrail.foregroundPgid(ofPID:)) {
             trail.ttys.append(tty)
@@ -229,15 +230,24 @@ extension TerminalProcess {
             if processes.contains(where: { !$0.isShell }) {
                 IndicatorDiagnostics.record("terminal.tty tty=\(path) tpgid=\(processes.first?.foregroundPgid ?? 0) procs=\(processes.map { "\($0.comm):\($0.pgid)" }.joined(separator: ","))")
             }
-            return TerminalReading(program: nil, pane: path)
+            return TerminalReading(program: nil, pane: pane)
         }
         let arguments = arguments(pid: process.pid)
         let found = program(comm: process.comm, arguments: arguments)
-        let reading = TerminalReading(program: TerminalProgram(key: found.key, name: found.name, pane: path), pane: path)
+        let reading = TerminalReading(program: TerminalProgram(key: found.key, name: found.name, pane: pane), pane: pane)
         guard depth < Multiplexer.maxDepth, let multiplexer = Multiplexer(rawValue: found.key) else { return reading }
 
-        let paneTTY = multiplexer.focusedPaneTTY(clientTTY: path, trail: &trail)
-        let inner = paneTTY.map { foregroundProgram(onTTY: $0, depth: depth + 1, trail: &trail) } ?? reading
+        let inner: TerminalReading
+        var paneTTY: String?
+        switch multiplexer.focusedPane(clientPID: process.pid, clientTTY: path, arguments: arguments, trail: &trail) {
+        case nil:
+            inner = reading
+        case let .tty(tty, label)?:
+            paneTTY = tty
+            inner = foregroundProgram(onTTY: tty, pane: label, depth: depth + 1, trail: &trail)
+        case let .program(paneProgram, label)?:
+            inner = TerminalReading(program: paneProgram, pane: label)
+        }
         IndicatorDiagnostics.record("terminal.mux kind=\(multiplexer.rawValue) client=\(path) pane=\(inner.pane ?? "-") paneTTY=\(paneTTY ?? "-") program=\(inner.program?.id ?? "shell")")
         return inner
     }
@@ -265,6 +275,30 @@ extension TerminalProcess {
         let dev = entry.kp_eproc.e_tdev
         // NODEV: no controlling tty
         return dev == -1 ? nil : devname(dev, S_IFCHR).map { "/dev/" + String(cString: $0) }
+    }
+
+    /// The paths the unix sockets of `pid` are connected to, e.g. a multiplexer
+    /// client's server socket; empty when the process is gone or not ours.
+    static func unixSocketPeers(ofPID pid: pid_t) -> [String] {
+        let stride = Int32(MemoryLayout<proc_fdinfo>.stride)
+        let size = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, nil, 0)
+        guard size > 0 else { return [] }
+        var fds = [proc_fdinfo](repeating: proc_fdinfo(), count: Int(size / stride) + 8)
+        let read = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, &fds, Int32(fds.count) * stride)
+        guard read > 0 else { return [] }
+
+        return fds.prefix(Int(read / stride)).compactMap { fd -> String? in
+            guard fd.proc_fdtype == PROX_FDTYPE_SOCKET else { return nil }
+            var info = socket_fdinfo()
+            let infoSize = Int32(MemoryLayout<socket_fdinfo>.size)
+            guard proc_pidfdinfo(pid, fd.proc_fd, PROC_PIDFDSOCKETINFO, &info, infoSize) == infoSize,
+                  info.psi.soi_family == AF_UNIX
+            else { return nil }
+            let peer = withUnsafeBytes(of: info.psi.soi_proto.pri_un.unsi_caddr.ua_sun.sun_path) { bytes in
+                String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self)
+            }
+            return peer.isEmpty ? nil : peer
+        }
     }
 
     static func processes(onTTY path: String) -> [TerminalProcess] {
@@ -337,11 +371,19 @@ extension TerminalProcess {
 // MARK: - CLI runs
 
 extension TerminalProcess {
-    /// ISP's environment for the CLIs.
-    private static let environment: [String] = ProcessInfo.processInfo.environment.map { "\($0)=\($1)" }
+    /// ISP's environment for the CLIs. zellij keeps its sockets under $TMPDIR,
+    /// which a GUI app may lack.
+    private static let environment: [String] = {
+        var environment = ProcessInfo.processInfo.environment
+        if environment["TMPDIR"] == nil {
+            environment["TMPDIR"] = URL(fileURLWithPath: NSTemporaryDirectory()).path
+        }
+        return environment.map { "\($0)=\($1)" }
+    }()
 
     /// `path`'s standard output when it exits with status 0 within `timeout`.
-    /// posix_spawn rather than `Process`, which costs about ten times the CPU per run.
+    /// posix_spawn rather than `Process`: zellij's client list is polled several
+    /// times a second, and `Process` costs about ten times the CPU per run.
     /// `watchdog` runs its handler `timeout` seconds on; tests fire it by hand.
     static func output(
         of path: String,
