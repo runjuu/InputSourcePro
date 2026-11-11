@@ -5,7 +5,7 @@ import XCTest
 
 @MainActor
 final class TerminalWatcherTests: XCTestCase {
-    /// A watcher on fake polls, process table, connections and timers, all driven by hand.
+    /// A watcher on fake polls, process table, zellij, connections and timers, all driven by hand.
     @MainActor
     private final class Harness {
         final class Poll {
@@ -31,6 +31,8 @@ final class TerminalWatcherTests: XCTestCase {
 
         var polls: [Poll] = []
         var foregroundPgids: [pid_t: pid_t] = [:]
+        var zellijPane: Multiplexer.Pane?
+        var zellijQueries: [String] = []
         var reachable: Set<TerminalWatcher.Connection> = []
         var attempts: [TerminalWatcher.Connection] = []
         var sends: [TerminalWatcher.Connection: (TerminalWatcher.ConnectionEvent) -> Void] = [:]
@@ -47,6 +49,10 @@ final class TerminalWatcherTests: XCTestCase {
                     return AnyCancellable { poll.isCancelled = true }
                 },
                 foregroundPgid: { [unowned self] in foregroundPgids[$0] },
+                zellijPane: { [unowned self] session in
+                    zellijQueries.append(session)
+                    return zellijPane
+                },
                 connect: { [unowned self] connection, send in
                     attempts.append(connection)
                     guard reachable.contains(connection) else { return nil }
@@ -82,8 +88,8 @@ final class TerminalWatcherTests: XCTestCase {
         }
     }
 
-    private func trail(ttys: [(pid_t, pid_t)] = [], tmux: Bool = false) -> TerminalTrail {
-        TerminalTrail(ttys: ttys.map { TerminalTrail.TTY(pid: $0.0, foregroundPgid: $0.1) }, tmux: tmux)
+    private func trail(ttys: [(pid_t, pid_t)] = [], tmux: Bool = false, zellij: TerminalTrail.Zellij? = nil) -> TerminalTrail {
+        TerminalTrail(ttys: ttys.map { TerminalTrail.TTY(pid: $0.0, foregroundPgid: $0.1) }, tmux: tmux, zellij: zellij)
     }
 
     // MARK: Lifecycle
@@ -163,6 +169,30 @@ final class TerminalWatcherTests: XCTestCase {
         let pid = getpid()
         XCTAssertNotNil(TerminalTrail.foregroundPgid(ofPID: pid))
         XCTAssertNil(TerminalTrail.foregroundPgid(ofPID: -1))
+    }
+
+    // MARK: zellij
+
+    func testZellijPollsItsClientListEveryQuarterSecond() {
+        let harness = Harness()
+        let pane = Multiplexer.Pane.program(nil, label: "zellij:s/terminal_1")
+        harness.zellijPane = pane
+        harness.bringToFront(.ghostty)
+        harness.watcher.follow(trail(ttys: [(10, 100)], zellij: TerminalTrail.Zellij(session: "s", pane: pane)), for: .ghostty)
+        harness.foregroundPgids[10] = 100
+
+        XCTAssertEqual(harness.livePolls.map(\.interval).sorted(), [TerminalWatcher.libprocInterval, TerminalWatcher.zellijInterval])
+        XCTAssertEqual(TerminalWatcher.zellijInterval, 0.5)
+
+        harness.tick()
+        harness.zellijPane = nil // zellij didn't answer
+        harness.tick()
+        XCTAssertEqual(harness.refreshes, 0)
+        XCTAssertEqual(harness.zellijQueries, ["s", "s"])
+
+        harness.zellijPane = .program(TerminalProgram(key: "nvim", pane: "zellij:s/terminal_1"), label: "zellij:s/terminal_1")
+        harness.tick()
+        XCTAssertEqual(harness.refreshes, 1)
     }
 
     // MARK: Connections
@@ -372,11 +402,12 @@ final class TerminalWatcherTests: XCTestCase {
     /// `TEST_RUNNER_ISP_TERMINAL_WATCH_PROBE`). Skipped otherwise.
     func testLiveProbe() throws {
         guard let json = ProcessInfo.processInfo.environment["ISP_TERMINAL_WATCH_PROBE"] else {
-            throw XCTSkip("Needs ISP_TERMINAL_WATCH_PROBE: a live tmux server")
+            throw XCTSkip("Needs ISP_TERMINAL_WATCH_PROBE: live tmux and zellij servers")
         }
         struct Config: Decodable {
             let tmux: String
             let tmuxClient: String
+            let zellij: String
         }
         let config = try JSONDecoder().decode(Config.self, from: Data(json.utf8))
         final class Counter { var refreshes = 0 }
@@ -386,13 +417,14 @@ final class TerminalWatcherTests: XCTestCase {
         let tmux = { (arguments: [String]) in Self.cli("/opt/homebrew/bin/tmux", ["-L", config.tmux] + arguments) }
         let windowSize = { tmux(["display", "-p", "-t", "A", "#{window_width}x#{window_height}"]) }
         let controlClient = { Self.cli("/usr/bin/pgrep", ["-f", "tmux -L \(config.tmux) -C attach"]) }
-        /// What a lookup of the frontmost pane would go through: tmux session A's active pane.
+        /// What a lookup of the frontmost pane would go through: tmux session A's active pane, zellij.
         func lookup(tty: Bool = true) -> TerminalTrail {
             var trail = TerminalTrail(tmux: true)
             if tty, let pid = pid_t(tmux(["display", "-p", "-t", "A", "#{pane_pid}"])),
                let foregroundPgid = TerminalTrail.foregroundPgid(ofPID: pid) {
                 trail.ttys = [TerminalTrail.TTY(pid: pid, foregroundPgid: foregroundPgid)]
             }
+            trail.zellij = Multiplexer.zellijPane(session: config.zellij).map { TerminalTrail.Zellij(session: config.zellij, pane: $0) }
             return trail
         }
         func spin(_ seconds: TimeInterval) { RunLoop.main.run(until: Date().addingTimeInterval(seconds)) }
@@ -432,8 +464,21 @@ final class TerminalWatcherTests: XCTestCase {
                 return String(format: "%.2f%%", used / wall * 100)
             }
             let clientTime = client.isEmpty ? "none" : "\(clientBefore) -> \(Self.cli("/bin/ps", ["-o", "time=", "-p", client]))"
-            print("PROBE idle \(name) \(Int(wall))s: test host \(cpu(before, after)), reaped children \(cpu(childrenBefore, childrenAfter)), tmux control client cpu time \(clientTime)")
+            print("PROBE idle \(name) \(Int(wall))s: test host \(cpu(before, after)), reaped children (zellij CLI) \(cpu(childrenBefore, childrenAfter)), tmux control client cpu time \(clientTime)")
         }
+
+        func cpuPerCall(_ name: String, _ body: () -> Void) {
+            func now() -> Double {
+                var usage = rusage()
+                getrusage(RUSAGE_SELF, &usage)
+                return Double(usage.ru_utime.tv_sec + usage.ru_stime.tv_sec) + Double(usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) / 1e6
+            }
+            body()
+            let start = now()
+            for _ in 0 ..< 20 { body() }
+            print(String(format: "PROBE test host cpu per %@: %.2f ms", name, (now() - start) / 20 * 1000))
+        }
+        cpuPerCall("zellij client-list query") { _ = Multiplexer.zellijPane(session: config.zellij) }
 
         let sizeBefore = windowSize()
         var front: AnyCancellable? = watcher.watching(.ghostty).sink { _ in }
@@ -451,7 +496,18 @@ final class TerminalWatcherTests: XCTestCase {
         step("tmux: switch-client to another session") { tmux(["switch-client", "-c", config.tmuxClient, "-t", "B"]) }
         step("tmux: switch-client back") { tmux(["switch-client", "-c", config.tmuxClient, "-t", "A"]) }
         step("tmux: rename-window (ignored)", expect: false) { tmux(["rename-window", "-t", "A:0", "renamed"]) }
+        for direction in ["left", "right"] {
+            step("zellij: move-focus \(direction)") { Self.cli("/opt/homebrew/bin/zellij", ["-s", config.zellij, "action", "move-focus", direction]) }
+        }
+
+        var withoutZellij = lookup()
+        withoutZellij.zellij = nil
+        watcher.follow(withoutZellij, for: .ghostty)
+        spin(0.5)
         idleCPU("frontmost, libproc + tmux watched", seconds: 10)
+        watcher.follow(lookup(), for: .ghostty)
+        spin(0.5)
+        idleCPU("frontmost, libproc + tmux + zellij watched", seconds: 10)
 
         front = nil
         step("left the front: select-window", expect: false) { tmux(["select-window", "-t", "A:0"]) }
@@ -477,7 +533,7 @@ final class TerminalWatcherTests: XCTestCase {
         _ = front
     }
 
-    /// Runs `path` with tmux's session variables removed, and returns its trimmed output.
+    /// Runs `path` with the multiplexers' session variables removed, and returns its trimmed output.
     @discardableResult
     private static func cli(_ path: String, _ arguments: [String]) -> String {
         let process = Process()
@@ -488,7 +544,7 @@ final class TerminalWatcherTests: XCTestCase {
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice
         process.environment = ProcessInfo.processInfo.environment.filter { key, _ in
-            !(key == "TMUX" || key == "TMUX_PANE")
+            !(key == "TMUX" || key == "TMUX_PANE" || key.hasPrefix("ZELLIJ"))
         }
         guard (try? process.run()) != nil else { return "" }
         let data = output.fileHandleForReading.readDataToEndOfFile()
