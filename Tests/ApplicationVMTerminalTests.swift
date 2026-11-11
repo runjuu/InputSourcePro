@@ -185,6 +185,171 @@ final class ApplicationVMTerminalTests: XCTestCase {
         XCTAssertNil(AppKind.from(ghostty, preferencesVM: preferencesVM).getTerminalInfo())
     }
 
+    /// A program without a rule is its own context while it controls its pane with
+    /// `isp:` commands, and back in the terminal's App Rule context once it releases it.
+    func testAProgramWithoutARuleIsItsOwnContextWhileItControlsItsPane() throws {
+        // The process the commands are traced back to, and its tty.
+        let pid: pid_t = 999_008
+        let tty = "/dev/ttys999"
+
+        let ghostty = FakeApp(bundleIdentifier: Terminal.ghostty.rawValue, pid: 999_007)
+        let htop = TerminalProgram(key: "htop", pane: tty, tty: tty)
+        let environment = ApplicationVM.Environment(
+            frontmostApplication: { ghostty },
+            focusedApplication: { nil },
+            runningApplications: Just([ghostty]).eraseToAnyPublisher(),
+            isTerminalEnabled: { $0 == .ghostty },
+            probedProgram: { _ in TerminalReading(program: htop, pane: tty, tty: tty) },
+            terminalPanelFocus: TerminalPanelFocus.Environment(
+                read: { _, _ in AnyCancellable {} }
+            ),
+            ttyOwner: { _ in (pid, tty) },
+            jobState: { _, _ in .foreground }
+        )
+        let preferencesVM = try Self.inMemoryPreferencesVM()
+        let restore = Self.setTerminalPreferences(preferencesVM, enabled: .ghostty, rules: ["claude"])
+        defer { restore() }
+        let applicationVM = ApplicationVM(preferencesVM: preferencesVM, environment: environment)
+        let program = { applicationVM.appKind?.getTerminalInfo()?.program }
+
+        Self.waitUntil("htop is read in front") {
+            preferencesVM.terminalPrograms[.ghostty] == htop && applicationVM.appKind?.getApp() === ghostty
+        }
+        XCTAssertNil(program(), "Without a rule, htop is the terminal's App Rule context")
+
+        let source = InputSource.getCurrentInputSource().persistentIdentifier
+        applicationVM.receiveTerminalControl(lines: "isp:\(pid):select:\(source)\n")
+        Self.waitUntil("htop's pane becomes its own context") { program() == htop }
+
+        applicationVM.receiveTerminalControl(lines: "isp:\(pid):release\n")
+        Self.waitUntil("htop's pane goes back to the terminal's context") { program() == nil }
+        XCTAssertTrue(applicationVM.appKind?.getApp() === ghostty)
+    }
+
+    /// A job in the background (`bg`, `&`) can't take the pane from whoever is at the prompt.
+    func testACommandFromABackgroundJobIsIgnored() throws {
+        let pid: pid_t = 999_012
+        let tty = "/dev/ttys997"
+        let ghostty = FakeApp(bundleIdentifier: Terminal.ghostty.rawValue, pid: 999_011)
+        let environment = ApplicationVM.Environment(
+            frontmostApplication: { ghostty },
+            focusedApplication: { nil },
+            runningApplications: Just([ghostty]).eraseToAnyPublisher(),
+            isTerminalEnabled: { $0 == .ghostty },
+            probedProgram: { _ in TerminalReading(program: nil, pane: tty, tty: tty) },
+            terminalPanelFocus: TerminalPanelFocus.Environment(
+                read: { _, _ in AnyCancellable {} }
+            ),
+            ttyOwner: { _ in (pid, tty) },
+            jobState: { _, _ in .background }
+        )
+        let preferencesVM = try Self.inMemoryPreferencesVM()
+        let applicationVM = ApplicationVM(preferencesVM: preferencesVM, environment: environment)
+
+        let source = InputSource.getCurrentInputSource().persistentIdentifier
+        applicationVM.receiveTerminalControl(lines: "isp:\(pid):select:\(source)\nisp:\(pid):push:\(source)\n")
+
+        XCTAssertFalse(preferencesVM.terminalControl.isControlled(tty))
+        XCTAssertNil(preferencesVM.terminalControl.current(on: tty))
+    }
+
+    /// A program that died before its pane was read again leaves the next one nothing to `pop`.
+    func testADeadProgramsStackIsNotInherited() throws {
+        let (dead, alive): (pid_t, pid_t) = (999_014, 999_015)
+        let tty = "/dev/ttys996"
+        let ghostty = FakeApp(bundleIdentifier: Terminal.ghostty.rawValue, pid: 999_013)
+        final class State: @unchecked Sendable {
+            let lock = NSLock()
+            var isAlive = true
+        }
+        let state = State()
+        let environment = ApplicationVM.Environment(
+            frontmostApplication: { ghostty },
+            focusedApplication: { nil },
+            runningApplications: Just([ghostty]).eraseToAnyPublisher(),
+            isTerminalEnabled: { $0 == .ghostty },
+            probedProgram: { _ in TerminalReading(program: nil, pane: nil) },
+            terminalPanelFocus: TerminalPanelFocus.Environment(
+                read: { _, _ in AnyCancellable {} }
+            ),
+            ttyOwner: { ($0, tty) },
+            jobState: { pid, _ in pid == alive || state.lock.withLock { state.isAlive } ? .foreground : .gone }
+        )
+        let preferencesVM = try Self.inMemoryPreferencesVM()
+        let applicationVM = ApplicationVM(preferencesVM: preferencesVM, environment: environment)
+
+        let source = InputSource.getCurrentInputSource().persistentIdentifier
+        applicationVM.receiveTerminalControl(lines: "isp:\(dead):select:\(source)\nisp:\(dead):push:\(source)\n")
+        XCTAssertTrue(preferencesVM.terminalControl.isControlled(tty))
+
+        state.lock.withLock { state.isAlive = false }
+        applicationVM.receiveTerminalControl(lines: "isp:\(alive):pop\n")
+        XCTAssertFalse(preferencesVM.terminalControl.isControlled(tty), "Nothing of the dead program's is left to pop")
+    }
+
+    /// A program that dies without `release` hands its pane back to the rules, even when
+    /// the next reading of that tty already shows another program (here another htop).
+    func testAProgramThatDiesWithoutReleasingLeavesItsPaneUncontrolled() throws {
+        let pid: pid_t = 999_010
+        let tty = "/dev/ttys998"
+
+        let ghostty = FakeApp(bundleIdentifier: Terminal.ghostty.rawValue, pid: 999_009)
+        let htop = TerminalProgram(key: "htop", pane: tty, tty: tty)
+        final class State: @unchecked Sendable {
+            let lock = NSLock()
+            var isEnabled = true
+            var probes = 0
+            var isAlive = true
+            var isDelivered = false
+        }
+        let state = State()
+        let environment = ApplicationVM.Environment(
+            frontmostApplication: { ghostty },
+            focusedApplication: { nil },
+            runningApplications: Just([ghostty]).eraseToAnyPublisher(),
+            isTerminalEnabled: { terminal in state.lock.withLock { terminal == .ghostty && state.isEnabled } },
+            probedProgram: { _ in
+                state.lock.withLock { state.probes += 1 }
+                return TerminalReading(program: htop, pane: tty, tty: tty)
+            },
+            terminalPanelFocus: TerminalPanelFocus.Environment(
+                read: { _, _ in AnyCancellable {} }
+            ),
+            ttyOwner: { _ in (pid, tty) },
+            jobState: { _, _ in state.lock.withLock { state.isAlive ? .foreground : .gone } }
+        )
+        let preferencesVM = try Self.inMemoryPreferencesVM()
+        let restore = Self.setTerminalPreferences(preferencesVM, enabled: .ghostty, rules: ["claude"])
+        defer { restore() }
+        let applicationVM = ApplicationVM(preferencesVM: preferencesVM, environment: environment)
+        let program = { applicationVM.appKind?.getTerminalInfo()?.program }
+
+        Self.waitUntil("htop is read in front") {
+            preferencesVM.terminalPrograms[.ghostty] == htop && applicationVM.appKind?.getApp() === ghostty
+        }
+        let source = InputSource.getCurrentInputSource().persistentIdentifier
+        applicationVM.receiveTerminalControl(lines: "isp:\(pid):select:\(source)\n")
+        Self.waitUntil("htop's pane becomes its own context") { program() == htop }
+
+        // It dies; flipping Ghostty's switch off and on rebuilds its watch, which reads the pane again.
+        let probes = state.lock.withLock {
+            state.isAlive = false
+            return state.probes
+        }
+        for isEnabled in [false, true] {
+            state.lock.withLock { state.isEnabled = isEnabled }
+            preferencesVM.runtimeRuleChangeNotifier.notify()
+        }
+        Self.waitUntil("the pane is read again") { state.lock.withLock { state.probes > probes } }
+        // A hop queued behind the probe's delivery.
+        TerminalProcess.queue.async {
+            DispatchQueue.main.async { state.lock.withLock { state.isDelivered = true } }
+        }
+        Self.waitUntil("the reading is delivered") { state.lock.withLock { state.isDelivered } }
+        XCTAssertFalse(preferencesVM.terminalControl.isControlled(tty))
+        Self.waitUntil("htop's pane goes back to the terminal's context") { program() == nil }
+    }
+
     func testRulesAreSavedByIdAndSwitchesAreStoredOnce() throws {
         let preferencesVM = try Self.inMemoryPreferencesVM()
         let restore = Self.setTerminalPreferences(preferencesVM, enabled: .ghostty, rules: ["claude"])

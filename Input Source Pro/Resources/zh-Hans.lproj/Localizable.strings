@@ -263,3 +263,10 @@
 
 "Receive beta updates" = "接收测试版更新";
 "Stable updates resume when a newer stable build is available." = "当有更新的稳定版构建可用时，将恢复稳定版更新。";
+
+"A program can take over its own pane, so Terminal Rules and App rules no longer apply there, by writing a line to:" = "程序可以接管自己所在的窗格，让终端规则和 App 规则在那里不再生效，方法是往这个文件写一行：";
+"Switch to the input source" = "切换到该输入法";
+"Remember the current input source, then switch" = "记住当前输入法，再切换";
+"Switch back to the remembered input source" = "切回记住的输入法";
+"Hand the pane back to the rules" = "把窗格交还给规则";
+"<pid> is a process running in that pane; <id> is an input source ID such as com.apple.keylayout.ABC. Panes inside Zellij are not supported." = "<pid> 是在该窗格里运行的进程；<id> 是输入法 ID，例如 com.apple.keylayout.ABC。不支持 Zellij 里的窗格。";

@@ -149,10 +149,31 @@ final class TerminalProcessTests: XCTestCase {
         XCTAssertNil(TerminalProcess.ttyPath(ofPID: pid_t.max))
     }
 
+    func testTTYOwnerWalksUpToTheNearestTTY() {
+        let table: [pid_t: (ppid: pid_t, tty: String?)] = [
+            10: (9, nil), 9: (8, "/dev/ttys1"), 8: (7, "/dev/ttys0"),
+            20: (19, nil), 19: (18, nil), 18: (17, nil), 17: (16, nil), 16: (15, "/dev/ttys2"),
+            30: (1, nil),
+        ]
+        func owner(_ pid: pid_t, depth: Int = 4) -> pid_t? {
+            TerminalProcess.ttyOwner(ofPID: pid, maxDepth: depth) { table[$0] }?.pid
+        }
+        XCTAssertEqual(owner(8), 8) // has a tty itself
+        XCTAssertEqual(owner(10), 9) // the nearest one wins
+        XCTAssertEqual(owner(20), 16) // exactly maxDepth parents up
+        XCTAssertNil(owner(20, depth: 3)) // one short
+        XCTAssertNil(owner(30)) // stops at launchd
+        XCTAssertNil(owner(99)) // gone
+        if let own = TerminalProcess.ttyPath(ofPID: getpid()) {
+            XCTAssertEqual(TerminalProcess.ttyOwner(ofPID: getpid())?.pid, getpid())
+            XCTAssertEqual(TerminalProcess.ttyOwner(ofPID: getpid())?.tty, own)
+        }
+    }
+
     func testRefreshReadsTheRememberedTTYUntilItIsForgotten() {
         TerminalProcess.queue.sync {
             // /dev/null runs no foreground job, so it reads as a shell prompt in that pane.
-            let shell = TerminalReading(program: nil, pane: "/dev/null")
+            let shell = TerminalReading(program: nil, pane: "/dev/null", tty: "/dev/null")
             XCTAssertEqual(Terminal.ghostty.focusedProgram(onTTY: "/dev/null"), shell)
             XCTAssertEqual(Terminal.ghostty.refreshedProgram(), shell)
             XCTAssertEqual(Terminal.ghostty.focusedTTY, "/dev/null")
@@ -304,6 +325,15 @@ final class AppKindTerminalTests: XCTestCase {
     func testProgramIdLeavesOutPane() {
         XCTAssertEqual(TerminalProgram(key: "claude", name: "2.1.318", pane: "/dev/ttys008").id, "claude/2.1.318")
     }
+
+    /// A pane an `isp:` program controls is a context without a rule: its program keys it.
+    func testIdWithoutARuleUsesTheProgram() throws {
+        let bundleId = try XCTUnwrap(app.bundleId())
+        let program = TerminalProgram(key: "program", name: "htop", pane: "/dev/ttys008")
+        let kind = AppKind.terminal(app: app, info: (focusedElement: nil, isFocusOnInputContainer: true, program: program, rule: nil))
+
+        XCTAssertEqual(kind.getId(), "\(bundleId)_program/htop")
+    }
 }
 
 @MainActor
@@ -429,5 +459,218 @@ final class TerminalProbeTests: XCTestCase {
         XCTAssertNil(TerminalProbe.tty(titled: "user@host: ~", among: [shell, claude]))
         XCTAssertNil(TerminalProbe.tty(titled: nil, among: [shell, claude]))
         XCTAssertNil(TerminalProbe.tty(titled: "claude", among: []))
+    }
+}
+
+final class TerminalControlCommandTests: XCTestCase {
+    func testParsesEveryCommand() {
+        XCTAssertEqual(TerminalControlCommand(line: "isp:123:select:com.apple.keylayout.ABC")?.command, .select("com.apple.keylayout.ABC"))
+        XCTAssertEqual(TerminalControlCommand(line: "isp:123:push:x")?.command, .push("x"))
+        XCTAssertEqual(TerminalControlCommand(line: "isp:123:pop"), TerminalControlCommand(pid: 123, command: .pop))
+        XCTAssertEqual(TerminalControlCommand(line: "isp:99999:release")?.pid, 99999)
+    }
+
+    func testIdMayContainColons() {
+        XCTAssertEqual(
+            TerminalControlCommand(line: "isp:7:select:im.rime.inputmethod.Squirrel.Hans::im.rime.inputmethod.Squirrel.Hans")?.command,
+            .select("im.rime.inputmethod.Squirrel.Hans::im.rime.inputmethod.Squirrel.Hans")
+        )
+    }
+
+    func testRejectsMalformedLines() {
+        for line in [
+            "isp:123:jump", "isp:123:select:", "isp:123:select", "isp:123:push:", "isp:123:pop:x", "isp:123:release ",
+            "isp:abc:pop", "isp::pop", "isp:-5:pop", "isp:0:pop", "isp:١٢:pop", "isp:123", "isp:99999999999999999999:pop",
+            "mode:123:insert", "tmux:123:pop", "",
+            "isp:123:select:" + String(repeating: "a", count: 256),
+        ] {
+            XCTAssertNil(TerminalControlCommand(line: line), line)
+        }
+        XCTAssertNotNil(TerminalControlCommand(line: "isp:123:select:" + String(repeating: "a", count: 256 - 15)))
+    }
+}
+
+final class TerminalControlTrackerTests: XCTestCase {
+    private var control = TerminalControlTracker<String>()
+    private let tty = "/dev/ttys001"
+
+    func testSelectTakesControlAndSetsCurrent() {
+        XCTAssertFalse(control.isControlled(tty))
+        control.select("abc", on: tty, pid: 10)
+
+        XCTAssertTrue(control.isControlled(tty))
+        XCTAssertEqual(control.current(on: tty), "abc")
+    }
+
+    func testPushStacksCurrentThenPopReturnsToIt() {
+        control.select("rime", on: tty, pid: 10)
+        control.push("abc", on: tty, pid: 10, live: "other")
+
+        XCTAssertEqual(control.current(on: tty), "abc")
+        XCTAssertEqual(control.pop(on: tty, pid: 10), "rime")
+        XCTAssertEqual(control.current(on: tty), "rime")
+    }
+
+    func testFirstPushStacksTheLiveSource() {
+        control.push("abc", on: tty, pid: 10, live: "rime")
+
+        XCTAssertEqual(control.pop(on: tty, pid: 10), "rime")
+    }
+
+    func testUnfocusedFirstPushStacksNothing() {
+        control.push("abc", on: tty, pid: 10, live: nil)
+
+        XCTAssertTrue(control.isControlled(tty))
+        XCTAssertNil(control.pop(on: tty, pid: 10))
+        XCTAssertEqual(control.current(on: tty), "abc")
+    }
+
+    func testPopOnEmptyStackChangesNothing() {
+        XCTAssertNil(control.pop(on: tty, pid: 10))
+        XCTAssertFalse(control.isControlled(tty))
+
+        control.select("abc", on: tty, pid: 10)
+        XCTAssertNil(control.pop(on: tty, pid: 10))
+        XCTAssertEqual(control.current(on: tty), "abc")
+    }
+
+    func testStackKeepsTheNewestSixteen() {
+        control.select("0", on: tty, pid: 10)
+        for n in 1...20 { control.push("\(n)", on: tty, pid: 10, live: nil) }
+
+        var popped: [String] = []
+        while let source = control.pop(on: tty, pid: 10) { popped.append(source) }
+        XCTAssertEqual(popped.count, TerminalControlTracker<String>.maxStack)
+        XCTAssertEqual(popped.first, "19")
+        XCTAssertEqual(popped.last, "4")
+    }
+
+    func testManualChangeUpdatesCurrentOnlyOfControlledPanes() {
+        control.select("rime", on: tty, pid: 10)
+        control.follow("abc", on: tty)
+        control.follow("abc", on: "/dev/ttys009")
+
+        XCTAssertEqual(control.current(on: tty), "abc")
+        XCTAssertFalse(control.isControlled("/dev/ttys009"))
+    }
+
+    func testReleaseDropsStateOfThatTTYOnly() {
+        control.select("rime", on: tty, pid: 10)
+        control.select("abc", on: "/dev/ttys002", pid: 11)
+        control.release(tty)
+
+        XCTAssertFalse(control.isControlled(tty))
+        XCTAssertNil(control.current(on: tty))
+        XCTAssertEqual(control.current(on: "/dev/ttys002"), "abc")
+    }
+
+    func testAReadingKeepsControlWhileTheProgramIsInTheForeground() {
+        control.push("abc", on: tty, pid: 10, live: "rime")
+        control.check(tty) { pid, onTTY in pid == 10 && onTTY == self.tty ? .foreground : .gone }
+
+        XCTAssertTrue(control.isControlled(tty))
+        XCTAssertEqual(control.current(on: tty), "abc")
+        XCTAssertEqual(control.pop(on: tty, pid: 10), "rime")
+    }
+
+    /// Whatever the reading shows, a shell or another program, control ends with its process.
+    func testAReadingReleasesOnceTheProgramIsGone() {
+        control.select("abc", on: tty, pid: 10)
+        control.check(tty) { _, _ in .gone }
+
+        XCTAssertFalse(control.isControlled(tty))
+        XCTAssertNil(control.current(on: tty))
+        control.check("/dev/ttys009") { _, _ in .gone }
+    }
+
+    /// Ctrl-Z: the shell (or what runs next) gets the rules, and `current` waits for `fg`.
+    func testASuspendedProgramDoesNotControlItsPaneUntilItResumes() {
+        control.select("abc", on: tty, pid: 10)
+        control.check(tty) { _, _ in .background }
+
+        XCTAssertFalse(control.isControlled(tty))
+        control.follow("rime", on: tty)
+        XCTAssertEqual(control.current(on: tty), "abc")
+
+        control.check(tty) { _, _ in .foreground }
+        XCTAssertTrue(control.isControlled(tty))
+        XCTAssertEqual(control.current(on: tty), "abc")
+    }
+
+    func testACommandResumesASuspendedProgram() {
+        control.select("abc", on: tty, pid: 10)
+        control.check(tty) { _, _ in .background }
+        control.push("rime", on: tty, pid: 10, live: nil)
+
+        XCTAssertTrue(control.isControlled(tty))
+        XCTAssertEqual(control.pop(on: tty, pid: 10), "abc")
+
+        control.check(tty) { _, _ in .background }
+        control.select("rime", on: tty, pid: 10)
+        XCTAssertTrue(control.isControlled(tty))
+    }
+
+    func testAnotherPIDTakesOverTheTTY() {
+        control.select("abc", on: tty, pid: 10)
+        control.select("rime", on: tty, pid: 20)
+        control.check(tty) { pid, _ in pid == 20 ? .foreground : .gone }
+
+        XCTAssertEqual(control.current(on: tty), "rime")
+        control.check(tty) { pid, _ in pid == 10 ? .foreground : .gone }
+        XCTAssertFalse(control.isControlled(tty))
+    }
+
+    func testJobStateOfAProcessNotOnTheTTYIsGone() {
+        XCTAssertEqual(TerminalProcess.jobState(ofPID: pid_t.max, onTTY: "/dev/ttys000"), .gone)
+        XCTAssertEqual(TerminalProcess.jobState(ofPID: getpid(), onTTY: "/dev/not-a-tty"), .gone)
+    }
+}
+
+final class TerminalControlFramerTests: XCTestCase {
+    private var framer = TerminalControlFramer()
+
+    private func append(_ text: String) -> String {
+        framer.append(Array(text.utf8))
+    }
+
+    func testALineSplitAcrossReadsIsDeliveredWhole() {
+        XCTAssertEqual(append("isp:1:sel"), "")
+        XCTAssertEqual(append("ect:abc\n"), "isp:1:select:abc\n")
+    }
+
+    func testTwoLinesInOneRead() {
+        XCTAssertEqual(append("isp:1:pop\nisp:1:release\n"), "isp:1:pop\nisp:1:release\n")
+    }
+
+    /// `isp:1:release` must not run when `x` is still to come.
+    func testAPartialLineWaitsForItsNewline() {
+        XCTAssertEqual(append("isp:1:pop\nisp:1:release"), "isp:1:pop\n")
+        XCTAssertEqual(append("x\n"), "isp:1:releasex\n")
+    }
+
+    func testAnOverlongLineIsDroppedAndTheNextLineStillArrives() {
+        let long = String(repeating: "a", count: TerminalControlFramer.maxPending + 1)
+        XCTAssertEqual(append("isp:1:select:" + long), "")
+        XCTAssertEqual(append(long + "isp:1:release"), "")
+        XCTAssertEqual(append("\nisp:1:pop\n"), "isp:1:pop\n")
+    }
+}
+
+@MainActor
+final class FocusedTerminalTTYTests: XCTestCase {
+    func testAPaneShowingAShellIsFocusedForItsFirstCommand() throws {
+        let preferencesVM = try ApplicationVMTerminalTests.inMemoryPreferencesVM()
+        // The switches live in the test host's own defaults.
+        let restore = ApplicationVMTerminalTests.setTerminalPreferences(preferencesVM, enabled: .ghostty, rules: [])
+        defer { restore() }
+
+        preferencesVM.terminalTTYs[.ghostty] = "/dev/ttys001" // the latest reading was a shell
+        preferencesVM.setTerminal(.ghostty, enabled: false)
+        XCTAssertNil(preferencesVM.focusedTerminalTTY(.ghostty))
+
+        preferencesVM.setTerminal(.ghostty, enabled: true)
+        XCTAssertEqual(preferencesVM.focusedTerminalTTY(.ghostty), "/dev/ttys001")
+        preferencesVM.setTerminal(.iterm, enabled: true)
+        XCTAssertNil(preferencesVM.focusedTerminalTTY(.iterm))
     }
 }

@@ -261,3 +261,10 @@
 
 "Receive beta updates" = "Receive beta updates";
 "Stable updates resume when a newer stable build is available." = "Stable updates resume when a newer stable build is available.";
+
+"A program can take over its own pane, so Terminal Rules and App rules no longer apply there, by writing a line to:" = "A program can take over its own pane, so Terminal Rules and App rules no longer apply there, by writing a line to:";
+"Switch to the input source" = "Switch to the input source";
+"Remember the current input source, then switch" = "Remember the current input source, then switch";
+"Switch back to the remembered input source" = "Switch back to the remembered input source";
+"Hand the pane back to the rules" = "Hand the pane back to the rules";
+"<pid> is a process running in that pane; <id> is an input source ID such as com.apple.keylayout.ABC. Panes inside Zellij are not supported." = "<pid> is a process running in that pane; <id> is an input source ID such as com.apple.keylayout.ABC. Panes inside Zellij are not supported.";

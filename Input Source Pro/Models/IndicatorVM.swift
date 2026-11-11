@@ -345,6 +345,10 @@ extension IndicatorVM {
             .sink(receiveValue: { [weak self] in self?.send(.inputSourceChanged($0)) })
             .store(in: cancelBag)
 
+        applicationVM.terminalSwitches
+            .sink(receiveValue: { [weak self] in self?.send(.switchInputSourceByShortcut($0)) })
+            .store(in: cancelBag)
+
         refreshShortcutSubject
             .sink { [weak self] _ in
                 guard let self = self else { return }

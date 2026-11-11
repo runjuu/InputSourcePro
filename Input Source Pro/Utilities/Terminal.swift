@@ -85,11 +85,14 @@ extension Terminal {
 /// shell prompt, and the pane read (the program's own pane when there is one),
 /// so a shell is tied to its pane too. `pane` is nil when no pane was read.
 /// `trail` is what the lookup went through, for `TerminalWatcher`; it is not
-/// part of what was read, so two readings compare equal without it.
+/// part of what was read, so two readings compare equal without it. `tty` is
+/// the innermost tty read (through multiplexers), nil when none was; it is left
+/// out of `==` too, since `pane` already tells panes apart.
 struct TerminalReading: Equatable {
     let program: TerminalProgram?
     let pane: String?
     var trail = TerminalTrail()
+    var tty: String? = nil
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.program == rhs.program && lhs.pane == rhs.pane
@@ -101,16 +104,19 @@ struct TerminalReading: Equatable {
 /// (the kernel's process name when it differs, e.g. Claude Code's `2.1.318`).
 /// `pane` names the terminal instance (the pane's tty path, or, inside a
 /// multiplexer, the inner pane's tty or `zellij:<session>/<pane>`), so
-/// moving to another pane running the same program is a new context.
+/// moving to another pane running the same program is a new context. `tty` is
+/// the pane's own tty when known, which `isp:` commands are traced back to.
 struct TerminalProgram: Equatable {
     let key: String
     let name: String?
     let pane: String?
+    let tty: String?
 
-    init(key: String, name: String? = nil, pane: String? = nil) {
+    init(key: String, name: String? = nil, pane: String? = nil, tty: String? = nil) {
         self.key = key
         self.name = name == key ? nil : name
         self.pane = pane
+        self.tty = tty
     }
 
     /// Names the program in diagnostics; leaves out `pane`.
@@ -232,11 +238,11 @@ extension TerminalProcess {
             if processes.contains(where: { !$0.isShell }) {
                 IndicatorDiagnostics.record("terminal.tty tty=\(path) tpgid=\(processes.first?.foregroundPgid ?? 0) procs=\(processes.map { "\($0.comm):\($0.pgid)" }.joined(separator: ","))")
             }
-            return TerminalReading(program: nil, pane: pane)
+            return TerminalReading(program: nil, pane: pane, tty: path)
         }
         let arguments = arguments(pid: process.pid)
         let found = program(comm: process.comm, arguments: arguments)
-        let reading = TerminalReading(program: TerminalProgram(key: found.key, name: found.name, pane: pane), pane: pane)
+        let reading = TerminalReading(program: TerminalProgram(key: found.key, name: found.name, pane: pane, tty: path), pane: pane, tty: path)
         guard depth < Multiplexer.maxDepth, let multiplexer = Multiplexer(rawValue: found.key) else { return reading }
 
         let inner: TerminalReading
@@ -266,6 +272,43 @@ extension TerminalProcess {
     /// The controlling tty of `pid` (e.g. `/dev/ttys002`), or nil when the process
     /// is gone, has no tty, or belongs to another user.
     static func ttyPath(ofPID pid: pid_t) -> String? {
+        processInfo(pid)?.tty
+    }
+
+    /// The nearest process at or above `pid` (up to `maxDepth` parents) that has a tty
+    /// of ours, with that tty: a program's helper (`nvim --embed`) has none, its parent does.
+    static func ttyOwner(ofPID pid: pid_t, maxDepth: Int = 4) -> (pid: pid_t, tty: String)? {
+        ttyOwner(ofPID: pid, maxDepth: maxDepth) { processInfo($0).map { ($0.ppid, $0.tty) } }
+    }
+
+    /// Where `pid` stands on `tty`: gone (exited, or not on it), in the background
+    /// (stopped with Ctrl-Z, or behind another job), or the foreground job.
+    static func jobState(ofPID pid: pid_t, onTTY tty: String) -> JobState {
+        guard let info = processInfo(pid), info.tty == tty else { return .gone }
+        return info.isForeground ? .foreground : .background
+    }
+
+    enum JobState {
+        case gone, background, foreground
+    }
+
+    /// `info` reads a process's parent and tty; nil when it is gone or not ours.
+    static func ttyOwner(
+        ofPID pid: pid_t,
+        maxDepth: Int,
+        info: (pid_t) -> (ppid: pid_t, tty: String?)?
+    ) -> (pid: pid_t, tty: String)? {
+        var current = pid
+        for _ in 0 ... maxDepth {
+            guard let entry = info(current) else { return nil }
+            if let tty = entry.tty { return (current, tty) }
+            guard entry.ppid > 1 else { return nil }
+            current = entry.ppid
+        }
+        return nil
+    }
+
+    private static func processInfo(_ pid: pid_t) -> (ppid: pid_t, tty: String?, isForeground: Bool)? {
         var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
         var entry = kinfo_proc()
         var size = MemoryLayout<kinfo_proc>.stride
@@ -276,7 +319,8 @@ extension TerminalProcess {
         else { return nil }
         let dev = entry.kp_eproc.e_tdev
         // NODEV: no controlling tty
-        return dev == -1 ? nil : devname(dev, S_IFCHR).map { "/dev/" + String(cString: $0) }
+        let tty = dev == -1 ? nil : devname(dev, S_IFCHR).map { "/dev/" + String(cString: $0) }
+        return (entry.kp_eproc.e_ppid, tty, entry.kp_eproc.e_pgid == entry.kp_eproc.e_tpgid)
     }
 
     /// The paths the unix sockets of `pid` are connected to, e.g. a multiplexer
@@ -478,5 +522,89 @@ extension TerminalProcess {
         var status: Int32 = 0
         while waitpid(pid, &status, 0) < 0, errno == EINTR {}
         return status == 0 ? String(decoding: output, as: UTF8.self) : nil
+    }
+}
+
+// MARK: - Program control
+
+/// Panes whose program (nvim, ...) took over the input source with `isp:` commands,
+/// per tty, in memory only. A controlled pane skips Terminal and App rules: it
+/// goes back to `current`, which follows every change made while it has focus,
+/// so the program can `push` the source it wants, `pop` back to what was there,
+/// and `release` the pane to the rules. The last program to command a tty is
+/// its `pid`, and the pane is controlled only while that process is the tty's
+/// foreground job: in the background (Ctrl-Z) the entry waits for `fg`, and it is
+/// dropped once the process is gone, whether or not it let go. Only a program
+/// the pane runs is a context of its own (`AppKind.from`): a shell commanding
+/// its own pane from a hook switches it, and stays the terminal's App Rule context.
+/// A pane inside Zellij is never controlled: Zellij names its focused pane
+/// without a tty, so a command can't be traced to it.
+struct TerminalControlTracker<Source> {
+    static var maxStack: Int { 16 }
+
+    private struct Entry {
+        var stack: [Source] = []
+        var current: Source?
+        var pid: pid_t = 0
+        var isSuspended = false
+    }
+
+    private var entries: [String: Entry] = [:]
+
+    func isControlled(_ tty: String) -> Bool {
+        entries[tty].map { !$0.isSuspended } ?? false
+    }
+
+    /// The source the pane should have, kept while it is suspended; nil for an
+    /// uncontrolled pane, or when none is known.
+    func current(on tty: String) -> Source? {
+        entries[tty]?.current
+    }
+
+    mutating func select(_ source: Source, on tty: String, pid: pid_t) {
+        entries[tty] = Entry(stack: entries[tty]?.stack ?? [], current: source, pid: pid)
+    }
+
+    /// Stacks the pane's source, `live` when none is recorded yet and nil when unknown, then makes `source` current.
+    mutating func push(_ source: Source, on tty: String, pid: pid_t, live: Source?) {
+        var entry = entries[tty] ?? Entry()
+        entry.pid = pid
+        entry.isSuspended = false
+        if let base = entry.current ?? live {
+            entry.stack.append(base)
+            if entry.stack.count > Self.maxStack { entry.stack.removeFirst() }
+        }
+        entry.current = source
+        entries[tty] = entry
+    }
+
+    /// The source `pop` returns to, now current; nil, changing nothing, for an empty stack.
+    mutating func pop(on tty: String, pid: pid_t) -> Source? {
+        guard let popped = entries[tty]?.stack.popLast() else { return nil }
+        entries[tty]?.current = popped
+        entries[tty]?.pid = pid
+        entries[tty]?.isSuspended = false
+        return popped
+    }
+
+    /// The pane has focus and its source changed, whoever changed it.
+    mutating func follow(_ source: Source, on tty: String) {
+        guard isControlled(tty) else { return }
+        entries[tty]?.current = source
+    }
+
+    /// The program let go.
+    mutating func release(_ tty: String) {
+        entries[tty] = nil
+    }
+
+    /// The pane was read: `state` tells where its program's process stands on it.
+    mutating func check(_ tty: String, state: (pid_t, String) -> TerminalProcess.JobState) {
+        guard let pid = entries[tty]?.pid else { return }
+        switch state(pid, tty) {
+        case .gone: entries[tty] = nil
+        case .background: entries[tty]?.isSuspended = true
+        case .foreground: entries[tty]?.isSuspended = false
+        }
     }
 }
