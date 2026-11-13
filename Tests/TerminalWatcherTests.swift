@@ -33,6 +33,8 @@ final class TerminalWatcherTests: XCTestCase {
         var foregroundPgids: [pid_t: pid_t] = [:]
         /// Processes that have exited.
         var ended: Set<pid_t> = []
+        /// System uptime.
+        var clock: TimeInterval = 1000
         var zellijPane: Multiplexer.Pane?
         var zellijQueries: [String] = []
         var reachable: Set<TerminalWatcher.Connection> = []
@@ -54,6 +56,7 @@ final class TerminalWatcherTests: XCTestCase {
                 },
                 foregroundPgid: { [unowned self] in foregroundPgids[$0] },
                 isAlive: { [unowned self] in !ended.contains($0) },
+                now: { [unowned self] in clock },
                 zellijPane: { [unowned self] session in
                     zellijQueries.append(session)
                     return zellijPane
@@ -181,9 +184,11 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertEqual(harness.refreshes, 1)
     }
 
-    /// A script's foreground group stays while its commands come and go: only the first
-    /// one read there is watched, so the script costs one more read, not one per command.
-    func testOnlyTheFirstProgramOfAForegroundGroupIsWatched() {
+    /// A script run by a shell (`sh install.sh`, `sh -c 'a; b'`) keeps its foreground group
+    /// while its commands come and go. The first one's end is reported at once; one that
+    /// follows it only after the cooldown, so the script costs a read every few seconds,
+    /// not one per command.
+    func testAProgramThatFollowsAnotherInItsGroupIsReportedAfterTheCooldown() {
         let harness = Harness()
         harness.foregroundPgids = [10: 100]
         harness.bringToFront(.ghostty)
@@ -195,21 +200,35 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertEqual(harness.refreshes, 1, "The first command ended")
 
         harness.watcher.follow(reading(12), for: .ghostty)
-        harness.ended = [11, 12]
+        harness.ended.insert(12)
         harness.tick()
+        XCTAssertEqual(harness.refreshes, 1, "The next command ended within the cooldown")
+        harness.clock += TerminalWatcher.programCooldown
+        harness.tick()
+        XCTAssertEqual(harness.refreshes, 2, "Reported once the cooldown is over")
+
+        // A shell read in between (the script between two commands) does not start the group over.
+        harness.watcher.follow(reading(nil), for: .ghostty)
         harness.watcher.follow(reading(13), for: .ghostty)
-        harness.ended = [11, 12, 13]
+        harness.ended.insert(13)
         harness.tick()
-        XCTAssertEqual(harness.refreshes, 1, "The script's next commands are not watched")
+        XCTAssertEqual(harness.refreshes, 2)
+
+        // One that outlives the cooldown (an editor the script opens) is reported when it ends.
+        harness.watcher.follow(reading(14), for: .ghostty)
+        harness.clock += 60
+        harness.tick()
+        XCTAssertEqual(harness.refreshes, 2, "Still running")
+        harness.ended.insert(14)
+        harness.tick()
+        XCTAssertEqual(harness.refreshes, 3)
 
         // Another foreground group (the script ended, the user ran something else) starts over.
         harness.foregroundPgids = [10: 200]
-        harness.tick()
-        XCTAssertEqual(harness.refreshes, 2)
         harness.watcher.follow(TerminalTrail(ttys: [TerminalTrail.TTY(pid: 10, foregroundPgid: 200, program: 21)]), for: .ghostty)
         harness.ended.insert(21)
         harness.tick()
-        XCTAssertEqual(harness.refreshes, 3)
+        XCTAssertEqual(harness.refreshes, 4)
     }
 
     func testAliveMeansTheProcessExistsWhoeverOwnsIt() {

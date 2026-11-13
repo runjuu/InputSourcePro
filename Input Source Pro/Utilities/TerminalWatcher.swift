@@ -10,8 +10,7 @@ struct TerminalTrail: Equatable {
     /// and the tty's foreground process group when it was read. `program` is the
     /// process read as the tty's program, if any: one that runs in its shell's own
     /// process group (a command in a startup file, a step of `sh -c 'a; b'`) ends
-    /// without the foreground group changing. The watcher follows only the first
-    /// one read in a foreground group.
+    /// without the foreground group changing.
     struct TTY: Equatable {
         let pid: pid_t
         let foregroundPgid: pid_t
@@ -96,6 +95,8 @@ final class TerminalWatcher {
         var poll: (_ interval: TimeInterval, _ check: @escaping () -> String?, _ fire: @escaping (String) -> Void) -> AnyCancellable
         var foregroundPgid: (pid_t) -> pid_t?
         var isAlive: (pid_t) -> Bool
+        /// System uptime.
+        var now: () -> TimeInterval
         var zellijPane: (_ session: String) -> Multiplexer.Pane?
         /// Opens a connection without waiting on it, or nil when its server can't be reached.
         var connect: (Connection, _ send: @escaping (ConnectionEvent) -> Void) -> AnyCancellable?
@@ -105,6 +106,9 @@ final class TerminalWatcher {
     static let libprocInterval: TimeInterval = 0.1
     static let zellijInterval: TimeInterval = 0.5
     static let connectionGrace: TimeInterval = 10
+    /// How long after it was first read a program that follows another in the same
+    /// foreground group may end unreported.
+    static let programCooldown: TimeInterval = 2
     /// Attempts in a row that find no server, or get no handshake from it, before giving up on it.
     static let maxFailedAttempts = 6
 
@@ -126,11 +130,13 @@ final class TerminalWatcher {
     /// Counts poll sets, so a change fired by a replaced poll is ignored.
     private var pollGeneration = 0
     private var watchedPIDs: [pid_t] = []
-    /// Per watched tty (by its `pid`), the foreground group it was read in and the program
-    /// first read there. Only that program's end is watched: a script's foreground group
-    /// stays while its commands come and go, and watching each of them would read the pane
-    /// again for every one.
-    private var firstPrograms: [pid_t: (foregroundPgid: pid_t, program: pid_t)] = [:]
+    /// Per watched tty (by its `pid`): the foreground group it was read in, the program
+    /// watched there, and the uptime before which that program's end is not reported. The
+    /// first program of a group is reported at once; one that follows it in the same group
+    /// only `programCooldown` after it was first read. A script keeps its group while its
+    /// commands come and go, and reporting each at once would read the pane for every one.
+    /// Kept while no tty is watched, so coming back to a terminal does not start over.
+    private var watchedPrograms: [pid_t: (foregroundPgid: pid_t, program: pid_t, notBefore: TimeInterval)] = [:]
     private var watchedZellij: String?
     private var connections: [Connection: AnyCancellable] = [:]
     /// Attaches dropped in a row since a connection's last handshake; each one waits longer.
@@ -190,7 +196,13 @@ final class TerminalWatcher {
             watchedPIDs = pids
         }
         if !trail.ttys.isEmpty {
-            let check = Self.libprocCheck(watchingFirstPrograms(trail.ttys), foregroundPgid: environment.foregroundPgid, isAlive: environment.isAlive)
+            let check = Self.libprocCheck(
+                trail.ttys,
+                programNotBefore: programHolds(trail.ttys),
+                foregroundPgid: environment.foregroundPgid,
+                isAlive: environment.isAlive,
+                now: environment.now
+            )
             polls.append(environment.poll(Self.libprocInterval, check) { [weak self] change in
                 self?.trigger(src: "libproc", change, paneMayHaveChanged: false, generation: generation)
             })
@@ -218,21 +230,27 @@ final class TerminalWatcher {
         }
     }
 
-    /// `ttys` with `program` kept only where it is the first one read in its tty's
-    /// foreground group; see `firstPrograms`.
-    private func watchingFirstPrograms(_ ttys: [TerminalTrail.TTY]) -> [TerminalTrail.TTY] {
-        firstPrograms = firstPrograms.filter { first in ttys.contains { $0.pid == first.key } }
-        return ttys.map { tty in
-            var tty = tty
-            if let first = firstPrograms[tty.pid], first.foregroundPgid == tty.foregroundPgid {
-                if tty.program != first.program { tty.program = nil }
-            } else if let program = tty.program {
-                firstPrograms[tty.pid] = (tty.foregroundPgid, program)
-            } else {
-                firstPrograms[tty.pid] = nil
+    /// Per tty in `ttys` (by its `pid`), the uptime before which its program's end is not
+    /// reported; see `watchedPrograms`.
+    private func programHolds(_ ttys: [TerminalTrail.TTY]) -> [pid_t: TimeInterval] {
+        watchedPrograms = watchedPrograms.filter { watched in ttys.contains { $0.pid == watched.key } }
+        let now = environment.now()
+        for tty in ttys {
+            let watched = watchedPrograms[tty.pid].flatMap { $0.foregroundPgid == tty.foregroundPgid ? $0 : nil }
+            guard let program = tty.program else {
+                // A shell read in the same group keeps the entry: the next program there is not the first.
+                if watched == nil { watchedPrograms[tty.pid] = nil }
+                continue
             }
-            return tty
+            if let watched {
+                if watched.program != program {
+                    watchedPrograms[tty.pid] = (tty.foregroundPgid, program, now + Self.programCooldown)
+                }
+            } else {
+                watchedPrograms[tty.pid] = (tty.foregroundPgid, program, 0)
+            }
         }
+        return watchedPrograms.mapValues(\.notBefore)
     }
 
     private func trigger(src: String, _ detail: String, paneMayHaveChanged: Bool, generation: Int? = nil) {
@@ -316,19 +334,21 @@ final class TerminalWatcher {
     // MARK: Checks (run on the poll queue)
 
     /// The first tty whose foreground group differs from `ttys`' baseline or can't be read
-    /// any more, or whose program has ended.
+    /// any more, or whose program has ended and may be reported (`programNotBefore`, by tty `pid`).
     nonisolated static func libprocCheck(
         _ ttys: [TerminalTrail.TTY],
+        programNotBefore: [pid_t: TimeInterval] = [:],
         foregroundPgid: @escaping (pid_t) -> pid_t?,
-        isAlive: @escaping (pid_t) -> Bool
+        isAlive: @escaping (pid_t) -> Bool,
+        now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
     ) -> () -> String? {
         {
             for tty in ttys {
-                let now = foregroundPgid(tty.pid)
-                if now != tty.foregroundPgid {
-                    return "pid=\(tty.pid) tpgid=\(tty.foregroundPgid)->\(now.map(String.init) ?? "gone")"
+                let current = foregroundPgid(tty.pid)
+                if current != tty.foregroundPgid {
+                    return "pid=\(tty.pid) tpgid=\(tty.foregroundPgid)->\(current.map(String.init) ?? "gone")"
                 }
-                if let program = tty.program, !isAlive(program) {
+                if let program = tty.program, now() >= programNotBefore[tty.pid] ?? 0, !isAlive(program) {
                     return "pid=\(tty.pid) program=\(program)->gone"
                 }
             }
@@ -414,6 +434,7 @@ extension TerminalWatcher.Environment {
             poll: poll,
             foregroundPgid: TerminalTrail.foregroundPgid(ofPID:),
             isAlive: TerminalTrail.isAlive,
+            now: { ProcessInfo.processInfo.systemUptime },
             zellijPane: Multiplexer.zellijPane(session:),
             connect: { connection, send in
                 switch connection {
