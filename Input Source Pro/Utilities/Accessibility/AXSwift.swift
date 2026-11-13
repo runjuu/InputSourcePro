@@ -12,10 +12,18 @@ struct CursorRectInfo {
         CGPoint(x: kind == .caret ? rect.midX : rect.minX, y: rect.maxY + 6)
     }
 
-    /// `indicatorPoint`, or nil when it is on no screen: a window still sliding in
-    /// (Ghostty's quick terminal) reports a frame that is mostly off screen.
+    /// `indicatorPoint`, or nil when the rect's top edge is on no screen: a window still
+    /// sliding in (Ghostty's quick terminal) reports a frame that is mostly off screen.
     func indicatorPoint(on screens: [CGRect]) -> CGPoint? {
-        screens.contains { $0.contains(indicatorPoint) } ? indicatorPoint : nil
+        Self.isTopOnScreen(CGPoint(x: indicatorPoint.x, y: rect.maxY), screens: screens) ? indicatorPoint : nil
+    }
+
+    /// Whether `top`, a point on a rect's top edge in AppKit screen coordinates, is on a
+    /// screen. The edge is tested rather than the indicator point 6pt above it: a caret on
+    /// the first row of a full-screen window sits within those 6pt of the screen's top.
+    static func isTopOnScreen(_ top: CGPoint, screens: [CGRect]) -> Bool {
+        // `contains` leaves out the far edges, where a caret flush with the screen's top is.
+        screens.contains { $0.insetBy(dx: -1, dy: -1).contains(top) }
     }
 
     static func insertionPoint(rect: CGRect, zeroWidthCaretWidth: CGFloat? = nil) -> CursorRectInfo? {

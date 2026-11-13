@@ -226,21 +226,17 @@ final class AppKindTerminalTests: XCTestCase {
     private func terminal(_ program: TerminalProgram, rule: TerminalRule? = nil) -> AppKind {
         .terminal(
             app: app,
-            info: (focusedElement: nil, isFocusOnInputContainer: true, program: program, rule: rule)
+            info: (focusedElement: nil, isFocusOnInputContainer: true, program: program, rule: rule ?? TerminalRule(program: program.key))
         )
     }
 
-    func testIdUsesMatchedRuleOrProgram() throws {
+    func testIdUsesMatchedRule() throws {
         let bundleId = try XCTUnwrap(app.bundleId())
         let rule = TerminalRule(program: "claude")
 
         XCTAssertEqual(
             terminal(TerminalProgram(key: "claude", name: "Claude Code"), rule: rule).getId(),
             "\(bundleId)_\(rule.id.uuidString)"
-        )
-        XCTAssertEqual(
-            terminal(TerminalProgram(key: "program", name: "htop")).getId(),
-            "\(bundleId)_program/htop"
         )
     }
 
@@ -266,13 +262,8 @@ final class AppKindTerminalTests: XCTestCase {
         XCTAssertEqual(paneA.getId(), "\(bundleId)_\(rule.id.uuidString)")
     }
 
-    func testProgramIdLeavesOutPane() throws {
-        let bundleId = try XCTUnwrap(app.bundleId())
-        let program = TerminalProgram(key: "claude", name: "2.1.318", pane: "/dev/ttys008")
-
-        XCTAssertEqual(program.id, "claude/2.1.318")
-        XCTAssertEqual(terminal(program).getId(), "\(bundleId)_claude/2.1.318")
-        XCTAssertEqual(terminal(program).getId(), terminal(TerminalProgram(key: "claude", name: "2.1.318", pane: "/dev/ttys009")).getId())
+    func testProgramIdLeavesOutPane() {
+        XCTAssertEqual(TerminalProgram(key: "claude", name: "2.1.318", pane: "/dev/ttys008").id, "claude/2.1.318")
     }
 }
 

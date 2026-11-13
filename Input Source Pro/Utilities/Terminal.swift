@@ -111,9 +111,7 @@ struct TerminalProgram: Equatable {
         self.pane = pane
     }
 
-    /// Stable per-program part of `AppKind.getId()` when no rule matches. Leaves
-    /// out `pane`, so panes running the same program share one remembered input
-    /// source, like tabs on the same website.
+    /// Names the program in diagnostics; leaves out `pane`.
     var id: String {
         [key, name].compactMap { $0 }.joined(separator: "/").lowercased()
     }
@@ -381,6 +379,25 @@ extension TerminalProcess {
         return environment.map { "\($0)=\($1)" }
     }()
 
+    /// Where package managers install CLIs (Homebrew on Apple silicon and Intel,
+    /// MacPorts, Nix), in the order they are searched: ISP runs without a login PATH.
+    static let executableDirectories = [
+        "/opt/homebrew/bin",
+        "/usr/local/bin",
+        "/opt/local/bin",
+        "/run/current-system/sw/bin",
+        NSHomeDirectory() + "/.nix-profile/bin",
+    ]
+
+    /// The first executable called `name` in `directories`, nil when there is none.
+    static func executable(
+        named name: String,
+        in directories: [String] = executableDirectories,
+        isExecutable: (String) -> Bool = FileManager.default.isExecutableFile(atPath:)
+    ) -> String? {
+        directories.lazy.map { $0 + "/" + name }.first(where: isExecutable)
+    }
+
     /// `path`'s standard output when it exits with status 0 within `timeout`.
     /// posix_spawn rather than `Process`: zellij's client list is polled several
     /// times a second, and `Process` costs about ten times the CPU per run.
@@ -422,13 +439,24 @@ extension TerminalProcess {
         // The child stays unreaped until `exited` is set, so its pid can't be reused under the kill.
         let lock = NSLock()
         var exited = false
+        var timedOut = false
         watchdog(timeout) {
-            lock.withLock { if !exited { kill(pid, SIGKILL) } }
+            lock.withLock {
+                timedOut = true
+                if !exited { kill(pid, SIGKILL) }
+            }
         }
 
         var output: [UInt8] = []
         var chunk = [UInt8](repeating: 0, count: 4096)
+        var readable = pollfd(fd: readEnd, events: Int16(POLLIN), revents: 0)
         while true {
+            // Waits in slices rather than in `read`: a process the child left behind
+            // can keep the pipe open long after the child itself was killed.
+            if lock.withLock({ timedOut }) { break }
+            let ready = poll(&readable, 1, 100)
+            if ready == 0 || (ready < 0 && errno == EINTR) { continue }
+            guard ready > 0 else { break }
             let count = read(readEnd, &chunk, chunk.count)
             if count > 0 {
                 output += chunk[..<count]

@@ -127,9 +127,9 @@ final class CaretPalette {
                   screens.contains(where: { $0.intersects(rect.insetBy(dx: -1, dy: 0)) })
             else { return nil }
             // IMK returns AppKit screen coordinates, already bottom-left based.
-            let point = CGPoint(x: rect.midX, y: rect.maxY + 6)
-            // A window sliding in (Ghostty's quick terminal) can put the caret on screen but the point above it.
-            return screens.contains { $0.insetBy(dx: -1, dy: 0).contains(point) } ? point : nil
+            // A window sliding in from above (Ghostty's quick terminal) can show the caret's foot while its top is still off screen.
+            guard CursorRectInfo.isTopOnScreen(CGPoint(x: rect.midX, y: rect.maxY), screens: screens) else { return nil }
+            return CGPoint(x: rect.midX, y: rect.maxY + 6)
         }
     }
 
@@ -440,8 +440,11 @@ final class CaretPalette {
 
     /// The terminal's focused pane changed: the last sample shows the previous pane's caret.
     func markSampleStale() {
-        guard sample != nil, staleSince == nil else { return }
-        staleSince = ProcessInfo.processInfo.systemUptime
+        let now = ProcessInfo.processInfo.systemUptime
+        // A grace that ran out without a new sample is over: the next pane change starts another.
+        if let staleSince, now - staleSince < Self.staleGrace { return }
+        guard sample != nil else { return }
+        staleSince = now
         // Re-query once the grace ends so a pane switch the helper never resamples (no key event) still shows.
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.staleGrace) { [weak self] in self?.updates.send(()) }
     }

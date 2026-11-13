@@ -173,11 +173,12 @@ final class ActivateEventInputSourceChangeTests: XCTestCase {
     }
 
     func testSameProgramInAnotherPaneIsAFocusChange() {
+        let rule = TerminalRule(program: "claude")
         func state(pane: String) -> IndicatorVM.State {
             .init(
                 appKind: .terminal(
                     app: app,
-                    info: (focusedElement: nil, isFocusOnInputContainer: true, program: TerminalProgram(key: "claude", pane: pane), rule: nil)
+                    info: (focusedElement: nil, isFocusOnInputContainer: true, program: TerminalProgram(key: "claude", pane: pane), rule: rule)
                 ),
                 inputSource: TestInputSource("EN"),
                 inputSourceChangeReason: .noChanges

@@ -189,6 +189,8 @@ final class TerminalPanelFocusTests: XCTestCase {
             )
         )
         let preferencesVM = try ApplicationVMTerminalTests.inMemoryPreferencesVM()
+        let restore = ApplicationVMTerminalTests.setTerminalPreferences(preferencesVM, enabled: .ghostty, rules: ["claude", "vim"])
+        defer { restore() }
         // Last read in Ghostty's window, not its panel.
         preferencesVM.terminalPrograms[.ghostty] = TerminalProgram(key: "vim", pane: "/dev/ttys001")
         let applicationVM = ApplicationVM(preferencesVM: preferencesVM, environment: environment)
@@ -242,6 +244,8 @@ final class TerminalPanelFocusTests: XCTestCase {
             )
         )
         let preferencesVM = try ApplicationVMTerminalTests.inMemoryPreferencesVM()
+        let restore = ApplicationVMTerminalTests.setTerminalPreferences(preferencesVM, enabled: .ghostty, rules: ["claude", "zsh-tool"])
+        defer { restore() }
         let applicationVM = ApplicationVM(preferencesVM: preferencesVM, environment: environment)
         let program = { applicationVM.appKind?.getTerminalInfo()?.program.key }
 
