@@ -48,6 +48,8 @@ extension Terminal {
     private static var focusedPanels: Set<Terminal> = []
 
     var isPanelFocused: Bool { Self.focusedPanels.contains(self) }
+    /// The tty a refresh reads again, nil when none is remembered. Call on `TerminalProcess.queue`.
+    var focusedTTY: String? { Self.focusedTTYs[self] }
 
     /// Marks whether this terminal's floating panel has focus and forgets the
     /// focused tty, which belonged to the other side. Call on `TerminalProcess.queue`.

@@ -23,11 +23,31 @@ struct TerminalRule: Codable, Equatable, Identifiable {
         return [program.key, program.name].contains { $0.map(Self.normalized) == value }
     }
 
-    static func firstEnabledRule(matching program: TerminalProgram, in rules: [TerminalRule]) -> TerminalRule? {
-        rules.first { !$0.disabled && $0.matches(program) }
+    static func firstEnabledRule(
+        matching program: TerminalProgram,
+        in rules: [TerminalRule],
+        where isUsable: (TerminalRule) -> Bool = { _ in true }
+    ) -> TerminalRule? {
+        rules.first { !$0.disabled && $0.matches(program) && isUsable($0) }
     }
 
     private static func normalized(_ value: String) -> String {
         value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+}
+
+extension TerminalRule {
+    /// Only `program` is required, so a rule stored or backed up without a field added
+    /// later still reads: the synthesized decoder would fail on it, and one unreadable
+    /// rule empties the stored list and rejects a whole backup.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID(),
+            program: try container.decode(String.self, forKey: .program),
+            inputSourceId: try container.decodeIfPresent(String.self, forKey: .inputSourceId),
+            disabled: try container.decodeIfPresent(Bool.self, forKey: .disabled) ?? false,
+            createdAt: try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        )
     }
 }

@@ -55,7 +55,10 @@ extension IndicatorWindowController {
                             }
                             .eraseToAnyPublisher()
                         let app = appKind.getApp()
-                        guard self.preferencesVM.terminalPanel == app else { return visibility }
+                        // Only where the indicator is set to show at the caret: elsewhere it stays where it was put.
+                        guard self.preferencesVM.terminalPanel == app,
+                              self.preferencesVM.positionsNearCaret(app: app)
+                        else { return visibility }
 
                         let followed = Self.panelCaretPublisher(
                             changes: CaretPalette.shared.changes,
