@@ -303,9 +303,12 @@ extension ApplicationVM {
                 terminalPaneFocusChanges.send(terminal)
             }
         }
-        terminalProgramGate.receive(reading, current: preferencesVM.terminalPrograms[terminal], for: terminal, recheck: recheck) { [weak self] reading in
+        terminalProgramGate.receive(reading, current: preferencesVM.terminalPrograms[terminal], for: terminal, recheck: recheck) { [weak self] published in
             guard let self else { return }
-            let changed = self.updateTerminalProgram(reading, for: terminal)
+            // A held shell's recheck is a lookup of its own: what it went through, and the
+            // program it found, are what to watch from here on.
+            if published.trail != reading.trail { self.terminalWatcher.follow(published.trail, for: terminal) }
+            let changed = self.updateTerminalProgram(published, for: terminal)
             let owed = self.terminalRepublishes.removeValue(forKey: terminal) != nil
             if changed || owed { self.terminalProgramChanges.send(terminal) }
         }

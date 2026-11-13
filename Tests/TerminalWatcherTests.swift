@@ -31,6 +31,8 @@ final class TerminalWatcherTests: XCTestCase {
 
         var polls: [Poll] = []
         var foregroundPgids: [pid_t: pid_t] = [:]
+        /// Processes that have exited.
+        var ended: Set<pid_t> = []
         var zellijPane: Multiplexer.Pane?
         var zellijQueries: [String] = []
         var reachable: Set<TerminalWatcher.Connection> = []
@@ -51,6 +53,7 @@ final class TerminalWatcherTests: XCTestCase {
                     return AnyCancellable { poll.isCancelled = true }
                 },
                 foregroundPgid: { [unowned self] in foregroundPgids[$0] },
+                isAlive: { [unowned self] in !ended.contains($0) },
                 zellijPane: { [unowned self] session in
                     zellijQueries.append(session)
                     return zellijPane
@@ -157,6 +160,33 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertEqual(harness.refreshes, 2)
     }
 
+    /// A program in its shell's own process group (a command in a startup file, a step
+    /// of `sh -c 'a; b'`) ends without the foreground group changing.
+    func testLibprocTriggersWhenTheProgramEndsInsideItsShellsGroup() {
+        let harness = Harness()
+        harness.foregroundPgids = [10: 100]
+        harness.bringToFront(.ghostty)
+        let reading = TerminalTrail(ttys: [TerminalTrail.TTY(pid: 10, foregroundPgid: 100, program: 11)])
+        harness.watcher.follow(reading, for: .ghostty)
+
+        harness.tick()
+        XCTAssertEqual(harness.refreshes, 0, "Still running")
+        harness.ended = [11]
+        harness.tick()
+        XCTAssertEqual([harness.refreshes, harness.paneChanges], [1, 0])
+
+        // The lookup it caused reads a shell: nothing more to watch but the group.
+        harness.watcher.follow(trail(ttys: [(10, 100)]), for: .ghostty)
+        harness.tick()
+        XCTAssertEqual(harness.refreshes, 1)
+    }
+
+    func testAliveMeansTheProcessExistsWhoeverOwnsIt() {
+        XCTAssertTrue(TerminalTrail.isAlive(getpid()))
+        XCTAssertTrue(TerminalTrail.isAlive(1), "launchd is root's")
+        XCTAssertFalse(TerminalTrail.isAlive(pid_t.max))
+    }
+
     func testTTYIsWatchedThroughItsEarliestReadableProcess() {
         let processes = [
             TerminalProcess(pid: 9, pgid: 9, foregroundPgid: 9, startTime: 3, comm: "nvim"),
@@ -166,7 +196,7 @@ final class TerminalWatcherTests: XCTestCase {
         let rootLogin: pid_t = 5
         let tty = TerminalTrail.TTY(watching: processes) { $0 == rootLogin ? nil : 1 }
 
-        XCTAssertEqual(tty, TerminalTrail.TTY(pid: 6, foregroundPgid: 9), "Baseline is the table's value, not the new read")
+        XCTAssertEqual(tty, TerminalTrail.TTY(pid: 6, foregroundPgid: 9, program: 9), "Baseline is the table's value, not the new read")
         XCTAssertNil(TerminalTrail.TTY(watching: processes) { _ in nil })
     }
 
