@@ -100,8 +100,15 @@ final class TerminalPanelFocusTests: XCTestCase {
 
         harness.attributes = Self.panel
         harness.notify()
-        // Permission revoked while the panel has focus.
+        // One read the terminal was too busy to answer keeps the panel.
         harness.attributes = nil
+        harness.notify()
+        XCTAssertEqual(harness.changes, [Self.ghostty])
+        harness.attributes = Self.panel
+        harness.notify()
+        // Permission revoked while the panel has focus: the recheck's next read fails too.
+        harness.attributes = nil
+        harness.notify()
         harness.notify()
         XCTAssertEqual(harness.changes, [Self.ghostty, nil])
     }

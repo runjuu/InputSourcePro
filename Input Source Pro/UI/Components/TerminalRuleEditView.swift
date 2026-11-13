@@ -76,7 +76,8 @@ struct TerminalRuleEditView: View {
                     .keyboardShortcut(.cancelAction)
 
                 Button("\(rule == nil ? "Add" : "Save")".i18n(), action: save)
-                    .disabled(trimmedProgram.isEmpty)
+                    // A rule's only effect is its keyboard.
+                    .disabled(trimmedProgram.isEmpty || inputSourceItem == .empty)
                     .keyboardShortcut(.defaultAction)
             }
             .padding(.top, 6)

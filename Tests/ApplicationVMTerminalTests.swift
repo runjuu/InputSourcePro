@@ -163,6 +163,30 @@ final class ApplicationVMTerminalTests: XCTestCase {
         XCTAssertFalse(preferencesVM.appNeedCacheKeyboard(claude))
     }
 
+    func testRulesAreSavedByIdAndSwitchesAreStoredOnce() throws {
+        let preferencesVM = try Self.inMemoryPreferencesVM()
+        let restore = Self.setTerminalPreferences(preferencesVM, enabled: .ghostty, rules: ["claude"])
+        defer { restore() }
+
+        var claude = try XCTUnwrap(preferencesVM.terminalRules.first)
+        claude.disabled = true
+        preferencesVM.saveTerminalRule(claude)
+        let nvim = TerminalRule(program: "nvim")
+        preferencesVM.saveTerminalRule(nvim)
+        XCTAssertEqual(preferencesVM.terminalRules, [claude, nvim], "Same id replaces, a new id appends")
+        XCTAssertNil(preferencesVM.getTerminalRule(program: TerminalProgram(key: "claude")), "A disabled rule matches nothing")
+
+        preferencesVM.deleteTerminalRules(ids: [claude.id])
+        XCTAssertEqual(preferencesVM.terminalRules, [nvim])
+
+        preferencesVM.setTerminal(.ghostty, enabled: true)
+        preferencesVM.setTerminal(.iterm, enabled: true)
+        XCTAssertEqual(preferencesVM.preferences.enabledTerminals, [Terminal.ghostty.rawValue, Terminal.iterm.rawValue])
+        preferencesVM.setTerminal(.ghostty, enabled: false)
+        XCTAssertFalse(preferencesVM.isTerminalEnabled(.ghostty))
+        XCTAssertTrue(preferencesVM.isTerminalEnabled(.iterm))
+    }
+
     static func inMemoryPreferencesVM() throws -> PreferencesVM {
         let container = NSPersistentContainer(name: "Main", managedObjectModel: PreferencesVM.managedObjectModel)
         let description = NSPersistentStoreDescription()

@@ -89,8 +89,8 @@ final class TerminalWatcher {
     static let libprocInterval: TimeInterval = 0.1
     static let zellijInterval: TimeInterval = 0.5
     static let connectionGrace: TimeInterval = 10
-    /// Attempts in a row at a server that can't be reached before giving up on it.
-    static let maxUnreachableAttempts = 6
+    /// Attempts in a row that find no server, or get no handshake from it, before giving up on it.
+    static let maxFailedAttempts = 6
 
     /// The wait before an attempt that follows `failures` failed ones: 0.5s, doubling up to 5s.
     static func retryDelay(afterFailures failures: Int) -> TimeInterval {
@@ -98,7 +98,8 @@ final class TerminalWatcher {
     }
 
     private let environment: Environment
-    private let refresh: () -> Void
+    /// `paneMayHaveChanged`: a multiplexer reported the change, not a job starting or ending on a tty.
+    private let refresh: (_ paneMayHaveChanged: Bool) -> Void
 
     private var active: Terminal?
     /// Counts `watching` subscriptions, so a late cancel of an earlier one is ignored.
@@ -115,7 +116,7 @@ final class TerminalWatcher {
     private var drops: [Connection: Int] = [:]
     private var closing: AnyCancellable?
 
-    init(environment: Environment = .live(), refresh: @escaping () -> Void) {
+    init(environment: Environment = .live(), refresh: @escaping (_ paneMayHaveChanged: Bool) -> Void) {
         self.environment = environment
         self.refresh = refresh
     }
@@ -144,7 +145,6 @@ final class TerminalWatcher {
     private func start(_ terminal: Terminal) -> Int {
         session += 1
         active = terminal
-        closing = nil
         if let trail = trails[terminal] {
             // A stale baseline reads as a change, which looks the pane up again.
             watch(trail)
@@ -156,9 +156,6 @@ final class TerminalWatcher {
         guard session == self.session, active != nil else { return }
         active = nil
         watch(TerminalTrail())
-        guard !connections.isEmpty else { return }
-        closing = environment.delay(Self.connectionGrace)
-            .sink { [weak self] _ in self?.closeConnections() }
     }
 
     private func watch(_ trail: TerminalTrail) {
@@ -174,7 +171,7 @@ final class TerminalWatcher {
         if !trail.ttys.isEmpty {
             let check = Self.libprocCheck(trail.ttys, foregroundPgid: environment.foregroundPgid)
             polls.append(environment.poll(Self.libprocInterval, check) { [weak self] change in
-                self?.trigger(src: "libproc", change, generation: generation)
+                self?.trigger(src: "libproc", change, paneMayHaveChanged: false, generation: generation)
             })
         }
 
@@ -185,17 +182,25 @@ final class TerminalWatcher {
         if let zellij = trail.zellij {
             let check = Self.zellijCheck(zellij, pane: environment.zellijPane)
             polls.append(environment.poll(Self.zellijInterval, check) { [weak self] change in
-                self?.trigger(src: "zellij-poll", change, generation: generation)
+                self?.trigger(src: "zellij-poll", change, paneMayHaveChanged: true, generation: generation)
             })
         }
 
-        if trail.tmux { open(.tmux) }
+        if trail.tmux {
+            closing = nil
+            open(.tmux)
+        } else if !connections.isEmpty, closing == nil {
+            // Nothing in front goes through the server any more (tmux detached, another
+            // terminal, or none): its connection is kept for the grace period, then closed.
+            closing = environment.delay(Self.connectionGrace)
+                .sink { [weak self] _ in self?.closeConnections() }
+        }
     }
 
-    private func trigger(src: String, _ detail: String, generation: Int? = nil) {
+    private func trigger(src: String, _ detail: String, paneMayHaveChanged: Bool, generation: Int? = nil) {
         guard active != nil, generation.map({ $0 == pollGeneration }) ?? true else { return }
         record(src: src, "trigger \(detail)")
-        refresh()
+        refresh(paneMayHaveChanged)
     }
 
     // MARK: Connections
@@ -212,7 +217,7 @@ final class TerminalWatcher {
     }
 
     /// One attempt after its wait. A server that can't be reached is tried again, each time
-    /// after a longer wait, `maxUnreachableAttempts` times; after that the next lookup that
+    /// after a longer wait, `maxFailedAttempts` times; after that the next lookup that
     /// goes through it starts over.
     private func attempt(_ connection: Connection, unreachable: Int) -> AnyCancellable {
         let wait = Self.retryDelay(afterFailures: (drops[connection] ?? 0) + unreachable)
@@ -221,7 +226,7 @@ final class TerminalWatcher {
             let live = self.environment.connect(connection) { [weak self] in self?.receive($0, from: connection) }
             if let live {
                 self.connections[connection] = live
-            } else if unreachable + 1 < Self.maxUnreachableAttempts {
+            } else if unreachable + 1 < Self.maxFailedAttempts {
                 self.connections[connection] = self.attempt(connection, unreachable: unreachable + 1)
             } else {
                 self.record(connection, "stop unreachable")
@@ -234,16 +239,24 @@ final class TerminalWatcher {
     private func receive(_ event: ConnectionEvent, from connection: Connection) {
         switch event {
         case .changed:
-            trigger(src: connection.src, "event")
+            trigger(src: connection.src, "event", paneMayHaveChanged: true)
         case .closed(wasReady: true):
             // The server went away (or restarts): attach again with backoff.
             record(connection, "reconnect")
             drops[connection] = nil
             connections[connection] = subscribe(connection)
         case .dropped:
-            // No handshake in time, or the server vanished: back off further each time.
-            drops[connection, default: 0] += 1
-            record(connection, "reconnect dropped=\(drops[connection] ?? 0)")
+            // No handshake in time, or the server vanished: back off further each time, and
+            // give up on a server that never answers until a lookup reaches it again.
+            let dropped = (drops[connection] ?? 0) + 1
+            guard dropped < Self.maxFailedAttempts else {
+                record(connection, "stop dropped=\(dropped)")
+                connections[connection] = nil
+                drops[connection] = nil
+                return
+            }
+            drops[connection] = dropped
+            record(connection, "reconnect dropped=\(dropped)")
             connections[connection] = subscribe(connection)
         case .closed(wasReady: false):
             // Refused before its handshake: retrying at once would loop, so wait for a lookup that reaches it again.
@@ -436,8 +449,12 @@ extension TerminalWatcher.Environment {
             try? input.fileHandleForWriting.close()
             return nil
         }
-        // A control client exits when its stdin closes; so does it when ISP quits.
-        return (fd, { try? input.fileHandleForWriting.close(); _ = process })
+        // A control client exits when its stdin closes; so does it when ISP quits. One still
+        // waiting on a server that doesn't answer never reads its stdin, so it is ended too.
+        return (fd, {
+            try? input.fileHandleForWriting.close()
+            if process.isRunning { process.terminate() }
+        })
     }
 
     /// Whether a server listens at `path`, without waiting on it.

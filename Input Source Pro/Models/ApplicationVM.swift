@@ -26,7 +26,10 @@ final class ApplicationVM: ObservableObject {
     private let terminalProgramGate = TerminalProgramGate {
         Timer.delay(seconds: ApplicationVM.terminalShellConfirmationDelay).mapToVoid().eraseToAnyPublisher()
     }
-    private lazy var terminalWatcher = TerminalWatcher { [weak self] in self?.requestTerminalRefresh() }
+    private lazy var terminalWatcher = TerminalWatcher { [weak self] in self?.requestTerminalRefresh(paneMayHaveChanged: $0) }
+    /// Terminals whose program was forgotten and is being read again: the read publishes
+    /// what it finds even when that is no change, and the wait publishes if no read answers.
+    private var terminalRepublishes: [Terminal: AnyCancellable] = [:]
     private lazy var terminalPanelFocus = TerminalPanelFocus(environment: environment.terminalPanelFocus) { [weak self] in
         self?.receiveTerminalPanel($0)
     }
@@ -242,13 +245,13 @@ extension ApplicationVM {
         }
         for (terminal, isFocused) in terminals {
             TerminalProcess.queue.async { terminal.setPanelFocused(isFocused) }
-            preferencesVM.terminalPrograms[terminal] = nil
+            // A terminal still picked (its panel gave focus to its window) keeps its
+            // context until this side is read, so a ruled program on both sides switches once.
+            awaitTerminalProgram(terminal)
         }
         preferencesVM.terminalPanel = panel
         // Re-evaluates the frontmost app, which the panel now stands in for or hands back to.
         terminalPanelChanges.send(())
-        // A terminal still picked (its panel gave focus to its window) drops the old program too.
-        terminals.forEach { terminalProgramChanges.send($0.terminal) }
 
         // While the panel has focus, another app's activation and a slow poll
         // re-evaluate too, in case it hides without a notification.
@@ -263,10 +266,25 @@ extension ApplicationVM {
 
     static let terminalPanelRecheckInterval: TimeInterval = 0.5
 
-    private func requestTerminalRefresh() {
-        // The pane may have changed; the helper's resample usually lands before the lookup resolves.
-        CaretPalette.shared.markSampleStale()
+    private func requestTerminalRefresh(paneMayHaveChanged: Bool) {
+        // After a pane switch the last caret sample is the other pane's; the helper's resample
+        // usually lands before the lookup resolves. A job starting or ending leaves the pane as it is.
+        if paneMayHaveChanged { CaretPalette.shared.markSampleStale() }
         terminalRefreshes.send(())
+    }
+
+    /// How long a forgotten program waits for its read before the terminal is published without one.
+    static let terminalProbeGrace: TimeInterval = 0.3
+
+    /// Forgets `terminal`'s program, which was read somewhere else (before the terminal left
+    /// the front, or on the other side of its panel), and owes one publish: by the next read,
+    /// or after `terminalProbeGrace` when the terminal doesn't answer.
+    private func awaitTerminalProgram(_ terminal: Terminal) {
+        preferencesVM.terminalPrograms[terminal] = nil
+        terminalRepublishes[terminal] = Timer.delay(seconds: Self.terminalProbeGrace).sink { [weak self] _ in
+            guard let self, self.terminalRepublishes.removeValue(forKey: terminal) != nil else { return }
+            self.terminalProgramChanges.send(terminal)
+        }
     }
 
     /// The least time between two probes that window title changes ask for.
@@ -286,8 +304,10 @@ extension ApplicationVM {
             }
         }
         terminalProgramGate.receive(reading, current: preferencesVM.terminalPrograms[terminal], for: terminal, recheck: recheck) { [weak self] reading in
-            guard let self, self.updateTerminalProgram(reading, for: terminal) else { return }
-            self.terminalProgramChanges.send(terminal)
+            guard let self else { return }
+            let changed = self.updateTerminalProgram(reading, for: terminal)
+            let owed = self.terminalRepublishes.removeValue(forKey: terminal) != nil
+            if changed || owed { self.terminalProgramChanges.send(terminal) }
         }
     }
 
@@ -305,6 +325,9 @@ extension ApplicationVM {
     private func watchTerminalProgram(_ app: NSRunningApplication, _ terminal: Terminal) -> AnyPublisher<AppKind, Never> {
         let preferencesVM = preferencesVM
         let probedProgram = environment.probedProgram
+        // What was read before the terminal left the front may have ended, or be another
+        // pane's: the terminal is published once its focused pane has been read again.
+        awaitTerminalProgram(terminal)
 
         // A refresh (`TerminalWatcher`) reads the remembered tty again, and once
         // more a moment later in case the change it saw had not finished.
@@ -351,12 +374,10 @@ extension ApplicationVM {
                 return nil
             }
 
-        // The last known program answers at once; a probe, lookup or refresh corrects it.
         return terminalProgramChanges
             .filter { $0 == terminal }
             .mapToVoid()
             .merge(with: lookedUp, terminalWatcher.watching(terminal).setOutputType(to: Void.self))
-            .prepend(())
             .map { AppKind.from(app, preferencesVM: preferencesVM) }
             .eraseToAnyPublisher()
     }

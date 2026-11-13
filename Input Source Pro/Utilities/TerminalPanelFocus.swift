@@ -53,6 +53,8 @@ final class TerminalPanelFocus {
     private var reads: [pid_t: AnyCancellable] = [:]
     /// Terminals evaluated again while their read was in flight.
     private var rereads: Set<pid_t> = []
+    /// The terminal with the focused panel whose last read went unanswered.
+    private var unanswered: pid_t?
     private let environment: Environment
     private let changed: (_ focusedPID: pid_t?) -> Void
 
@@ -67,6 +69,7 @@ final class TerminalPanelFocus {
         // Work for a terminal that left is void: a queued read is skipped, an evaluation asked again dropped.
         reads = reads.filter { pids.contains($0.key) }
         rereads.formIntersection(pids)
+        if let unanswered, !pids.contains(unanswered) { self.unanswered = nil }
         if let focusedPID, !pids.contains(focusedPID) { set(nil) }
     }
 
@@ -80,7 +83,15 @@ final class TerminalPanelFocus {
         reads[pid] = environment.read(pid) { [weak self] attributes in
             guard let self else { return }
             self.reads[pid] = nil
-            self.apply(pid, isFocused: attributes.map(Self.isPanelFocused) ?? false)
+            // One unanswered read of the terminal with the panel (busy for longer than the
+            // messaging timeout) keeps the panel; the recheck while it has focus asks again,
+            // and a second one in a row (permission revoked, hung) counts as no panel.
+            if attributes == nil, self.focusedPID == pid, self.unanswered != pid {
+                self.unanswered = pid
+            } else {
+                self.unanswered = nil
+                self.apply(pid, isFocused: attributes.map(Self.isPanelFocused) ?? false)
+            }
             if self.rereads.remove(pid) != nil { self.evaluate(pid) }
         }
     }
