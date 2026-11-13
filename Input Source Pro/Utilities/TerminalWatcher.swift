@@ -135,7 +135,9 @@ final class TerminalWatcher {
     /// first program of a group is reported at once; one that follows it in the same group
     /// only `programCooldown` after it was first read. A script keeps its group while its
     /// commands come and go, and reporting each at once would read the pane for every one.
-    /// Kept while no tty is watched, so coming back to a terminal does not start over.
+    /// Entries follow the latest lookup's ttys: kept while no tty is watched (leaving a
+    /// terminal and coming straight back does not start over), dropped for a tty the
+    /// latest lookup did not go through.
     private var watchedPrograms: [pid_t: (foregroundPgid: pid_t, program: pid_t, notBefore: TimeInterval)] = [:]
     private var watchedZellij: String?
     private var connections: [Connection: AnyCancellable] = [:]

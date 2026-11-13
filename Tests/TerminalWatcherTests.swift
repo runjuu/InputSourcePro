@@ -231,6 +231,39 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertEqual(harness.refreshes, 4)
     }
 
+    /// The same program read again (the refresh's second read, a window-title probe once a
+    /// second) must not push its report back, or a spinner in the title would hold it forever.
+    func testReadingTheSameProgramAgainDoesNotRestartItsCooldown() {
+        let harness = Harness()
+        harness.foregroundPgids = [10: 100]
+        harness.bringToFront(.ghostty)
+        let reading = { (program: pid_t?) in TerminalTrail(ttys: [TerminalTrail.TTY(pid: 10, foregroundPgid: 100, program: program)]) }
+        harness.watcher.follow(reading(11), for: .ghostty)
+        harness.watcher.follow(reading(12), for: .ghostty)
+        harness.ended = [12]
+
+        for _ in 0 ..< 3 {
+            harness.clock += TerminalWatcher.programCooldown / 2
+            harness.watcher.follow(reading(12), for: .ghostty)
+        }
+        harness.tick()
+        XCTAssertEqual(harness.refreshes, 1, "Reported a cooldown after it was first read, however often it was read since")
+    }
+
+    /// A tty the latest lookup did not go through is forgotten: read again, its program is a first one.
+    func testAProgramOnATTYNoLongerReadIsAFirstOneAgain() {
+        let harness = Harness()
+        harness.foregroundPgids = [10: 100, 20: 200]
+        harness.bringToFront(.ghostty)
+        let pane = { (program: pid_t) in TerminalTrail(ttys: [TerminalTrail.TTY(pid: 10, foregroundPgid: 100, program: program)]) }
+        harness.watcher.follow(pane(11), for: .ghostty)
+        harness.watcher.follow(self.trail(ttys: [(20, 200)]), for: .ghostty) // another pane
+        harness.watcher.follow(pane(12), for: .ghostty)
+        harness.ended = [12]
+        harness.tick()
+        XCTAssertEqual(harness.refreshes, 1, "No cooldown: nothing is remembered of the pane's earlier program")
+    }
+
     func testAliveMeansTheProcessExistsWhoeverOwnsIt() {
         XCTAssertTrue(TerminalTrail.isAlive(getpid()))
         XCTAssertTrue(TerminalTrail.isAlive(1), "launchd is root's")
