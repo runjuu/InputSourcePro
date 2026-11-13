@@ -7,10 +7,19 @@ import Foundation
 struct TerminalTrail: Equatable {
     /// A tty that was read: a process on it that ISP can read (the earliest
     /// started, normally the shell; a `login` session leader belongs to root),
-    /// and the tty's foreground process group when it was read.
+    /// and the tty's foreground process group when it was read. `program` is the
+    /// process read as the tty's program, if any: one that runs in its shell's own
+    /// process group (a command in a startup file, a step of `sh -c 'a; b'`) ends
+    /// without the foreground group changing.
     struct TTY: Equatable {
         let pid: pid_t
         let foregroundPgid: pid_t
+        var program: pid_t?
+    }
+
+    /// Whether `pid` still exists; another user's process (a program under `sudo`) does.
+    static func isAlive(_ pid: pid_t) -> Bool {
+        kill(pid, 0) == 0 || errno == EPERM
     }
 
     /// The zellij session asked, and the focused pane it answered.
@@ -43,13 +52,18 @@ extension TerminalTrail.TTY {
             .first(where: { read($0.pid) != nil })
         else { return nil }
         // The table's value, not a new read: a job started since the lookup must still count as a change.
-        self.init(pid: process.pid, foregroundPgid: process.foregroundPgid)
+        self.init(
+            pid: process.pid,
+            foregroundPgid: process.foregroundPgid,
+            program: TerminalProcess.foregroundProcess(in: processes)?.pid
+        )
     }
 }
 
 /// Notices changes in the frontmost terminal's focused pane without shell
 /// hooks or plugins, and calls `refresh` so the pane is read again:
-/// - libproc: each tty the last lookup read, for a job starting or ending;
+/// - libproc: each tty the last lookup read, for a job starting or ending, and the
+///   program read on it, for one that ends inside its shell's process group;
 /// - tmux: a control-mode client, for pane, window and session switches;
 /// - zellij: its client list, polled, since it has neither ttys nor events.
 ///
@@ -80,6 +94,7 @@ final class TerminalWatcher {
         /// on the main thread.
         var poll: (_ interval: TimeInterval, _ check: @escaping () -> String?, _ fire: @escaping (String) -> Void) -> AnyCancellable
         var foregroundPgid: (pid_t) -> pid_t?
+        var isAlive: (pid_t) -> Bool
         var zellijPane: (_ session: String) -> Multiplexer.Pane?
         /// Opens a connection without waiting on it, or nil when its server can't be reached.
         var connect: (Connection, _ send: @escaping (ConnectionEvent) -> Void) -> AnyCancellable?
@@ -169,7 +184,7 @@ final class TerminalWatcher {
             watchedPIDs = pids
         }
         if !trail.ttys.isEmpty {
-            let check = Self.libprocCheck(trail.ttys, foregroundPgid: environment.foregroundPgid)
+            let check = Self.libprocCheck(trail.ttys, foregroundPgid: environment.foregroundPgid, isAlive: environment.isAlive)
             polls.append(environment.poll(Self.libprocInterval, check) { [weak self] change in
                 self?.trigger(src: "libproc", change, paneMayHaveChanged: false, generation: generation)
             })
@@ -277,13 +292,21 @@ final class TerminalWatcher {
 
     // MARK: Checks (run on the poll queue)
 
-    /// The first tty whose foreground group differs from `ttys`' baseline, or can't be read any more.
-    nonisolated static func libprocCheck(_ ttys: [TerminalTrail.TTY], foregroundPgid: @escaping (pid_t) -> pid_t?) -> () -> String? {
+    /// The first tty whose foreground group differs from `ttys`' baseline or can't be read
+    /// any more, or whose program has ended.
+    nonisolated static func libprocCheck(
+        _ ttys: [TerminalTrail.TTY],
+        foregroundPgid: @escaping (pid_t) -> pid_t?,
+        isAlive: @escaping (pid_t) -> Bool
+    ) -> () -> String? {
         {
             for tty in ttys {
                 let now = foregroundPgid(tty.pid)
                 if now != tty.foregroundPgid {
                     return "pid=\(tty.pid) tpgid=\(tty.foregroundPgid)->\(now.map(String.init) ?? "gone")"
+                }
+                if let program = tty.program, !isAlive(program) {
+                    return "pid=\(tty.pid) program=\(program)->gone"
                 }
             }
             return nil
@@ -367,6 +390,7 @@ extension TerminalWatcher.Environment {
         Self(
             poll: poll,
             foregroundPgid: TerminalTrail.foregroundPgid(ofPID:),
+            isAlive: TerminalTrail.isAlive,
             zellijPane: Multiplexer.zellijPane(session:),
             connect: { connection, send in
                 switch connection {
