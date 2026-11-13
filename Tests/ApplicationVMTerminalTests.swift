@@ -141,7 +141,9 @@ final class ApplicationVMTerminalTests: XCTestCase {
         let keys = ["terminalRules", "enabledTerminals"]
         let saved = Bundle.main.bundleIdentifier.flatMap { defaults.persistentDomain(forName: $0) } ?? [:]
         preferencesVM.update {
-            $0.terminalRules = programs.map { TerminalRule(program: $0) }
+            // A rule needs an installed keyboard to apply.
+            let keyboard = InputSource.getCurrentInputSource().persistentIdentifier
+            $0.terminalRules = programs.map { TerminalRule(program: $0, inputSourceId: keyboard) }
             $0.enabledTerminals = [terminal.rawValue]
         }
         return {
@@ -176,6 +178,11 @@ final class ApplicationVMTerminalTests: XCTestCase {
         XCTAssertEqual(claude.getTerminalInfo()?.program.key, "claude")
         XCTAssertFalse(claude.isSameAppOrWebsite(with: make, detectAddressBar: true))
         XCTAssertFalse(preferencesVM.appNeedCacheKeyboard(claude))
+
+        // A rule whose keyboard is not installed applies nothing, so its program is no context either.
+        preferencesVM.saveTerminalRule(TerminalRule(program: "nvim", inputSourceId: "com.example.not-installed"))
+        preferencesVM.terminalPrograms[.ghostty] = TerminalProgram(key: "nvim", pane: "A")
+        XCTAssertNil(AppKind.from(ghostty, preferencesVM: preferencesVM).getTerminalInfo())
     }
 
     func testRulesAreSavedByIdAndSwitchesAreStoredOnce() throws {

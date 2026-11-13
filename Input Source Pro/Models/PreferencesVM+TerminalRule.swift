@@ -22,8 +22,11 @@ extension PreferencesVM {
         setTerminalRules(terminalRules.filter { !ids.contains($0.id) })
     }
 
+    /// The first enabled rule for `program` whose keyboard is installed. A rule whose
+    /// keyboard is gone (removed, or from another Mac's backup) has nothing to apply, so
+    /// its program stays in the terminal's App Rule context.
     func getTerminalRule(program: TerminalProgram) -> TerminalRule? {
-        TerminalRule.firstEnabledRule(matching: program, in: terminalRules)
+        TerminalRule.firstEnabledRule(matching: program, in: terminalRules) { $0.forcedKeyboard != nil }
     }
 
     private func setTerminalRules(_ rules: [TerminalRule]) {

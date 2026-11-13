@@ -35,6 +35,23 @@ final class TerminalRuleTests: XCTestCase {
 
         XCTAssertEqual(try JSONDecoder().decode([TerminalRule].self, from: data), [rule])
     }
+
+    func testARuleStoredWithoutLaterFieldsStillReads() throws {
+        let rules = try JSONDecoder().decode([TerminalRule].self, from: Data(#"[{"program":"nvim"}]"#.utf8))
+        XCTAssertEqual(rules.map(\.program), ["nvim"])
+        XCTAssertEqual(rules.first?.disabled, false)
+        XCTAssertNil(rules.first?.inputSourceId)
+        XCTAssertThrowsError(try JSONDecoder().decode([TerminalRule].self, from: Data(#"[{"disabled":true}]"#.utf8)))
+    }
+
+    func testARuleCanBeRequiredToBeUsable() {
+        let dead = TerminalRule(program: "claude", inputSourceId: "gone")
+        let live = TerminalRule(program: "claude", inputSourceId: "installed")
+        let claude = TerminalProgram(key: "claude")
+        XCTAssertEqual(TerminalRule.firstEnabledRule(matching: claude, in: [dead, live]), dead)
+        XCTAssertEqual(TerminalRule.firstEnabledRule(matching: claude, in: [dead, live]) { $0.inputSourceId != "gone" }, live)
+        XCTAssertNil(TerminalRule.firstEnabledRule(matching: claude, in: [dead]) { $0.inputSourceId != "gone" })
+    }
 }
 
 final class TerminalProcessTests: XCTestCase {
@@ -138,8 +155,10 @@ final class TerminalProcessTests: XCTestCase {
             let shell = TerminalReading(program: nil, pane: "/dev/null")
             XCTAssertEqual(Terminal.ghostty.focusedProgram(onTTY: "/dev/null"), shell)
             XCTAssertEqual(Terminal.ghostty.refreshedProgram(), shell)
+            XCTAssertEqual(Terminal.ghostty.focusedTTY, "/dev/null")
 
             XCTAssertEqual(Terminal.ghostty.focusedProgram(onTTY: nil), TerminalReading(program: nil, pane: nil))
+            XCTAssertNil(Terminal.ghostty.focusedTTY, "Forgotten: the next refresh asks the terminal")
         }
     }
 

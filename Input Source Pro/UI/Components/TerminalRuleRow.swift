@@ -18,6 +18,12 @@ struct TerminalRuleRow: View {
 
             Spacer()
 
+            if rule.forcedKeyboard == nil {
+                // Its keyboard is not installed: the rule applies nothing until one is picked.
+                SwiftUI.Image(systemName: "exclamationmark.triangle")
+                    .opacity(0.7)
+            }
+
             if let forcedKeyboard = rule.forcedKeyboard {
                 SwiftUI.Image(nsImage: forcedKeyboard.icon ?? NSImage())
                     .resizable()

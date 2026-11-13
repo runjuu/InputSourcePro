@@ -181,6 +181,37 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertEqual(harness.refreshes, 1)
     }
 
+    /// A script's foreground group stays while its commands come and go: only the first
+    /// one read there is watched, so the script costs one more read, not one per command.
+    func testOnlyTheFirstProgramOfAForegroundGroupIsWatched() {
+        let harness = Harness()
+        harness.foregroundPgids = [10: 100]
+        harness.bringToFront(.ghostty)
+        let reading = { (program: pid_t?) in TerminalTrail(ttys: [TerminalTrail.TTY(pid: 10, foregroundPgid: 100, program: program)]) }
+
+        harness.watcher.follow(reading(11), for: .ghostty)
+        harness.ended = [11]
+        harness.tick()
+        XCTAssertEqual(harness.refreshes, 1, "The first command ended")
+
+        harness.watcher.follow(reading(12), for: .ghostty)
+        harness.ended = [11, 12]
+        harness.tick()
+        harness.watcher.follow(reading(13), for: .ghostty)
+        harness.ended = [11, 12, 13]
+        harness.tick()
+        XCTAssertEqual(harness.refreshes, 1, "The script's next commands are not watched")
+
+        // Another foreground group (the script ended, the user ran something else) starts over.
+        harness.foregroundPgids = [10: 200]
+        harness.tick()
+        XCTAssertEqual(harness.refreshes, 2)
+        harness.watcher.follow(TerminalTrail(ttys: [TerminalTrail.TTY(pid: 10, foregroundPgid: 200, program: 21)]), for: .ghostty)
+        harness.ended.insert(21)
+        harness.tick()
+        XCTAssertEqual(harness.refreshes, 3)
+    }
+
     func testAliveMeansTheProcessExistsWhoeverOwnsIt() {
         XCTAssertTrue(TerminalTrail.isAlive(getpid()))
         XCTAssertTrue(TerminalTrail.isAlive(1), "launchd is root's")

@@ -10,7 +10,8 @@ struct TerminalTrail: Equatable {
     /// and the tty's foreground process group when it was read. `program` is the
     /// process read as the tty's program, if any: one that runs in its shell's own
     /// process group (a command in a startup file, a step of `sh -c 'a; b'`) ends
-    /// without the foreground group changing.
+    /// without the foreground group changing. The watcher follows only the first
+    /// one read in a foreground group.
     struct TTY: Equatable {
         let pid: pid_t
         let foregroundPgid: pid_t
@@ -125,6 +126,11 @@ final class TerminalWatcher {
     /// Counts poll sets, so a change fired by a replaced poll is ignored.
     private var pollGeneration = 0
     private var watchedPIDs: [pid_t] = []
+    /// Per watched tty (by its `pid`), the foreground group it was read in and the program
+    /// first read there. Only that program's end is watched: a script's foreground group
+    /// stays while its commands come and go, and watching each of them would read the pane
+    /// again for every one.
+    private var firstPrograms: [pid_t: (foregroundPgid: pid_t, program: pid_t)] = [:]
     private var watchedZellij: String?
     private var connections: [Connection: AnyCancellable] = [:]
     /// Attaches dropped in a row since a connection's last handshake; each one waits longer.
@@ -184,7 +190,7 @@ final class TerminalWatcher {
             watchedPIDs = pids
         }
         if !trail.ttys.isEmpty {
-            let check = Self.libprocCheck(trail.ttys, foregroundPgid: environment.foregroundPgid, isAlive: environment.isAlive)
+            let check = Self.libprocCheck(watchingFirstPrograms(trail.ttys), foregroundPgid: environment.foregroundPgid, isAlive: environment.isAlive)
             polls.append(environment.poll(Self.libprocInterval, check) { [weak self] change in
                 self?.trigger(src: "libproc", change, paneMayHaveChanged: false, generation: generation)
             })
@@ -209,6 +215,23 @@ final class TerminalWatcher {
             // terminal, or none): its connection is kept for the grace period, then closed.
             closing = environment.delay(Self.connectionGrace)
                 .sink { [weak self] _ in self?.closeConnections() }
+        }
+    }
+
+    /// `ttys` with `program` kept only where it is the first one read in its tty's
+    /// foreground group; see `firstPrograms`.
+    private func watchingFirstPrograms(_ ttys: [TerminalTrail.TTY]) -> [TerminalTrail.TTY] {
+        firstPrograms = firstPrograms.filter { first in ttys.contains { $0.pid == first.key } }
+        return ttys.map { tty in
+            var tty = tty
+            if let first = firstPrograms[tty.pid], first.foregroundPgid == tty.foregroundPgid {
+                if tty.program != first.program { tty.program = nil }
+            } else if let program = tty.program {
+                firstPrograms[tty.pid] = (tty.foregroundPgid, program)
+            } else {
+                firstPrograms[tty.pid] = nil
+            }
+            return tty
         }
     }
 
