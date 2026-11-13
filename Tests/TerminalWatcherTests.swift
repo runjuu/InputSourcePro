@@ -222,6 +222,25 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertEqual(harness.attempts.count, 3, "Lost after its handshake: attached again")
     }
 
+    func testAServerThatStaysUnreachableIsGivenUpUntilTheNextLookup() {
+        let harness = Harness()
+        harness.bringToFront(.ghostty)
+        harness.watcher.follow(trail(tmux: true), for: .ghostty)
+
+        for seconds in [0.5, 1, 2, 4, 5, 5] {
+            harness.fireTimer(seconds)
+        }
+        XCTAssertEqual(harness.attempts.count, TerminalWatcher.maxUnreachableAttempts)
+        XCTAssertTrue(harness.timers.isEmpty, "No endless retry")
+
+        harness.watcher.follow(trail(tmux: true), for: .ghostty)
+        harness.reachable = [.tmux]
+        harness.fireTimer(0.5)
+        XCTAssertEqual(harness.attempts.count, TerminalWatcher.maxUnreachableAttempts + 1, "The next lookup through tmux starts over")
+        harness.sends[.tmux]?(.changed)
+        XCTAssertEqual(harness.refreshes, 1)
+    }
+
     func testAConnectionRefusedBeforeItsHandshakeWaitsForTheNextLookup() {
         let harness = Harness()
         harness.reachable = [.tmux]
@@ -386,6 +405,22 @@ final class TerminalWatcherTests: XCTestCase {
         }
         XCTAssertNil(output, "Killed when it hangs")
         XCTAssertEqual(timeouts, [0.5])
+    }
+
+    /// A process the CLI leaves behind keeps the pipe open; the read must not wait for it.
+    func testCLIOutputDoesNotWaitForAProcessLeftBehind() {
+        let started = Date()
+        let output = TerminalProcess.output(of: "/bin/sh", arguments: ["-c", "sleep 30 & echo done"], timeout: 0.3)
+        XCTAssertEqual(output, "done\n")
+        XCTAssertLessThan(Date().timeIntervalSince(started), 5)
+    }
+
+    func testExecutableIsTheFirstInstalledOne() {
+        let installed: Set<String> = ["/usr/local/bin/tmux", "/opt/local/bin/tmux"]
+        let find = { TerminalProcess.executable(named: $0, in: ["/opt/homebrew/bin", "/usr/local/bin", "/opt/local/bin"], isExecutable: installed.contains) }
+        XCTAssertEqual(find("tmux"), "/usr/local/bin/tmux")
+        XCTAssertNil(find("zellij"))
+        XCTAssertTrue(TerminalProcess.executableDirectories.contains("/usr/local/bin"))
     }
 
     /// Smoke test on real processes.

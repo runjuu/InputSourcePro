@@ -973,7 +973,7 @@ final class CaretPaletteTests: XCTestCase {
         XCTAssertFalse(caret.isContainer)
     }
 
-    func testIndicatorPointOffEveryScreenIsDropped() {
+    func testIndicatorPointOfARectWhoseTopIsOffEveryScreenIsDropped() {
         let screens = [CGRect(x: 0, y: 0, width: 1512, height: 982), CGRect(x: 1512, y: 0, width: 1920, height: 1080)]
         // Ghostty's quick terminal read 35ms into its slide-in: only its bottom 77pt are on screen.
         let sliding = CursorRectInfo(rect: CGRect(x: 0, y: 905, width: 1512, height: 400), kind: .container)
@@ -983,6 +983,11 @@ final class CaretPaletteTests: XCTestCase {
         let secondScreen = CursorRectInfo(rect: CGRect(x: 2000, y: 1000, width: 2, height: 20), kind: .caret)
         XCTAssertEqual(secondScreen.indicatorPoint(on: screens), CGPoint(x: 2001, y: 1026))
         XCTAssertNil(secondScreen.indicatorPoint(on: []))
+        // The first row of a full-screen window: the caret is on screen, the point 6pt above it is not.
+        let firstRow = CursorRectInfo(rect: CGRect(x: 30, y: 960, width: 2, height: 20), kind: .caret)
+        XCTAssertEqual(firstRow.indicatorPoint(on: screens), CGPoint(x: 31, y: 986))
+        let flush = CursorRectInfo(rect: CGRect(x: 30, y: 962, width: 2, height: 20), kind: .caret)
+        XCTAssertEqual(flush.indicatorPoint(on: screens), CGPoint(x: 31, y: 988))
     }
 
     func testTextMarkerSelectionsAreNotMistakenForNarrowCarets() {
@@ -1203,11 +1208,14 @@ final class CaretPaletteTests: XCTestCase {
         XCTAssertNil(sample.point(for: 99, now: 10.1, focusedAt: 9, screens: [screen]))
     }
 
-    func testRejectsASampleWhosePointIsAboveTheScreen() {
-        // Ghostty's quick terminal sliding in: the caret's top is on screen, the point 6pt above it is not.
+    func testRejectsASampleWhoseTopIsAboveTheScreen() {
+        // Ghostty's quick terminal sliding in from above: the caret's foot is on screen, its top is not yet.
         let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
-        let sliding = CaretPalette.Sample(rect: CGRect(x: 30, y: 957, width: 1, height: 20), pid: 42, uptime: 10)
+        let sliding = CaretPalette.Sample(rect: CGRect(x: 30, y: 970, width: 1, height: 20), pid: 42, uptime: 10)
         XCTAssertNil(sliding.point(for: 42, now: 10.1, focusedAt: 9, screens: [screen]))
+        // The first row of a full-screen window: the point 6pt above the caret is off screen, the caret is not.
+        let firstRow = CaretPalette.Sample(rect: CGRect(x: 30, y: 960, width: 1, height: 20), pid: 42, uptime: 10)
+        XCTAssertEqual(firstRow.point(for: 42, now: 10.1, focusedAt: 9, screens: [screen]), CGPoint(x: 30.5, y: 986))
         let settled = CaretPalette.Sample(rect: CGRect(x: 30, y: 843, width: 1, height: 20), pid: 42, uptime: 10)
         XCTAssertEqual(settled.point(for: 42, now: 10.1, focusedAt: 9, screens: [screen]), CGPoint(x: 30.5, y: 869))
     }

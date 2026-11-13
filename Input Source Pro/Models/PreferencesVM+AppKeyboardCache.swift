@@ -4,7 +4,7 @@ extension PreferencesVM {
     func appNeedCacheKeyboard(_ appKind: AppKind) -> Bool {
         // A program rule is a forced default: switching by hand inside claude
         // must not be remembered, or the rule stops working after one use.
-        if appKind.getTerminalInfo()?.rule != nil {
+        if appKind.getTerminalInfo() != nil {
             return false
         }
 
@@ -104,7 +104,7 @@ extension PreferencesVM {
             return inputSource
         }
 
-        if let inputSource = appKind.getTerminalInfo()?.rule?.forcedKeyboard {
+        if let inputSource = appKind.getTerminalInfo()?.rule.forcedKeyboard {
             return inputSource
         }
 

@@ -269,6 +269,9 @@ extension ApplicationVM {
         terminalRefreshes.send(())
     }
 
+    /// The least time between two probes that window title changes ask for.
+    static let terminalTitleProbeInterval: TimeInterval = 1
+
     /// How long a change from a program to a shell waits before it is read again.
     static let terminalShellConfirmationDelay: TimeInterval = 0.25
 
@@ -313,15 +316,25 @@ extension ApplicationVM {
         // Re-ask which pane has focus on activation and on AX changes: a tab
         // or split switch may announce itself only as a title change, and
         // Alacritty's only per-window signal is a window switch.
-        let probes = app.watchAX([
+        let axChanges = app.watchAX([
             .focusedUIElementChanged,
             .focusedWindowChanged,
             .titleChanged,
             .windowCreated,
         ], [.application, .window])
             .filter { $0.notification != .windowCreated }
+            .share()
+        // A program that animates the window title (an agent's spinner) changes it several
+        // times a second for as long as it works, so titles ask less often than focus does.
+        let titleChanges = axChanges
+            .filter { $0.notification == .titleChanged }
+            .mapToVoid()
+            .throttle(for: .seconds(Self.terminalTitleProbeInterval), scheduler: DispatchQueue.main, latest: true)
+        let probes = axChanges
+            .filter { $0.notification != .titleChanged }
             .mapToVoid()
             .throttle(for: .milliseconds(300), scheduler: DispatchQueue.main, latest: true)
+            .merge(with: titleChanges)
             // The terminal in front can gain or lose its panel without being picked again.
             .merge(with: terminalPanelChanges)
             .prepend(())
@@ -375,8 +388,6 @@ extension ApplicationVM {
             .compactMap { $0 }
             .filter { [weak self] _ in self?.preferencesVM.preferences.isEnhancedModeEnabled == true }
             .filter { [weak self] in self?.preferencesVM.isHideIndicator($0) != true }
-            // Browser URL and terminal program changes republish the same app; each activation is several AX round trips.
-            .removeDuplicates { $0.getApp().processIdentifier == $1.getApp().processIdentifier }
             .sink { $0.getApp().activateAccessibilities() }
             .store(in: cancelBag)
     }

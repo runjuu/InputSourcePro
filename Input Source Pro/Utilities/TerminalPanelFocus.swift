@@ -9,6 +9,10 @@ import Combine
 /// stays the same but the panel is another pane, which the terminal's front
 /// window doesn't name.
 ///
+/// Any focused floating window counts as such a panel: Accessibility does not tell a
+/// terminal's own panel from a utility panel with the same subrole, so while one of
+/// those has focus the terminal is read as if its panel did.
+///
 /// Contract: every notification re-evaluates whether the terminal reports
 /// `AXFrontmost` and its focused window is an `AXFloatingWindow`; no single
 /// notification is trusted to mean shown or hidden. Only a change of the

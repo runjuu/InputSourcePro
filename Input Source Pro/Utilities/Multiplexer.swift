@@ -2,8 +2,8 @@ import Foundation
 
 /// Terminal multiplexers whose focused pane Terminal Rules look into, so a rule
 /// follows the program inside tmux or zellij rather than the multiplexer
-/// itself. Each is asked through its own CLI at a fixed path: ISP runs without
-/// a login PATH.
+/// itself. Each is asked through its own CLI, looked up where package managers
+/// install it: ISP runs without a login PATH.
 // shortcut: only tmux's default server is asked (no -L/-S socket), and for a multiplexer with several clients only the first one counts; upgrade when those setups are in use.
 enum Multiplexer: String {
     case tmux, zellij
@@ -19,7 +19,8 @@ enum Multiplexer: String {
         case program(TerminalProgram?, label: String)
     }
 
-    var executable: String { "/opt/homebrew/bin/" + rawValue }
+    /// Where the CLI is installed, nil when it is in none of the usual places.
+    var executable: String? { TerminalProcess.executable(named: rawValue) }
 
     /// The focused pane of the client running on `clientTTY` with `arguments`
     /// (its argv), or nil when the multiplexer can't be asked. A multiplexer
@@ -28,7 +29,8 @@ enum Multiplexer: String {
         switch self {
         case .tmux:
             // The program is tmux, so a server is up or starting: the control-mode client retries until it answers.
-            trail.tmux = true
+            // Without the CLI there is nothing to ask or attach with.
+            trail.tmux = executable != nil
             // A space, not a tab: without a UTF-8 locale (an app launched at login has none) tmux prints control characters as "_".
             return run(["list-clients", "-F", "#{client_tty} #{pane_tty}"])
                 .flatMap { Self.pane(fromTmuxClients: $0, clientTTY: clientTTY) }
@@ -54,8 +56,7 @@ enum Multiplexer: String {
     /// Runs the multiplexer's CLI and returns its output, or nil when it is
     /// missing, fails, or hangs.
     private func run(_ arguments: [String]) -> String? {
-        guard FileManager.default.isExecutableFile(atPath: executable) else { return nil }
-        return TerminalProcess.output(of: executable, arguments: arguments)
+        executable.flatMap { TerminalProcess.output(of: $0, arguments: arguments) }
     }
 }
 

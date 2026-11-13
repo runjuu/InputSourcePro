@@ -34,13 +34,11 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Input Source Pro needs to monitor keyboard input to automatically switch between English and Chinese punctuation marks based on your app-specific rules.</string>
+	<string>Input Source Pro asks your terminal which pane has focus, so Terminal Rules can switch the input source for the program running in it.</string>
 	<key>NSAppleScriptEnabled</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string></string>
-	<key>NSAppleEventsUsageDescription</key>
-	<string>Input Source Pro needs to monitor keyboard input to automatically switch between English and Chinese punctuation marks based on your app-specific rules.</string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>ISPReleaseChannel</key>

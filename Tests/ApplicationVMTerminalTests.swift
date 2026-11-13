@@ -118,6 +118,51 @@ final class ApplicationVMTerminalTests: XCTestCase {
         }
     }
 
+    /// Stores Terminal Rules' preferences for one test: `terminal`'s switch on and a rule per
+    /// program. They live in the test host's own defaults, so call the result to put back
+    /// what was there.
+    static func setTerminalPreferences(_ preferencesVM: PreferencesVM, enabled terminal: Terminal, rules programs: [String]) -> () -> Void {
+        let defaults = UserDefaults.standard
+        let keys = ["terminalRules", "enabledTerminals"]
+        let saved = Bundle.main.bundleIdentifier.flatMap { defaults.persistentDomain(forName: $0) } ?? [:]
+        preferencesVM.update {
+            $0.terminalRules = programs.map { TerminalRule(program: $0) }
+            $0.enabledTerminals = [terminal.rawValue]
+        }
+        return {
+            for key in keys {
+                if let value = saved[key] {
+                    defaults.set(value, forKey: key)
+                } else {
+                    defaults.removeObject(forKey: key)
+                }
+            }
+        }
+    }
+
+    /// Only a program a rule matches is a context of its own: one without a rule
+    /// stays the terminal's App Rule context, so running it re-applies nothing.
+    func testOnlyAProgramWithARuleIsItsOwnContext() throws {
+        let ghostty = FakeApp(bundleIdentifier: Terminal.ghostty.rawValue, pid: 999_005)
+        let preferencesVM = try Self.inMemoryPreferencesVM()
+        let restore = Self.setTerminalPreferences(preferencesVM, enabled: .ghostty, rules: ["claude"])
+        defer { restore() }
+        let shell = AppKind.from(ghostty, preferencesVM: preferencesVM)
+        XCTAssertNil(shell.getTerminalInfo())
+
+        preferencesVM.terminalPrograms[.ghostty] = TerminalProgram(key: "make", pane: "A")
+        let make = AppKind.from(ghostty, preferencesVM: preferencesVM)
+        XCTAssertNil(make.getTerminalInfo())
+        XCTAssertTrue(make.isSameAppOrWebsite(with: shell, detectAddressBar: true))
+        XCTAssertEqual(make.getId(), shell.getId())
+
+        preferencesVM.terminalPrograms[.ghostty] = TerminalProgram(key: "claude", pane: "A")
+        let claude = AppKind.from(ghostty, preferencesVM: preferencesVM)
+        XCTAssertEqual(claude.getTerminalInfo()?.program.key, "claude")
+        XCTAssertFalse(claude.isSameAppOrWebsite(with: make, detectAddressBar: true))
+        XCTAssertFalse(preferencesVM.appNeedCacheKeyboard(claude))
+    }
+
     static func inMemoryPreferencesVM() throws -> PreferencesVM {
         let container = NSPersistentContainer(name: "Main", managedObjectModel: PreferencesVM.managedObjectModel)
         let description = NSPersistentStoreDescription()

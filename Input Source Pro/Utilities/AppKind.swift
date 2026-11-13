@@ -24,7 +24,7 @@ enum AppKind {
         isFocusOnInputContainer: Bool,
 
         program: TerminalProgram,
-        rule: TerminalRule?
+        rule: TerminalRule
     )
 
     case normal(app: NSRunningApplication, info: NormalInfo)
@@ -48,7 +48,7 @@ enum AppKind {
             }
         case let .terminal(app, info):
             guard let bundleId = app.bundleId() else { return nil }
-            return "\(bundleId)_\(info.rule?.id.uuidString ?? info.program.id)"
+            return "\(bundleId)_\(info.rule.id.uuidString)"
         }
     }
 
@@ -195,10 +195,13 @@ extension AppKind {
             }
         }
 
-        // A shell prompt, or a program not yet known, falls back to the terminal's App Rule.
+        // Only a program a rule matches is its own context. A shell prompt, a program
+        // not yet known and a program without a rule stay the terminal's App Rule
+        // context, so running a command does not re-apply the app's keyboard.
         if let terminal = Terminal(app),
            preferencesVM.isTerminalEnabled(terminal),
-           let program = preferencesVM.terminalPrograms[terminal]
+           let program = preferencesVM.terminalPrograms[terminal],
+           let rule = preferencesVM.getTerminalRule(program: program)
         {
             return .terminal(
                 app: app,
@@ -206,7 +209,7 @@ extension AppKind {
                     focusedElement: focusedElement,
                     isFocusOnInputContainer: isFocusOnInputContainer,
                     program: program,
-                    rule: preferencesVM.getTerminalRule(program: program)
+                    rule: rule
                 )
             )
         }

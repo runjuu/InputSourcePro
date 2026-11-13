@@ -89,6 +89,13 @@ final class TerminalWatcher {
     static let libprocInterval: TimeInterval = 0.1
     static let zellijInterval: TimeInterval = 0.5
     static let connectionGrace: TimeInterval = 10
+    /// Attempts in a row at a server that can't be reached before giving up on it.
+    static let maxUnreachableAttempts = 6
+
+    /// The wait before an attempt that follows `failures` failed ones: 0.5s, doubling up to 5s.
+    static func retryDelay(afterFailures failures: Int) -> TimeInterval {
+        min(0.5 * pow(2, Double(failures)), 5)
+    }
 
     private let environment: Environment
     private let refresh: () -> Void
@@ -199,26 +206,29 @@ final class TerminalWatcher {
         connections[connection] = subscribe(connection)
     }
 
-    /// Attaches with `AXWatchRetry`'s backoff until the server can be reached,
-    /// starting past the attempts already dropped.
+    /// Attaches once the server can be reached, starting past the attempts already dropped.
     private func subscribe(_ connection: Connection) -> AnyCancellable {
-        let environment = environment
-        return AXWatchRetry.publisher(
-            pid: 0,
-            // A local socket is retried at most every 5s.
-            notReadyDelayCap: 5,
-            isAlive: { true },
-            isTrusted: { true },
-            probe: { _, done in done(nil) },
-            // Starts past the attempts already dropped.
-            initialDelay: AXWatchRetry.delay(afterFailures: drops[connection] ?? 0, cap: 5),
-            attach: { send in
-                environment.connect(connection, send).map { .attached($0, registration: .init()) }
-                    ?? .notReady(reason: "unreachable")
-            },
-            delay: environment.delay
-        )
-        .sink { [weak self] event in self?.receive(event, from: connection) }
+        attempt(connection, unreachable: 0)
+    }
+
+    /// One attempt after its wait. A server that can't be reached is tried again, each time
+    /// after a longer wait, `maxUnreachableAttempts` times; after that the next lookup that
+    /// goes through it starts over.
+    private func attempt(_ connection: Connection, unreachable: Int) -> AnyCancellable {
+        let wait = Self.retryDelay(afterFailures: (drops[connection] ?? 0) + unreachable)
+        return environment.delay(wait).first().sink { [weak self] _ in
+            guard let self else { return }
+            let live = self.environment.connect(connection) { [weak self] in self?.receive($0, from: connection) }
+            if let live {
+                self.connections[connection] = live
+            } else if unreachable + 1 < Self.maxUnreachableAttempts {
+                self.connections[connection] = self.attempt(connection, unreachable: unreachable + 1)
+            } else {
+                self.record(connection, "stop unreachable")
+                self.connections[connection] = nil
+                self.drops[connection] = nil
+            }
+        }
     }
 
     private func receive(_ event: ConnectionEvent, from connection: Connection) {
@@ -403,10 +413,11 @@ extension TerminalWatcher.Environment {
     /// its stdin to end it. `no-output` keeps pane output away; it is not
     /// `read-only`, which would make other clients' `send-keys` fail.
     static func spawnTmuxControlClient(socket: String) -> (fd: Int32, onClose: () -> Void)? {
+        guard let tmux = Multiplexer.tmux.executable else { return nil }
         let process = Process()
         let input = Pipe()
         let output = Pipe()
-        process.executableURL = URL(fileURLWithPath: Multiplexer.tmux.executable)
+        process.executableURL = URL(fileURLWithPath: tmux)
         process.arguments = ["-L", socket, "-C", "attach", "-f", "no-output"]
         process.standardInput = input
         process.standardOutput = output

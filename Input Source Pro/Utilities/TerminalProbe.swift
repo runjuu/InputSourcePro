@@ -9,8 +9,11 @@ import Darwin
 /// terminals are asked with Apple Events sent from there (NSAppleScript is
 /// main-thread only).
 enum TerminalProbe {
-    // Confined to `TerminalProcess.queue`.
-    private static var automationDenied: Set<Terminal> = []
+    /// When each terminal last refused Automation (system uptime). Confined to `TerminalProcess.queue`.
+    private static var automationDenied: [Terminal: TimeInterval] = [:]
+    /// How long a refusal is believed. A refused event returns at once and never
+    /// prompts again, so asking this often is cheap and picks up a later grant.
+    static let automationRetryInterval: TimeInterval = 10
 
     /// The focused pane's program, nil for a shell prompt or, in no known
     /// pane, when the terminal can't be asked. The tty it finds becomes the
@@ -69,8 +72,8 @@ enum TerminalProbe {
     /// running, fails or doesn't answer in time. In process: an `osascript`
     /// run costs about 300 ms, the event about 10.
     private static func ask(_ terminal: Terminal, _ specifier: NSAppleEventDescriptor) -> NSAppleEventDescriptor? {
-        // shortcut: a denial sticks until relaunch, so granting Automation later needs an app restart.
-        guard !automationDenied.contains(terminal),
+        let now = ProcessInfo.processInfo.systemUptime
+        guard automationDenied[terminal].map({ now - $0 >= automationRetryInterval }) ?? true,
               let pid = NSRunningApplication.runningApplications(withBundleIdentifier: terminal.rawValue).first?.processIdentifier
         else { return nil }
 
@@ -84,13 +87,16 @@ enum TerminalProbe {
         event.setParam(specifier, forKeyword: keyDirectObject)
         do {
             // AppleScript's send mode, so the first ask brings up the Automation prompt as before.
-            return try event.sendEvent(options: [.waitForReply, .canInteract], timeout: 2)
-                .paramDescriptor(forKeyword: keyDirectObject)
+            let reply = try event.sendEvent(options: [.waitForReply, .canInteract], timeout: 2)
+            automationDenied[terminal] = nil
+            return reply.paramDescriptor(forKeyword: keyDirectObject)
         } catch {
             let code = (error as NSError).code
             if code == errAEEventNotPermitted || code == errAEEventWouldRequireUserConsent {
-                automationDenied.insert(terminal)
-                NSLog("\(terminal.displayName) automation is not permitted; Terminal Rules fall back to its App Rule.")
+                if automationDenied[terminal] == nil {
+                    NSLog("\(terminal.displayName) automation is not permitted; Terminal Rules fall back to its App Rule.")
+                }
+                automationDenied[terminal] = now
             }
             return nil
         }
@@ -134,11 +140,21 @@ enum TerminalProbe {
 
     // MARK: - WezTerm
 
-    private static let wezterm = "/opt/homebrew/bin/wezterm"
+    /// The `wezterm` CLI: the one inside the running app (a download from wezterm.org
+    /// installs nothing else), else one a package manager installed.
+    private static var wezterm: String? {
+        let bundled = NSRunningApplication
+            .runningApplications(withBundleIdentifier: Terminal.wezterm.rawValue)
+            .first?.bundleURL?
+            .appendingPathComponent("Contents/MacOS/wezterm").path
+        return bundled.flatMap { FileManager.default.isExecutableFile(atPath: $0) ? $0 : nil }
+            ?? TerminalProcess.executable(named: "wezterm")
+    }
 
     /// The focused pane's tty from `wezterm cli`, which talks to the running
     /// GUI; nil when it isn't running (`--no-auto-start`: never start a mux server).
     private static func weztermTTY() -> String? {
+        guard let wezterm else { return nil }
         let cli = { (command: String) in
             TerminalProcess.output(of: wezterm, arguments: ["cli", "--no-auto-start", command, "--format", "json"])
         }
