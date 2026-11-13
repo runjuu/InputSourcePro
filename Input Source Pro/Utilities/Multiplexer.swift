@@ -36,9 +36,10 @@ enum Multiplexer: String {
                 .flatMap { Self.pane(fromTmuxClients: $0, clientTTY: clientTTY) }
         case .zellij:
             // shortcut: a pane running a multiplexer inside zellij names no tty, so nesting stops there; upgrade if that setup shows up.
-            // A bare `zellij` names its session only through the server socket it talks to.
-            guard let session = Self.zellijSession(fromArguments: arguments)
-                ?? Self.zellijSession(fromSocketPeers: TerminalProcess.unixSocketPeers(ofPID: clientPID))
+            // The server socket the client talks to names its session now: argv keeps
+            // the one it started with after a switch to another session inside the client.
+            guard let session = Self.zellijSession(fromSocketPeers: TerminalProcess.unixSocketPeers(ofPID: clientPID))
+                ?? Self.zellijSession(fromArguments: arguments)
                 ?? run(["list-sessions", "-n"]).flatMap(Self.onlySession(fromList:)),
                 let pane = Self.zellijPane(session: session)
             else { return nil }

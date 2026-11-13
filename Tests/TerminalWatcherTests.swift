@@ -39,6 +39,8 @@ final class TerminalWatcherTests: XCTestCase {
         var closed: [TerminalWatcher.Connection] = []
         var timers: [(seconds: TimeInterval, subject: PassthroughSubject<Date, Never>)] = []
         var refreshes = 0
+        /// Refreshes that said the pane may have changed.
+        var paneChanges = 0
         private var front: AnyCancellable?
 
         lazy var watcher = TerminalWatcher(
@@ -66,7 +68,10 @@ final class TerminalWatcherTests: XCTestCase {
                     return subject.eraseToAnyPublisher()
                 }
             ),
-            refresh: { [unowned self] in refreshes += 1 }
+            refresh: { [unowned self] paneMayHaveChanged in
+                refreshes += 1
+                paneChanges += paneMayHaveChanged ? 1 : 0
+            }
         )
 
         var livePolls: [Poll] { polls.filter { !$0.isCancelled && !$0.isDone } }
@@ -230,13 +235,13 @@ final class TerminalWatcherTests: XCTestCase {
         for seconds in [0.5, 1, 2, 4, 5, 5] {
             harness.fireTimer(seconds)
         }
-        XCTAssertEqual(harness.attempts.count, TerminalWatcher.maxUnreachableAttempts)
+        XCTAssertEqual(harness.attempts.count, TerminalWatcher.maxFailedAttempts)
         XCTAssertTrue(harness.timers.isEmpty, "No endless retry")
 
         harness.watcher.follow(trail(tmux: true), for: .ghostty)
         harness.reachable = [.tmux]
         harness.fireTimer(0.5)
-        XCTAssertEqual(harness.attempts.count, TerminalWatcher.maxUnreachableAttempts + 1, "The next lookup through tmux starts over")
+        XCTAssertEqual(harness.attempts.count, TerminalWatcher.maxFailedAttempts + 1, "The next lookup through tmux starts over")
         harness.sends[.tmux]?(.changed)
         XCTAssertEqual(harness.refreshes, 1)
     }
@@ -275,6 +280,55 @@ final class TerminalWatcherTests: XCTestCase {
         harness.sends[.tmux]?(.closed(wasReady: true))
         harness.fireTimer(0.5)
         XCTAssertEqual(harness.attempts.count, 7)
+    }
+
+    func testAServerThatNeverAnswersItsHandshakeIsGivenUpUntilTheNextLookup() {
+        let harness = Harness()
+        harness.reachable = [.tmux]
+        harness.bringToFront(.ghostty)
+        harness.watcher.follow(trail(tmux: true), for: .ghostty)
+        harness.fireTimer(0.5)
+
+        for seconds in [1, 2, 4, 5, 5] as [TimeInterval] {
+            harness.sends[.tmux]?(.dropped)
+            harness.fireTimer(seconds)
+        }
+        harness.sends[.tmux]?(.dropped)
+        XCTAssertEqual(harness.attempts.count, TerminalWatcher.maxFailedAttempts)
+        XCTAssertTrue(harness.timers.isEmpty, "No endless retry")
+
+        harness.watcher.follow(trail(tmux: true), for: .ghostty)
+        harness.fireTimer(0.5)
+        XCTAssertEqual(harness.attempts.count, TerminalWatcher.maxFailedAttempts + 1)
+    }
+
+    func testAConnectionNoLookupGoesThroughIsClosedAfterTheGracePeriod() {
+        let harness = Harness()
+        harness.reachable = [.tmux]
+        harness.bringToFront(.ghostty)
+        harness.watcher.follow(trail(tmux: true), for: .ghostty)
+        harness.fireTimer(0.5)
+
+        // tmux detached: the terminal stays in front, its lookups no longer go through the server.
+        harness.watcher.follow(trail(ttys: [(1, 1)]), for: .ghostty)
+        XCTAssertTrue(harness.closed.isEmpty)
+        harness.fireTimer(TerminalWatcher.connectionGrace)
+        XCTAssertEqual(harness.closed, [.tmux])
+    }
+
+    func testOnlyAMultiplexerSaysThePaneMayHaveChanged() {
+        let harness = Harness()
+        harness.reachable = [.tmux]
+        harness.foregroundPgids = [1: 1]
+        harness.bringToFront(.ghostty)
+        harness.watcher.follow(trail(ttys: [(1, 1)], tmux: true), for: .ghostty)
+        harness.fireTimer(0.5)
+
+        harness.foregroundPgids = [1: 2]
+        harness.tick()
+        XCTAssertEqual([harness.refreshes, harness.paneChanges], [1, 0], "A job started in the same pane")
+        harness.sends[.tmux]?(.changed)
+        XCTAssertEqual([harness.refreshes, harness.paneChanges], [2, 1])
     }
 
     func testConnectionsOutliveLeavingTheFrontForAGracePeriod() {
@@ -447,7 +501,7 @@ final class TerminalWatcherTests: XCTestCase {
         let config = try JSONDecoder().decode(Config.self, from: Data(json.utf8))
         final class Counter { var refreshes = 0 }
         let counter = Counter()
-        let watcher = TerminalWatcher(environment: .live(tmuxSocket: config.tmux), refresh: { counter.refreshes += 1 })
+        let watcher = TerminalWatcher(environment: .live(tmuxSocket: config.tmux), refresh: { _ in counter.refreshes += 1 })
 
         let tmux = { (arguments: [String]) in Self.cli("/opt/homebrew/bin/tmux", ["-L", config.tmux] + arguments) }
         let windowSize = { tmux(["display", "-p", "-t", "A", "#{window_width}x#{window_height}"]) }
