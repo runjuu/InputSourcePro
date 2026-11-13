@@ -23,7 +23,6 @@ final class CaretPalette {
     private var focusGeneration = 0
     private var focusApplication: NSRunningApplication?
     private var textFocus: TextFocus { focus.state }
-    private var session: String?
     private var focusedAt = ProcessInfo.processInfo.systemUptime
     private var observers: [NSObjectProtocol] = []
     private var timer: Timer?
@@ -101,10 +100,12 @@ final class CaretPalette {
         mutating func receiveMissingCaret(
             at uptime: TimeInterval,
             after lastUptime: TimeInterval,
+            focusedAt: TimeInterval,
             isTemporaryInputWindowInProgress: Bool,
             pid: pid_t?
         ) -> Bool {
-            guard uptime >= lastUptime, !isTemporaryInputWindowInProgress else { return false }
+            // A report from before the current focus would replace its wait with one that is never current.
+            guard uptime >= lastUptime, uptime >= focusedAt, !isTemporaryInputWindowInProgress else { return false }
             // Wait for the helper's next sample rather than falling back to the mouse. Custom editors
             // such as Zed expose no text field to Accessibility, so `unknown` focus waits too.
             if state.permitsCaret, let pid { confirmation = Confirmation(pid: pid, uptime: uptime) }
@@ -172,7 +173,6 @@ final class CaretPalette {
                     guard let self = self, self.channelGeneration == generation else { return }
                     self.sample = nil
                     self.pendingConfirmation = nil
-                    self.session = nil
                     if !connected { self.isConnected = false }
                     if connected { self.sendActivity(isInputEvent: false) }
                     self.updates.send(())
@@ -325,7 +325,6 @@ final class CaretPalette {
         pendingConfirmation = nil
         focus.confirmation = nil
         focusID = nil
-        session = nil
         focusedAt = ProcessInfo.processInfo.systemUptime
         updates.send(())
         if suspension.isSuspended {
@@ -359,7 +358,6 @@ final class CaretPalette {
         focusObserver = nil
         focusApplication = nil
         focus = FocusReadiness()
-        session = nil
         suspension = Suspension()
         if let source = source() { TISDeselectInputSource(source) }
         for observer in observers {
@@ -372,12 +370,11 @@ final class CaretPalette {
 
     private func receive(_ position: CaretPosition) {
         guard isEnabled, !suspension.isSuspended, !IsSecureEventInputEnabled() else { return }
-        let session = position.session
         let rectString = position.rect
         let pid = Int(position.pid)
         let uptime = position.uptime
         let pending = position.pending
-        IndicatorDiagnostics.record("helper.receive pid=\(pid) rect=\(NSRectFromString(rectString)) empty=\(rectString.isEmpty) pending=\(pending) sampleUptime=\(uptime) focus=\(textFocus) focusedAt=\(focusedAt) sessionMatches=\(self.session == session)")
+        IndicatorDiagnostics.record("helper.receive pid=\(pid) rect=\(NSRectFromString(rectString)) empty=\(rectString.isEmpty) pending=\(pending) sampleUptime=\(uptime) focus=\(textFocus) focusedAt=\(focusedAt) session=\(position.session.prefix(8))")
         let lastUptime = max(sample?.uptime ?? 0, pendingConfirmation?.uptime ?? 0)
         if let focusID = focusID, position.focusID != focusID {
             IndicatorDiagnostics.record("helper.rejected reason=focus-token-mismatch pid=\(pid)")
@@ -393,7 +390,7 @@ final class CaretPalette {
             // taking key focus also leaves the caret where it was, so the sample is kept and serves the app
             // while fresh; a field change within the app clears it through the focus update.
             if focus.receiveMissingCaret(
-                at: uptime, after: lastUptime,
+                at: uptime, after: lastUptime, focusedAt: focusedAt,
                 isTemporaryInputWindowInProgress: InputSourceSwitcher.isTemporaryInputWindowInProgress,
                 pid: focusApplication?.processIdentifier
             ) {
@@ -404,7 +401,6 @@ final class CaretPalette {
                   Self.holdsFocus(owner),
                   uptime >= focusedAt, uptime <= ProcessInfo.processInfo.systemUptime,
                   uptime >= lastUptime {
-            self.session = session
             if pending {
                 pendingConfirmation = Confirmation(pid: owner, uptime: uptime)
             } else {
