@@ -363,15 +363,23 @@ extension ApplicationVM {
             .filter { $0.notification != .titleChanged }
             .mapToVoid()
             .share()
-        let probes = focusChanges
-            // Asked once more a moment later: for some 20ms after focus moves to another
-            // split, Ghostty still names the split it left, and an answer from then stays
-            // until the next change.
-            .merge(with: focusChanges.delay(for: .milliseconds(Self.terminalFocusSettleMilliseconds), scheduler: DispatchQueue.main))
+        // Asked once more a moment later: for some 20ms after focus moves to another split,
+        // Ghostty still names the split it left, and an answer from then stays until the next
+        // change. Each ask has its own throttle, so the second lands a settle time after the
+        // first rather than at the end of the first's window.
+        let settle = DispatchQueue.SchedulerTimeType.Stride.milliseconds(Self.terminalFocusSettleMilliseconds)
+        let settledFocusChanges = focusChanges
+            .delay(for: settle, scheduler: DispatchQueue.main)
             .throttle(for: .milliseconds(300), scheduler: DispatchQueue.main, latest: true)
+        let probes = focusChanges
+            .throttle(for: .milliseconds(300), scheduler: DispatchQueue.main, latest: true)
+            .merge(with: settledFocusChanges)
             .merge(with: titleChanges)
             // The terminal in front can gain or lose its panel without being picked again.
             .merge(with: terminalPanelChanges)
+            // Picking the terminal asks at once and, as after a focus change, once more:
+            // a click on another split is what brought it to the front.
+            .merge(with: Just(()).delay(for: settle, scheduler: DispatchQueue.main))
             .prepend(())
             .map { () -> TerminalLookup in { TerminalProcess.onQueue { probedProgram(terminal) } } }
 
