@@ -222,6 +222,21 @@ final class MultiplexerTests: XCTestCase {
         )
     }
 
+    /// zellij 0.46 names its server socket by a hash, so the name read from it is no
+    /// session: the next way of naming the session is asked, each name once.
+    func testZellijSessionIsTheFirstNameThatAnswers() {
+        var asked: [String] = []
+        let ask = { (session: String) -> String? in
+            asked.append(session)
+            return session == "work" ? "pane" : nil
+        }
+        let answer = Multiplexer.firstAnswer(for: ["0546e8d7ae28", "0546e8d7ae28", "work", "other"], ask: ask)
+        XCTAssertEqual(answer?.session, "work")
+        XCTAssertEqual(answer?.answer, "pane")
+        XCTAssertEqual(asked, ["0546e8d7ae28", "work"])
+        XCTAssertNil(Multiplexer.firstAnswer(for: ["gone"], ask: ask))
+    }
+
     func testZellijShellOrPluginPaneMeansNoProgram() {
         let header = "CLIENT_ID ZELLIJ_PANE_ID RUNNING_COMMAND\n"
         XCTAssertEqual(Multiplexer.pane(fromZellijClients: header + "1 terminal_0 /bin/zsh\n", session: "s"), .program(nil, label: "zellij:s/terminal_0"))

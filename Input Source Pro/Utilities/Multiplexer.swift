@@ -36,16 +36,32 @@ enum Multiplexer: String {
                 .flatMap { Self.pane(fromTmuxClients: $0, clientTTY: clientTTY) }
         case .zellij:
             // shortcut: a pane running a multiplexer inside zellij names no tty, so nesting stops there; upgrade if that setup shows up.
-            // The server socket the client talks to names its session now: argv keeps
-            // the one it started with after a switch to another session inside the client.
-            guard let session = Self.zellijSession(fromSocketPeers: TerminalProcess.unixSocketPeers(ofPID: clientPID))
-                ?? Self.zellijSession(fromArguments: arguments)
-                ?? run(["list-sessions", "-n"]).flatMap(Self.onlySession(fromList:)),
-                let pane = Self.zellijPane(session: session)
-            else { return nil }
+            // Each way of naming the client's session can miss, so the first one zellij answers
+            // for counts. The server socket names the session the client is in now, where the
+            // socket is named after it (before zellij 0.46; since then it is a hash). argv keeps
+            // the session the client started with, after a switch to another one inside it.
+            // A bare `zellij` on 0.46 names it neither way: the only running session is asked.
+            let named = [
+                Self.zellijSession(fromSocketPeers: TerminalProcess.unixSocketPeers(ofPID: clientPID)),
+                Self.zellijSession(fromArguments: arguments),
+            ].compactMap { $0 }
+            let answered = Self.firstAnswer(for: named, ask: Self.zellijPane(session:))
+                ?? run(["list-sessions", "-n"])
+                .flatMap(Self.onlySession(fromList:))
+                .flatMap { named.contains($0) ? nil : Self.firstAnswer(for: [$0], ask: Self.zellijPane(session:)) }
+            guard let (session, pane) = answered else { return nil }
             trail.zellij = TerminalTrail.Zellij(session: session, pane: pane)
             return pane
         }
+    }
+
+    /// The first of `sessions` that `ask` answers for, with its answer; each is asked at most once.
+    static func firstAnswer<Answer>(for sessions: [String], ask: (String) -> Answer?) -> (session: String, answer: Answer)? {
+        var asked: Set<String> = []
+        for session in sessions where asked.insert(session).inserted {
+            if let answer = ask(session) { return (session, answer) }
+        }
+        return nil
     }
 
     /// The focused pane of zellij `session`'s first client, nil when zellij can't be asked.
