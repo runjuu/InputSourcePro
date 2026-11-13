@@ -178,7 +178,7 @@ final class TerminalWatcherTests: XCTestCase {
 
     // MARK: zellij
 
-    func testZellijPollsItsClientListEveryQuarterSecond() {
+    func testZellijPollsItsClientListEveryHalfSecond() {
         let harness = Harness()
         let pane = Multiplexer.Pane.program(nil, label: "zellij:s/terminal_1")
         harness.zellijPane = pane
@@ -464,7 +464,7 @@ final class TerminalWatcherTests: XCTestCase {
     /// A process the CLI leaves behind keeps the pipe open; the read must not wait for it.
     func testCLIOutputDoesNotWaitForAProcessLeftBehind() {
         let started = Date()
-        let output = TerminalProcess.output(of: "/bin/sh", arguments: ["-c", "sleep 30 & echo done"], timeout: 0.3)
+        let output = TerminalProcess.output(of: "/bin/sh", arguments: ["-c", "sleep 30 & echo done"])
         XCTAssertEqual(output, "done\n")
         XCTAssertLessThan(Date().timeIntervalSince(started), 5)
     }

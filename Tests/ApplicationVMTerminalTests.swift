@@ -55,6 +55,8 @@ final class ApplicationVMTerminalTests: XCTestCase {
             let lock = NSLock()
             var reading = TerminalReading(program: TerminalProgram(key: "claude", pane: "A"), pane: "A")
             var isEnabled = true
+            var probes = 0
+            var delivered = 0
         }
         let state = State()
         let environment = ApplicationVM.Environment(
@@ -62,7 +64,12 @@ final class ApplicationVMTerminalTests: XCTestCase {
             focusedApplication: { nil },
             runningApplications: Just([ghostty]).eraseToAnyPublisher(),
             isTerminalEnabled: { terminal in state.lock.withLock { terminal == .ghostty && state.isEnabled } },
-            probedProgram: { _ in state.lock.withLock { state.reading } },
+            probedProgram: { _ in
+                state.lock.withLock {
+                    state.probes += 1
+                    return state.reading
+                }
+            },
             terminalPanelFocus: TerminalPanelFocus.Environment(
                 read: { _, _ in AnyCancellable {} }
             )
@@ -84,6 +91,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
         // Each read is waited on. Flipping Ghostty's switch off and on rebuilds its watch, which probes at once.
         func read(_ key: String?, pane: String?) {
             let program = key.map { TerminalProgram(key: $0, pane: pane) }
+            let (probes, delivered) = state.lock.withLock { (state.probes, state.delivered) }
             for isEnabled in [false, true] {
                 state.lock.withLock {
                     state.reading = TerminalReading(program: program, pane: pane)
@@ -91,6 +99,13 @@ final class ApplicationVMTerminalTests: XCTestCase {
                 }
                 preferencesVM.runtimeRuleChangeNotifier.notify()
             }
+            // The watch forgets the program when it is rebuilt, so a shell is not read just because
+            // none is stored: wait for the probe, then for a hop queued behind its delivery.
+            Self.waitUntil("the rebuilt watch probes") { state.lock.withLock { state.probes > probes } }
+            TerminalProcess.queue.async {
+                DispatchQueue.main.async { state.lock.withLock { state.delivered += 1 } }
+            }
+            Self.waitUntil("the probe's reading is delivered") { state.lock.withLock { state.delivered > delivered } }
             Self.waitUntil("\(key ?? "shell") in \(pane ?? "no pane") is read") {
                 preferencesVM.terminalPrograms[.ghostty] == program
             }

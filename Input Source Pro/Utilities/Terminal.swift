@@ -160,7 +160,9 @@ struct TerminalProcess: Equatable {
 
         if let command, interpreters.contains(command),
            let script = arguments.dropFirst().first(where: { !$0.hasPrefix("-") && $0 != "run" }) {
-            return TerminalProgram(key: packageBinName(ofScript: script) ?? (script as NSString).lastPathComponent.components(separatedBy: ".")[0], name: comm)
+            let scriptName = (script as NSString).lastPathComponent.components(separatedBy: ".")[0]
+            // `node .` names no script: the interpreter is the program then.
+            return TerminalProgram(key: packageBinName(ofScript: script) ?? (scriptName.isEmpty ? command : scriptName), name: comm)
         }
         return TerminalProgram(key: command ?? comm, name: comm)
     }
