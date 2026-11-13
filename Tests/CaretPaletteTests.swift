@@ -757,7 +757,7 @@ final class CaretPaletteTests: XCTestCase {
             focus.resolve(state, pid: 42, at: 10.02)
 
             XCTAssertTrue(focus.receiveMissingCaret(
-                at: 12, after: 11, isTemporaryInputWindowInProgress: false, pid: 42
+                at: 12, after: 11, focusedAt: 10.02, isTemporaryInputWindowInProgress: false, pid: 42
             ))
             XCTAssertEqual(focus.confirmation?.pid, 42)
             XCTAssertEqual(focus.confirmation?.uptime, 12)
@@ -771,14 +771,14 @@ final class CaretPaletteTests: XCTestCase {
         nonInput.begin(pid: 42, at: 10)
         nonInput.resolve(.nonInput, pid: 42, at: 10.02)
         XCTAssertTrue(nonInput.receiveMissingCaret(
-            at: 12, after: 11, isTemporaryInputWindowInProgress: false, pid: 42
+            at: 12, after: 11, focusedAt: 10.02, isTemporaryInputWindowInProgress: false, pid: 42
         ))
         XCTAssertNil(nonInput.confirmation)
 
         var pending = CaretPalette.FocusReadiness()
         pending.begin(pid: 42, at: 10)
         XCTAssertTrue(pending.receiveMissingCaret(
-            at: 10.1, after: 10, isTemporaryInputWindowInProgress: false, pid: 42
+            at: 10.1, after: 10, focusedAt: 10, isTemporaryInputWindowInProgress: false, pid: 42
         ))
         // The focus query's own wait is left as it was.
         XCTAssertEqual(pending.confirmation?.uptime, 10)
@@ -791,10 +791,23 @@ final class CaretPaletteTests: XCTestCase {
             focus.resolve(.input, pid: 42, at: 10.02)
 
             XCTAssertFalse(focus.receiveMissingCaret(
-                at: uptime, after: 11, isTemporaryInputWindowInProgress: inProgress, pid: 42
+                at: uptime, after: 11, focusedAt: 10.02, isTemporaryInputWindowInProgress: inProgress, pid: 42
             ))
             XCTAssertEqual(focus.confirmation?.uptime, 10.02)
         }
+    }
+
+    func testMissingCaretFromBeforeCurrentFocusKeepsTheWait() {
+        // A report the app being left sent before this focus, delivered after it resolved.
+        var focus = CaretPalette.FocusReadiness()
+        focus.begin(pid: 42, at: 10)
+        focus.resolve(.unknown, pid: 42, at: 10.02)
+
+        XCTAssertFalse(focus.receiveMissingCaret(
+            at: 10.01, after: 0, focusedAt: 10.02, isTemporaryInputWindowInProgress: false, pid: 42
+        ))
+        XCTAssertEqual(focus.confirmation?.uptime, 10.02)
+        XCTAssertTrue(focus.isAwaitingConfirmation(for: 42, now: 10.1, focusedAt: 10.02))
     }
 
     func testDefaultIndicatorFallsBackOnceIfHelperNeverConfirms() {
