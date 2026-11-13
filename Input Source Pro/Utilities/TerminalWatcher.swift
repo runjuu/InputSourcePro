@@ -383,11 +383,13 @@ extension TerminalWatcher.Environment {
         )
     }
 
-    /// Polls, connecting and connection reads, off the main thread.
+    /// Connecting and connection reads, off the main thread.
     private static let queue = DispatchQueue(label: "dev.inputsourcepro.terminal-watch", qos: .utility)
 
     static func poll(every interval: TimeInterval, check: @escaping () -> String?, fire: @escaping (String) -> Void) -> AnyCancellable {
-        let timer = DispatchSource.makeTimerSource(queue: queue)
+        // A queue of its own: zellij's check runs its CLI, which must not hold up the
+        // other polls or the connection reads when the server is slow to answer.
+        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue(label: "dev.inputsourcepro.terminal-poll", qos: .utility))
         // Leeway lets the system batch the wakeups.
         timer.schedule(deadline: .now() + interval, repeating: interval, leeway: .milliseconds(Int(interval * 100)))
         timer.setEventHandler {

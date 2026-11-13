@@ -262,6 +262,11 @@ final class AppKindTerminalTests: XCTestCase {
         XCTAssertEqual(paneA.getId(), "\(bundleId)_\(rule.id.uuidString)")
     }
 
+    func testAnInterpreterWithoutAScriptNameIsTheProgram() {
+        XCTAssertEqual(TerminalProcess.program(comm: "node", arguments: ["node", "."]).key, "node")
+        XCTAssertEqual(TerminalProcess.program(comm: "node", arguments: ["node", "/tmp/isp-no-package/tool.js"]).key, "tool")
+    }
+
     func testProgramIdLeavesOutPane() {
         XCTAssertEqual(TerminalProgram(key: "claude", name: "2.1.318", pane: "/dev/ttys008").id, "claude/2.1.318")
     }
