@@ -287,6 +287,9 @@ extension ApplicationVM {
         }
     }
 
+    /// How long after a focus change the terminal is asked again for its focused pane.
+    static let terminalFocusSettleMilliseconds = 100
+
     /// The least time between two probes that window title changes ask for.
     static let terminalTitleProbeInterval: TimeInterval = 1
 
@@ -356,9 +359,15 @@ extension ApplicationVM {
             .filter { $0.notification == .titleChanged }
             .mapToVoid()
             .throttle(for: .seconds(Self.terminalTitleProbeInterval), scheduler: DispatchQueue.main, latest: true)
-        let probes = axChanges
+        let focusChanges = axChanges
             .filter { $0.notification != .titleChanged }
             .mapToVoid()
+            .share()
+        let probes = focusChanges
+            // Asked once more a moment later: for some 20ms after focus moves to another
+            // split, Ghostty still names the split it left, and an answer from then stays
+            // until the next change.
+            .merge(with: focusChanges.delay(for: .milliseconds(Self.terminalFocusSettleMilliseconds), scheduler: DispatchQueue.main))
             .throttle(for: .milliseconds(300), scheduler: DispatchQueue.main, latest: true)
             .merge(with: titleChanges)
             // The terminal in front can gain or lose its panel without being picked again.
