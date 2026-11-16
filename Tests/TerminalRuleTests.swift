@@ -231,7 +231,7 @@ final class MultiplexerTests: XCTestCase {
         XCTAssertEqual(Multiplexer.zellijSession(fromArguments: ["zellij", "--session=work"]), "work")
         XCTAssertEqual(Multiplexer.zellijSession(fromArguments: ["zellij", "attach", "work"]), "work")
         XCTAssertEqual(Multiplexer.zellijSession(fromSocketPeers: ["/var/folders/x/T/zellij-501/contract_version_1/zippy-panda"]), "zippy-panda")
-        XCTAssertNil(Multiplexer.zellijSession(fromSocketPeers: ["/tmp/tmux-501/default", ""]))
+        XCTAssertNil(Multiplexer.zellijSession(fromSocketPeers: ["/Users/me/.config/herdr/herdr.sock", ""]))
         XCTAssertEqual(Multiplexer.zellijSession(fromArguments: ["/opt/homebrew/bin/zellij", "a", "-c", "work"]), "work")
         XCTAssertNil(Multiplexer.zellijSession(fromArguments: ["zellij"]))
         XCTAssertNil(Multiplexer.zellijSession(fromArguments: ["zellij", "-l", "compact"]))
@@ -292,6 +292,37 @@ final class MultiplexerTests: XCTestCase {
         XCTAssertNil(Multiplexer.pane(fromZellijClients: "", session: "s"))
         XCTAssertNil(Multiplexer.pane(fromZellijClients: "CLIENT_ID ZELLIJ_PANE_ID RUNNING_COMMAND\n", session: "s"))
         XCTAssertNil(Multiplexer.pane(fromZellijClients: "Session not found\n1 terminal_0 claude\n", session: "s"))
+    }
+
+    func testHerdrProcessInfoNamesTheShell() throws {
+        let reply = #"{"id":"cli:pane:process_info","result":{"process_info":{"foreground_process_group_id":7282,"foreground_processes":[{"argv":["tmux"],"argv0":"tmux","cmdline":"tmux","cwd":"/Users/me","name":"tmux","pid":7282}],"pane_id":"wB:p5Q","shell_pid":4160},"type":"pane_process_info"}}"#
+        let shell = try XCTUnwrap(Multiplexer.herdrShell(fromProcessInfo: reply))
+
+        XCTAssertEqual(shell.pid, 4160)
+        XCTAssertEqual(shell.pane, "wB:p5Q")
+    }
+
+    /// A server that doesn't answer yet is still subscribed to, so its handshake reads the pane again.
+    func testHerdrSocketIsNotedEvenWhenTheQueryFails() {
+        var trail = TerminalTrail()
+        var asked: [[String]] = []
+        let pane = Multiplexer.herdrPane(arguments: ["herdr", "--session", "work"], trail: &trail, run: { asked.append($0); return nil })
+
+        XCTAssertNil(pane)
+        XCTAssertEqual(asked, [["--session", "work", "pane", "process-info"]])
+        XCTAssertEqual(trail.herdrSockets, [Multiplexer.herdrSocket(session: "work")].compactMap { $0 })
+
+        let reply = #"{"result":{"process_info":{"pane_id":"p1","shell_pid":4160}}}"#
+        XCTAssertNil(Multiplexer.herdrPane(arguments: ["herdr"], trail: &trail, run: { _ in reply }, ttyPath: { _ in nil }),
+                     "The shell has exited")
+        XCTAssertEqual(trail.herdrSockets.count, 2)
+        XCTAssertEqual(Multiplexer.herdrPane(arguments: ["herdr"], trail: &trail, run: { _ in reply }, ttyPath: { _ in "/dev/ttys009" }),
+                       .tty("/dev/ttys009", label: "herdr:p1"))
+    }
+
+    func testHerdrErrorReplyIsUnknown() {
+        XCTAssertNil(Multiplexer.herdrShell(fromProcessInfo: #"{"id":"cli:pane:process_info","error":{"code":"server_not_running","message":"no server"}}"#))
+        XCTAssertNil(Multiplexer.herdrShell(fromProcessInfo: "not json"))
     }
 }
 
