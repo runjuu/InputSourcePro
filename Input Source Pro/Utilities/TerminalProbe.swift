@@ -2,9 +2,8 @@ import AppKit
 import AXSwift
 import Darwin
 
-/// Reads the program in the focused pane of a terminal ISP pulls from (every
-/// terminal but Herdr, which pushes): each terminal names the pane's tty its
-/// own way, and the kernel's process table names the tty's foreground job.
+/// Reads the program in the focused pane. Herdr names the pane in its view
+/// file; other terminals report a tty. The kernel identifies its foreground job.
 /// Runs on `TerminalProcess.queue`, never on the main thread; scriptable
 /// terminals are asked with Apple Events sent from there (NSAppleScript is
 /// main-thread only).
