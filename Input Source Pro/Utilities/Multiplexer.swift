@@ -1,14 +1,14 @@
 import Foundation
 
 /// Terminal multiplexers whose focused pane Terminal Rules look into, so a rule
-/// follows the program inside tmux or zellij rather than the multiplexer
-/// itself. Each is asked through its own CLI, looked up where package managers
-/// install it: ISP runs without a login PATH.
-// shortcut: only tmux's default server is asked (no -L/-S socket), and for a multiplexer with several clients only the first one counts; upgrade when those setups are in use.
+/// follows the program inside tmux, zellij or the herdr TUI rather than the
+/// multiplexer itself. Each is asked through its own CLI, looked up where
+/// package managers install it: ISP runs without a login PATH.
+// shortcut: only tmux's default server is asked (no -L/-S socket), and for a multiplexer with several clients only the first or focused one counts; upgrade when those setups are in use.
 enum Multiplexer: String {
-    case tmux, zellij
+    case tmux, zellij, herdr
 
-    /// Nesting limit, e.g. a tmux client running in a tmux pane.
+    /// Nesting limit, e.g. Herdr → tmux → zellij.
     static let maxDepth = 3
 
     /// What a multiplexer's focused pane holds: a tty to read further (with
@@ -52,7 +52,28 @@ enum Multiplexer: String {
             guard let (session, pane) = answered else { return nil }
             trail.zellij = TerminalTrail.Zellij(session: session, pane: pane)
             return pane
+        case .herdr:
+            return Self.herdrPane(arguments: arguments, trail: &trail, run: run)
         }
+    }
+
+    /// The focused pane of the herdr TUI client with `arguments`. Its socket is
+    /// noted before asking, as tmux's server is: a server that doesn't answer
+    /// yet is still subscribed to, and its handshake reads the pane again.
+    static func herdrPane(
+        arguments: [String],
+        trail: inout TerminalTrail,
+        run: ([String]) -> String?,
+        ttyPath: (pid_t) -> String? = TerminalProcess.ttyPath(ofPID:)
+    ) -> Pane? {
+        let session = herdrSession(fromArguments: arguments)
+        guard let socket = herdrSocket(session: session) else { return nil }
+        trail.herdrSockets.append(socket)
+        guard let shell = run((session.map { ["--session", $0] } ?? []) + ["pane", "process-info"])
+            .flatMap(herdrShell(fromProcessInfo:)),
+            let tty = ttyPath(shell.pid)
+        else { return nil }
+        return .tty(tty, label: "herdr:" + shell.pane)
     }
 
     /// The first of `sessions` that `ask` answers for, with its answer; each is asked at most once.
@@ -122,6 +143,32 @@ extension Multiplexer {
             .map { $0.lastPathComponent }
     }
 
+    /// The named session a herdr TUI client attached to, from its argv:
+    /// `herdr --session X`, `--session=X` or `herdr session attach X`; nil for
+    /// the default session.
+    static func herdrSession(fromArguments arguments: [String]) -> String? {
+        var index = 1 // skip argv[0]
+        while index < arguments.endIndex {
+            let argument = arguments[index]
+            index += 1
+            if argument == "--session" { return index < arguments.endIndex ? arguments[index] : nil }
+            if argument.hasPrefix("--session=") { return String(argument.dropFirst("--session=".count)) }
+            if argument == "session", arguments[index...].first == "attach" {
+                return arguments[(index + 1)...].first { !$0.hasPrefix("-") }
+            }
+        }
+        return nil
+    }
+
+    /// The socket of herdr `session` (nil: the default one), or nil for a name
+    /// that would leave the sessions directory.
+    static func herdrSocket(session: String?) -> String? {
+        let herdr = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".config/herdr")
+        guard let session else { return herdr.appendingPathComponent("herdr.sock").path }
+        guard !session.isEmpty, !session.contains("/"), session != ".", session != ".." else { return nil }
+        return herdr.appendingPathComponent("sessions/\(session)/herdr.sock").path
+    }
+
     /// `zellij list-sessions -n`: `name [Created …]`, with `(EXITED - attach to resurrect)` after
     /// sessions that are gone but resurrectable; the name when exactly one session is running.
     static func onlySession(fromList output: String) -> String? {
@@ -149,5 +196,26 @@ extension Multiplexer {
         let key = TerminalProcess.program(comm: command, arguments: columns[2...].map(String.init)).key
         guard !key.isEmpty, !TerminalProcess.shells.contains(key) else { return .program(nil, label: label) }
         return .program(TerminalProgram(key: key, pane: label), label: label)
+    }
+
+    /// `herdr pane process-info`: the focused pane's shell pid and pane id. An
+    /// error reply (`server_not_running`) has no `result`.
+    static func herdrShell(fromProcessInfo output: String) -> (pid: pid_t, pane: String)? {
+        struct Reply: Decodable {
+            struct Result: Decodable { let processInfo: Info }
+            struct Info: Decodable {
+                let shellPid: pid_t
+                let paneId: String
+            }
+
+            let result: Result
+        }
+
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        guard let info = (try? decoder.decode(Reply.self, from: Data(output.utf8)))?.result.processInfo,
+              info.shellPid > 0
+        else { return nil }
+        return (info.shellPid, info.paneId)
     }
 }

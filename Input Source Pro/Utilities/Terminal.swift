@@ -110,7 +110,7 @@ struct TerminalReading: Equatable {
 /// identifier for it (the process's `argv[0]`); `name` is an alternative label
 /// (the kernel's process name when it differs, e.g. Claude Code's `2.1.318`).
 /// `pane` names the terminal instance (the pane's tty path, or, inside a
-/// multiplexer, the inner pane's tty or `zellij:<session>/<pane>`), so
+/// multiplexer, the inner pane's tty, `zellij:<session>/<pane>` or `herdr:<pane>`), so
 /// moving to another pane running the same program is a new context. `tty` is
 /// the pane's own tty when known, which `isp:` commands are traced back to.
 struct TerminalProgram: Equatable {
@@ -223,7 +223,7 @@ extension TerminalProcess {
 
     /// The foreground program on the tty at `path` (e.g. `/dev/ttys008`), nil
     /// for a shell prompt or an unreadable tty. Its pane is the tty path.
-    /// A multiplexer (tmux, zellij) is looked through to the program in its
+    /// A multiplexer (tmux, zellij, herdr) is looked through to the program in its
     /// focused pane, nested up to `Multiplexer.maxDepth`; when it can't be asked,
     /// the multiplexer itself is the program. Spawns processes then, so call it
     /// on `queue`.
@@ -291,7 +291,8 @@ extension TerminalProcess {
     }
 
     /// The controlling tty of `pid` (e.g. `/dev/ttys002`), or nil when the process
-    /// is gone, has no tty, or belongs to another user.
+    /// is gone, has no tty, or belongs to another user. Herdr reports the shell
+    /// wrapping a program (`sh -c 'lazygit'`), and its tty leads to the program.
     static func ttyPath(ofPID pid: pid_t) -> String? {
         processInfo(pid)?.tty
     }

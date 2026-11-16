@@ -31,6 +31,8 @@ struct TerminalTrail: Equatable {
     var ttys: [TTY] = []
     /// The default tmux server answered.
     var tmux = false
+    /// Sockets of the herdr TUI servers that answered.
+    var herdrSockets: [String] = []
     var zellij: Zellij?
 
     /// The foreground process group of `pid`'s controlling tty, from libproc;
@@ -65,6 +67,7 @@ extension TerminalTrail.TTY {
 /// - libproc: each tty the last lookup read, for a job starting or ending, and the
 ///   program read on it, for one that ends inside its shell's process group;
 /// - tmux: a control-mode client, for pane, window and session switches;
+/// - herdr TUI: a `pane.focused` subscription on the session's socket;
 /// - zellij: its client list, polled, since it has neither ttys nor events.
 ///
 /// Watches only while a terminal with Terminal Rules is frontmost (`watching`).
@@ -76,13 +79,15 @@ extension TerminalTrail.TTY {
 final class TerminalWatcher {
     enum Connection: Hashable {
         case tmux
+        case herdr(socket: String)
     }
 
-    /// What a connection reports, on the main thread. `wasReady`: its server
-    /// had answered the handshake before the connection closed. `dropped`: it
-    /// gave up before the handshake for a reason worth retrying (no answer in
-    /// time, or the server went away since it was found).
+    /// What a connection reports, on the main thread. `ready`: its server
+    /// answered the handshake. `wasReady`: it had, before the connection
+    /// closed. `dropped`: it gave up before the handshake for a reason worth
+    /// retrying (no answer in time, or the server went away since it was found).
     enum ConnectionEvent: Equatable {
+        case ready
         case changed
         case closed(wasReady: Bool)
         case dropped
@@ -221,12 +226,13 @@ final class TerminalWatcher {
             })
         }
 
-        if trail.tmux {
+        if trail.tmux || !trail.herdrSockets.isEmpty {
             closing = nil
-            open(.tmux)
+            if trail.tmux { open(.tmux) }
+            trail.herdrSockets.forEach { open(.herdr(socket: $0)) }
         } else if !connections.isEmpty, closing == nil {
-            // Nothing in front goes through the server any more (tmux detached, another
-            // terminal, or none): its connection is kept for the grace period, then closed.
+            // Nothing in front goes through a server any more (tmux detached, the herdr TUI
+            // left, another terminal, or none): the connections are kept for the grace period, then closed.
             closing = environment.delay(Self.connectionGrace)
                 .sink { [weak self] _ in self?.closeConnections() }
         }
@@ -296,8 +302,13 @@ final class TerminalWatcher {
 
     private func receive(_ event: ConnectionEvent, from connection: Connection) {
         switch event {
+        case .ready:
+            // A herdr pane focused after the lookup but before the subscription went unreported:
+            // read it again now that events flow. tmux's control client reports its own attach.
+            guard case .herdr = connection else { return }
+            trigger(src: connection.src, "ready \(connection.detail)", paneMayHaveChanged: true)
         case .changed:
-            trigger(src: connection.src, "event", paneMayHaveChanged: true)
+            trigger(src: connection.src, connection.detail.isEmpty ? "event" : "event \(connection.detail)", paneMayHaveChanged: true)
         case .closed(wasReady: true):
             // The server went away (or restarts): attach again with backoff.
             record(connection, "reconnect")
@@ -374,7 +385,7 @@ final class TerminalWatcher {
     }
 
     private func record(_ connection: Connection, _ message: String) {
-        record(src: connection.src, message)
+        record(src: connection.src, connection.detail.isEmpty ? message : "\(message) \(connection.detail)")
     }
 }
 
@@ -382,6 +393,14 @@ extension TerminalWatcher.Connection {
     var src: String {
         switch self {
         case .tmux: return "tmux-ctl"
+        case .herdr: return "herdr-sock"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .tmux: return ""
+        case let .herdr(socket): return "socket=\(socket)"
         }
     }
 }
@@ -407,6 +426,20 @@ extension TerminalWatcher {
             "%window-pane-changed", "%session-window-changed", "%client-session-changed", "%session-changed",
         ]
 
+        /// herdr's socket: `subscription_started` answers the subscribe request;
+        /// a `pane.focused` subscription sends one `pane_focused` per pane, tab or
+        /// workspace switch. Other events are ignored, so they never add a change.
+        static func herdr(_ line: Substring) -> Line? {
+            struct Message: Decodable {
+                struct Result: Decodable { let type: String? }
+                let event: String?
+                let result: Result?
+            }
+            guard let message = try? JSONDecoder().decode(Message.self, from: Data(line.utf8)) else { return nil }
+            if message.result?.type == "subscription_started" { return .ready }
+            return message.event == "pane_focused" ? .changed : nil
+        }
+
         /// Takes the complete lines out of `buffer`; true when any of them is a
         /// change, so a burst read together counts once. Sets `isReady` on a handshake line.
         static func scan(_ buffer: inout [UInt8], isReady: inout Bool, parse: (Substring) -> Line?) -> Bool {
@@ -419,7 +452,7 @@ extension TerminalWatcher {
                 }
                 buffer.removeSubrange(...newline)
             }
-            // tmux sends no long lines; a runaway one is dropped rather than kept growing.
+            // Neither protocol sends long lines; a runaway one is dropped rather than kept growing.
             if buffer.count > 1 << 16 { buffer.removeAll() }
             return changed
         }
@@ -446,6 +479,11 @@ extension TerminalWatcher.Environment {
                     guard isListening(path) else { return nil }
                     return attach(timeout: handshakeTimeout, parse: TerminalWatcher.Line.tmux, send: send) {
                         spawnTmuxControlClient(socket: tmuxSocket)
+                    }
+                case let .herdr(socket):
+                    guard isListening(socket) else { return nil }
+                    return attach(timeout: handshakeTimeout, parse: TerminalWatcher.Line.herdr, send: send) {
+                        subscribeHerdr(socket: socket)
                     }
                 }
             },
@@ -529,6 +567,18 @@ extension TerminalWatcher.Environment {
         })
     }
 
+    /// A `pane.focused` subscription on the herdr server at `socket`.
+    static func subscribeHerdr(socket: String) -> (fd: Int32, onClose: () -> Void)? {
+        guard let fd = connectUnix(socket) else { return nil }
+        let request = Array(#"{"id":"isp","method":"events.subscribe","params":{"subscriptions":[{"type":"pane.focused"}]}}"#.utf8) + [UInt8(ascii: "\n")]
+        // A fresh socket's buffer takes the request whole; anything less is a server in trouble.
+        guard Darwin.write(fd, request, request.count) == request.count else {
+            Darwin.close(fd)
+            return nil
+        }
+        return (fd, {})
+    }
+
     /// Whether a server listens at `path`, without waiting on it.
     static func isListening(_ path: String) -> Bool {
         guard let fd = connectUnix(path) else { return false }
@@ -563,8 +613,8 @@ extension TerminalWatcher.Environment {
         return fd
     }
 
-    /// Reads `fd` on `queue` until EOF, sending `.changed` at most once per
-    /// read and `.closed` at EOF, or `.dropped` when no handshake line came
+    /// Reads `fd` on `queue` until EOF, sending `.ready` on the handshake,
+    /// `.changed` at most once per read and `.closed` at EOF, or `.dropped` when no handshake line came
     /// within `timeout`; `send` runs on `queue`. Owns `fd`: it is closed, and
     /// `onClose` runs, once reading has stopped, at the latest when cancelled.
     static func stream(
@@ -588,9 +638,10 @@ extension TerminalWatcher.Environment {
                 return send(.closed(wasReady: isReady))
             }
             buffer += chunk[..<count]
-            if TerminalWatcher.Line.scan(&buffer, isReady: &isReady, parse: parse) {
-                send(.changed)
-            }
+            let wasReady = isReady
+            let changed = TerminalWatcher.Line.scan(&buffer, isReady: &isReady, parse: parse)
+            if isReady, !wasReady { send(.ready) }
+            if changed { send(.changed) }
         }
         source.setCancelHandler {
             Darwin.close(fd)

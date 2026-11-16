@@ -99,8 +99,8 @@ final class TerminalWatcherTests: XCTestCase {
         }
     }
 
-    private func trail(ttys: [(pid_t, pid_t)] = [], tmux: Bool = false, zellij: TerminalTrail.Zellij? = nil) -> TerminalTrail {
-        TerminalTrail(ttys: ttys.map { TerminalTrail.TTY(pid: $0.0, foregroundPgid: $0.1) }, tmux: tmux, zellij: zellij)
+    private func trail(ttys: [(pid_t, pid_t)] = [], tmux: Bool = false, herdr: [String] = [], zellij: TerminalTrail.Zellij? = nil) -> TerminalTrail {
+        TerminalTrail(ttys: ttys.map { TerminalTrail.TTY(pid: $0.0, foregroundPgid: $0.1) }, tmux: tmux, herdrSockets: herdr, zellij: zellij)
     }
 
     // MARK: Lifecycle
@@ -469,6 +469,56 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertEqual(harness.closed, [.tmux])
     }
 
+    func testHerdrConnectionsOutliveLeavingTheFrontForAGracePeriod() {
+        let socket = "/tmp/herdr.sock"
+        let herdr = TerminalWatcher.Connection.herdr(socket: socket)
+        let harness = Harness()
+        harness.reachable = [herdr]
+        harness.bringToFront(.ghostty)
+        harness.watcher.follow(trail(herdr: [socket]), for: .ghostty)
+        harness.fireTimer(0.5)
+        XCTAssertEqual(harness.attempts, [herdr])
+
+        harness.leaveFront()
+        harness.sends[herdr]?(.changed)
+        XCTAssertEqual(harness.refreshes, 0, "Not frontmost: events are ignored")
+        XCTAssertTrue(harness.closed.isEmpty)
+
+        harness.bringToFront(.ghostty)
+        harness.fireTimer(TerminalWatcher.connectionGrace) // cancelled by coming back
+        XCTAssertTrue(harness.closed.isEmpty, "Back in time: the connection is reused")
+        XCTAssertEqual(harness.attempts.count, 1)
+        harness.sends[herdr]?(.changed)
+        XCTAssertEqual(harness.refreshes, 1)
+
+        harness.leaveFront()
+        harness.fireTimer(TerminalWatcher.connectionGrace)
+        XCTAssertEqual(harness.closed, [herdr])
+    }
+
+    /// Read A, then subscribe: a switch made before the handshake sends no event,
+    /// so the handshake itself reads the pane again, once.
+    func testAHerdrHandshakeReadsThePaneAgain() {
+        let socket = "/tmp/herdr.sock"
+        let herdr = TerminalWatcher.Connection.herdr(socket: socket)
+        let harness = Harness()
+        harness.reachable = [herdr, .tmux]
+        harness.bringToFront(.ghostty)
+        harness.watcher.follow(trail(tmux: true, herdr: [socket]), for: .ghostty)
+        harness.fireTimer(0.5)
+        harness.fireTimer(0.5)
+
+        harness.sends[herdr]?(.ready)
+        XCTAssertEqual([harness.refreshes, harness.paneChanges], [1, 1])
+        harness.sends[.tmux]?(.ready)
+        XCTAssertEqual(harness.refreshes, 1, "tmux reports its attach as a session change")
+
+        // That read's lookup goes through the same socket: no new connection, so no new handshake.
+        harness.watcher.follow(trail(tmux: true, herdr: [socket]), for: .ghostty)
+        XCTAssertEqual(harness.attempts.count, 2)
+        XCTAssertTrue(harness.timers.isEmpty)
+    }
+
     // MARK: Lines
 
     func testTmuxControlModeLines() {
@@ -482,6 +532,27 @@ final class TerminalWatcherTests: XCTestCase {
                      "%output %1 %window-pane-changed", "%exit", "", "window-pane-changed"] {
             XCTAssertNil(parse(line), line)
         }
+    }
+
+    func testHerdrsThreeFocusEventsCountOnce() {
+        var buffer = Array("""
+        {"id":"isp","result":{"type":"subscription_started"}}
+        {"data":{"pane_id":"w1:p2","type":"pane_focused","workspace_id":"w1"},"event":"pane_focused"}
+        {"data":{"tab_id":"w1:t2","type":"tab_focused"},"event":"tab_focused"}
+        {"data":{"workspace_id":"w1","type":"workspace_focused"},"event":"workspace_focused"}
+        {"data":{"pane_id":"w1:p3","type":"pane_focused"},"event":"pane_focused"}
+        {"data":{"pane_id":
+        """.utf8)
+        var isReady = false
+
+        XCTAssertTrue(TerminalWatcher.Line.scan(&buffer, isReady: &isReady, parse: TerminalWatcher.Line.herdr))
+        XCTAssertTrue(isReady)
+        XCTAssertEqual(String(decoding: buffer, as: UTF8.self), #"{"data":{"pane_id":"#, "A partial line waits for the rest")
+
+        buffer += Array(#""w1:p4"},"event":"tab_focused"}"#.utf8) + [UInt8(ascii: "\n")]
+        XCTAssertFalse(TerminalWatcher.Line.scan(&buffer, isReady: &isReady, parse: TerminalWatcher.Line.herdr))
+        XCTAssertTrue(buffer.isEmpty)
+        XCTAssertNil(TerminalWatcher.Line.herdr(#"{"id":"isp","error":{"code":"bad"}}"#))
     }
 
     func testStreamSendsOneChangePerReadThenClosed() {
@@ -500,7 +571,7 @@ final class TerminalWatcherTests: XCTestCase {
         close(fds[1])
         wait(for: [closed], timeout: 5)
 
-        XCTAssertEqual(lock.withLock { events }, [.changed, .closed(wasReady: true)])
+        XCTAssertEqual(lock.withLock { events }, [.ready, .changed, .closed(wasReady: true)])
         stream.cancel()
     }
 
@@ -513,7 +584,7 @@ final class TerminalWatcherTests: XCTestCase {
         var openedOnMain = true
         var released = DispatchTimeoutResult.timedOut
 
-        let connection = TerminalWatcher.Environment.attach(timeout: 60, parse: TerminalWatcher.Line.tmux, send: { _ in }) {
+        let connection = TerminalWatcher.Environment.attach(timeout: 60, parse: TerminalWatcher.Line.herdr, send: { _ in }) {
             lock.withLock { openedOnMain = Thread.isMainThread }
             // Run in line, this would wait out its timeout: the signal comes only after `attach` returns.
             let result = release.wait(timeout: .now() + 5)
@@ -528,6 +599,32 @@ final class TerminalWatcherTests: XCTestCase {
             XCTAssertFalse(openedOnMain)
         }
         connection.cancel()
+    }
+
+    /// A server that listens but never accepts: the missing handshake ends in `.dropped`.
+    func testAServerThatNeverAnswersIsDropped() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let path = directory.appendingPathComponent("s.sock").path
+        let server = try XCTUnwrap(Self.listen(at: path))
+        defer { close(server) }
+
+        let environment = TerminalWatcher.Environment.live(handshakeTimeout: 0.2)
+        XCTAssertNil(environment.connect(.herdr(socket: directory.appendingPathComponent("none.sock").path)) { _ in },
+                     "Nothing listens: nil at once")
+
+        var events: [TerminalWatcher.ConnectionEvent] = []
+        let dropped = expectation(description: "dropped")
+        let connection = environment.connect(.herdr(socket: path)) { event in
+            XCTAssertTrue(Thread.isMainThread)
+            events.append(event)
+            dropped.fulfill()
+        }
+        XCTAssertNotNil(connection)
+        wait(for: [dropped], timeout: 5)
+        XCTAssertEqual(events, [.dropped])
+        connection?.cancel()
     }
 
     /// Cancelled while it was opening: what opens is closed at once, and nothing is sent.
@@ -560,6 +657,23 @@ final class TerminalWatcherTests: XCTestCase {
         DispatchQueue.main.async { drained.fulfill() }
         wait(for: [drained], timeout: 5)
         XCTAssertEqual(events, [], "Nothing after cancel")
+    }
+
+    /// A unix socket at `path` that listens and never accepts on its own.
+    private static func listen(at path: String) -> Int32? {
+        let fd = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
+        guard fd >= 0 else { return nil }
+        var address = sockaddr_un()
+        address.sun_family = sa_family_t(AF_UNIX)
+        withUnsafeMutableBytes(of: &address.sun_path) { $0.copyBytes(from: path.utf8.prefix($0.count - 1)) }
+        let bound = withUnsafePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.bind(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
+        }
+        guard bound == 0, Darwin.listen(fd, 8) == 0 else {
+            Darwin.close(fd)
+            return nil
+        }
+        return fd
     }
 
     // MARK: CLI runs
@@ -597,6 +711,22 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertNil(TerminalProcess.output(of: "/nonexistent", arguments: []))
     }
 
+    // MARK: herdr sessions
+
+    func testHerdrSessionFromItsClientArguments() {
+        XCTAssertNil(Multiplexer.herdrSession(fromArguments: ["herdr"]))
+        XCTAssertEqual(Multiplexer.herdrSession(fromArguments: ["herdr", "--session", "work"]), "work")
+        XCTAssertEqual(Multiplexer.herdrSession(fromArguments: ["herdr", "--session=work"]), "work")
+        XCTAssertEqual(Multiplexer.herdrSession(fromArguments: ["herdr", "session", "attach", "work"]), "work")
+        XCTAssertNil(Multiplexer.herdrSession(fromArguments: ["herdr", "session", "attach"]))
+
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        XCTAssertEqual(Multiplexer.herdrSocket(session: nil), home + "/.config/herdr/herdr.sock")
+        XCTAssertEqual(Multiplexer.herdrSocket(session: "work"), home + "/.config/herdr/sessions/work/herdr.sock")
+        XCTAssertNil(Multiplexer.herdrSocket(session: ".."))
+        XCTAssertNil(Multiplexer.herdrSocket(session: "a/b"))
+    }
+
     // MARK: Live probe
 
     /// The live sources against throwaway servers that a driver script starts:
@@ -604,12 +734,15 @@ final class TerminalWatcherTests: XCTestCase {
     /// `TEST_RUNNER_ISP_TERMINAL_WATCH_PROBE`). Skipped otherwise.
     func testLiveProbe() throws {
         guard let json = ProcessInfo.processInfo.environment["ISP_TERMINAL_WATCH_PROBE"] else {
-            throw XCTSkip("Needs ISP_TERMINAL_WATCH_PROBE: live tmux and zellij servers")
+            throw XCTSkip("Needs ISP_TERMINAL_WATCH_PROBE: live tmux, zellij and herdr servers")
         }
         struct Config: Decodable {
             let tmux: String
             let tmuxClient: String
             let zellij: String
+            let herdr: String
+            let herdrPanes: [[String]]
+            let herdrTabs: [[String]]
         }
         let config = try JSONDecoder().decode(Config.self, from: Data(json.utf8))
         final class Counter { var refreshes = 0 }
@@ -619,13 +752,14 @@ final class TerminalWatcherTests: XCTestCase {
         let tmux = { (arguments: [String]) in Self.cli("/opt/homebrew/bin/tmux", ["-L", config.tmux] + arguments) }
         let windowSize = { tmux(["display", "-p", "-t", "A", "#{window_width}x#{window_height}"]) }
         let controlClient = { Self.cli("/usr/bin/pgrep", ["-f", "tmux -L \(config.tmux) -C attach"]) }
-        /// What a lookup of the frontmost pane would go through: tmux session A's active pane, zellij.
+        /// What a lookup of the frontmost pane would go through: tmux session A's active pane, herdr, zellij.
         func lookup(tty: Bool = true) -> TerminalTrail {
             var trail = TerminalTrail(tmux: true)
             if tty, let pid = pid_t(tmux(["display", "-p", "-t", "A", "#{pane_pid}"])),
                let foregroundPgid = TerminalTrail.foregroundPgid(ofPID: pid) {
                 trail.ttys = [TerminalTrail.TTY(pid: pid, foregroundPgid: foregroundPgid)]
             }
+            trail.herdrSockets = Multiplexer.herdrSocket(session: config.herdr).map { [$0] } ?? []
             trail.zellij = Multiplexer.zellijPane(session: config.zellij).map { TerminalTrail.Zellij(session: config.zellij, pane: $0) }
             return trail
         }
@@ -698,6 +832,12 @@ final class TerminalWatcherTests: XCTestCase {
         step("tmux: switch-client to another session") { tmux(["switch-client", "-c", config.tmuxClient, "-t", "B"]) }
         step("tmux: switch-client back") { tmux(["switch-client", "-c", config.tmuxClient, "-t", "A"]) }
         step("tmux: rename-window (ignored)", expect: false) { tmux(["rename-window", "-t", "A:0", "renamed"]) }
+        for (index, arguments) in config.herdrPanes.enumerated() {
+            step("herdr: pane focus #\(index + 1)") { Self.cli("/opt/homebrew/bin/herdr", arguments) }
+        }
+        for (index, arguments) in config.herdrTabs.enumerated() {
+            step("herdr: tab focus #\(index + 1)") { Self.cli("/opt/homebrew/bin/herdr", arguments) }
+        }
         for direction in ["left", "right"] {
             step("zellij: move-focus \(direction)") { Self.cli("/opt/homebrew/bin/zellij", ["-s", config.zellij, "action", "move-focus", direction]) }
         }
@@ -706,10 +846,10 @@ final class TerminalWatcherTests: XCTestCase {
         withoutZellij.zellij = nil
         watcher.follow(withoutZellij, for: .ghostty)
         spin(0.5)
-        idleCPU("frontmost, libproc + tmux watched", seconds: 10)
+        idleCPU("frontmost, libproc + tmux + herdr watched", seconds: 10)
         watcher.follow(lookup(), for: .ghostty)
         spin(0.5)
-        idleCPU("frontmost, libproc + tmux + zellij watched", seconds: 10)
+        idleCPU("frontmost, libproc + tmux + herdr + zellij watched", seconds: 10)
 
         front = nil
         step("left the front: select-window", expect: false) { tmux(["select-window", "-t", "A:0"]) }
@@ -746,7 +886,7 @@ final class TerminalWatcherTests: XCTestCase {
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice
         process.environment = ProcessInfo.processInfo.environment.filter { key, _ in
-            !(key == "TMUX" || key == "TMUX_PANE" || key.hasPrefix("ZELLIJ"))
+            !(key == "TMUX" || key == "TMUX_PANE" || key.hasPrefix("HERDR") || key.hasPrefix("ZELLIJ"))
         }
         guard (try? process.run()) != nil else { return "" }
         let data = output.fileHandleForReading.readDataToEndOfFile()
