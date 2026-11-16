@@ -123,6 +123,89 @@ final class ApplicationVMTerminalTests: XCTestCase {
         XCTAssertEqual(shows, 2, "A read without a pane neither shows nor forgets the pane")
     }
 
+    // MARK: Herdr lookups
+
+    /// What a lookup's reads saw, from `TerminalProcess.queue`.
+    private final class Reads: @unchecked Sendable {
+        private let lock = NSLock()
+        private var counts: [String: Int] = [:]
+
+        func count(_ pane: String) -> Int { lock.withLock { counts[pane] ?? 0 } }
+
+        /// Counts a read of `pane`; nil (Herdr's CLI failed) for its first `failures` reads.
+        func read(_ pane: String, failures: Int = 0) -> TerminalReading? {
+            let count = lock.withLock {
+                counts[pane, default: 0] += 1
+                return counts[pane]!
+            }
+            return count > failures ? TerminalReading(program: TerminalProgram(key: "claude", pane: pane), pane: pane) : nil
+        }
+    }
+
+    /// `herdr-app ls` or `hc get` failed once, the pane unchanged: read again.
+    func testAHerdrLookupThatReadsNothingIsTriedAgain() {
+        let reads = Reads()
+        var received: [String?] = []
+        var finished = false
+        let subscription = ApplicationVM.retriedLookup(delay: { Just(()).eraseToAnyPublisher() }) { _ in reads.read("tA", failures: 1) }
+            .sink(receiveCompletion: { _ in finished = true }, receiveValue: { received.append($0.pane) })
+        defer { subscription.cancel() }
+        Self.waitUntil("the second read") { finished }
+        XCTAssertEqual(received, ["tA"])
+        XCTAssertEqual(reads.count("tA"), 2)
+
+        finished = false
+        var lastTries: [Bool] = [] // written on `TerminalProcess.queue`, read once the lookup finished
+        let never = ApplicationVM.retriedLookup(delay: { Just(()).eraseToAnyPublisher() }) {
+            lastTries.append($0)
+            return reads.read("tB", failures: .max)
+        }
+            .sink(receiveCompletion: { _ in finished = true }, receiveValue: { _ in XCTFail("Nothing to read") })
+        defer { never.cancel() }
+        Self.waitUntil("the last try") { finished }
+        XCTAssertEqual(reads.count("tB"), ApplicationVM.terminalLookupAttempts)
+        XCTAssertEqual(lastTries, [false, false, true], "The read is told which try is its last")
+    }
+
+    /// A newer pane arriving while an older one waits to retry wins, and the older one reads no more.
+    func testANewerHerdrPaneEndsTheOlderOnesRetries() {
+        let reads = Reads()
+        let lookups = PassthroughSubject<AnyPublisher<TerminalReading, Never>, Never>()
+        var received: [String?] = []
+        let subscription = lookups.switchToLatest().sink { received.append($0.pane) }
+        defer { subscription.cancel() }
+
+        let retry = PassthroughSubject<Void, Never>()
+        var isWaiting = false
+        lookups.send(ApplicationVM.retriedLookup(delay: {
+            isWaiting = true
+            return retry.eraseToAnyPublisher()
+        }) { _ in reads.read("tA", failures: 1) })
+        Self.waitUntil("tA waits to retry") { isWaiting }
+
+        lookups.send(ApplicationVM.retriedLookup { _ in reads.read("tB") })
+        Self.waitUntil("tB is read") { received == ["tB"] }
+        retry.send(())
+        TerminalProcess.queue.sync {}
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertEqual(received, ["tB"])
+        XCTAssertEqual(reads.count("tA"), 1, "No retry after the newer pane")
+    }
+
+    /// The CLIs of a pane already left never run: its read, still queued, is skipped.
+    func testASupersededHerdrLookupSkipsItsQueuedRead() {
+        let reads = Reads()
+        let release = DispatchSemaphore(value: 0)
+        TerminalProcess.queue.async { release.wait() }
+
+        let stale = ApplicationVM.retriedLookup { _ in reads.read("tA") }.sink { _ in XCTFail("Cancelled") }
+        stale.cancel()
+        release.signal()
+        TerminalProcess.queue.sync {}
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertEqual(reads.count("tA"), 0)
+    }
+
     static func waitUntil(_ what: String, timeout: TimeInterval = 5, _ condition: () -> Bool, file: StaticString = #filePath, line: UInt = #line) {
         let deadline = Date().addingTimeInterval(timeout)
         while !condition() {

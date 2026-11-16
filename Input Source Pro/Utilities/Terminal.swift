@@ -4,6 +4,7 @@ import Darwin
 
 /// Terminals whose foreground program can drive Terminal Rules.
 enum Terminal: String, CaseIterable {
+    case herdr = "dev.herdr.app"
     case ghostty = "com.mitchellh.ghostty"
     case iterm = "com.googlecode.iterm2"
     case terminalApp = "com.apple.Terminal"
@@ -17,6 +18,8 @@ enum Terminal: String, CaseIterable {
 
     var displayName: String {
         switch self {
+        case .herdr:
+            return "Herdr"
         case .ghostty:
             return "Ghostty"
         case .iterm:
@@ -38,11 +41,9 @@ enum Terminal: String, CaseIterable {
 // MARK: - Focused tty
 
 extension Terminal {
-    /// The outer tty each terminal's focused pane was last read from (a
-    /// `TerminalProbe` answer), so a refresh reads it again without asking the
-    /// terminal. Confined to `TerminalProcess.queue`, which orders it with the
-    /// reads that use it.
-    private static var focusedTTYs: [Terminal: (pid: pid_t, path: String)] = [:]
+    /// The terminal process, outer tty, and optional pane label from its latest
+    /// lookup. Accessed on `TerminalProcess.queue` with the reads that use it.
+    private static var focusedTTYs: [Terminal: (pid: pid_t, path: String, pane: String?)] = [:]
     /// Terminals whose floating panel has focus (`TerminalPanelFocus`), so
     /// `TerminalProbe` asks for the panel's pane. Confined to `TerminalProcess.queue`.
     private static var focusedPanels: Set<Terminal> = []
@@ -64,24 +65,40 @@ extension Terminal {
 
     /// What `tty` runs, which becomes this terminal's focused tty; nil forgets
     /// it and reads nothing, in no known pane. Call on `TerminalProcess.queue`.
-    func focusedProgram(onTTY tty: String?, pid: pid_t) -> TerminalReading {
-        Self.focusedTTYs[self] = tty.map { (pid, $0) }
-        return tty.map { TerminalProcess.foregroundProgram(onTTY: $0) } ?? TerminalReading(program: nil, pane: nil)
+    func focusedProgram(onTTY tty: String?, pane: String? = nil, pid: pid_t) -> TerminalReading {
+        Self.focusedTTYs[self] = tty.map { (pid, $0, pane) }
+        return tty.map { TerminalProcess.foregroundProgram(onTTY: $0, pane: pane) } ?? TerminalReading(program: nil, pane: nil)
     }
 
-    /// The focused pane, read again on the remembered tty; the terminal is
-    /// probed for its tty when none is remembered. Call on `TerminalProcess.queue`.
-    func refreshedProgram(pid: pid_t) -> TerminalReading {
+    /// Refresh the cached tty for this process. Herdr's view watcher supplies
+    /// its pane, so a refresh has nothing to publish until that lookup succeeds.
+    func refreshedProgram(pid: pid_t) -> TerminalReading? {
         // A second Alacritty window can open since the last lookup. Only a fresh
         // inventory can establish that the cached tty still identifies the window.
         if self == .alacritty { return TerminalProbe.program(self, pid: pid) }
-        let cached = Self.focusedTTYs[self]
-        let focused = cached?.pid == pid ? cached?.path : nil
-        IndicatorDiagnostics.record("terminal.refresh bundle=\(rawValue) tty=\(focused ?? "-")")
-        if let focused {
-            return TerminalProcess.foregroundProgram(onTTY: focused)
+        let cached = Self.focusedTTYs[self].flatMap { $0.pid == pid ? $0 : nil }
+        IndicatorDiagnostics.record("terminal.refresh bundle=\(rawValue) tty=\(cached?.path ?? "-")")
+        if let cached {
+            return TerminalProcess.foregroundProgram(onTTY: cached.path, pane: cached.pane)
         }
-        return TerminalProbe.program(self, pid: pid)
+        return self == .herdr ? nil : TerminalProbe.program(self, pid: pid)
+    }
+
+    /// What a Herdr pane named by its view file runs: the tty of the pane's
+    /// process (asked of `hc`), read like a lookup, which sees through shell
+    /// wrappers and multiplexers; that tty becomes the focused one. Nil when
+    /// `hc` can't tell or the process has no tty: Herdr can't tell yet, which
+    /// is not a shell; the focused tty is forgotten. Call on `TerminalProcess.queue`.
+    func paneProgram(
+        pane: String, appPID: pid_t,
+        herdrPID: (String) -> pid_t? = { HerdrDesktop.pid(ofTerminal: $0) },
+        ttyPath: (pid_t) -> String? = TerminalProcess.ttyPath(ofPID:)
+    ) -> TerminalReading? {
+        let pid = herdrPID(pane)
+        let tty = pid.flatMap(ttyPath)
+        IndicatorDiagnostics.record("terminal.pane bundle=\(rawValue) pid=\(pid.map(String.init) ?? "-") tty=\(tty ?? "-") pane=\(pane)")
+        let found = focusedProgram(onTTY: tty, pane: pane, pid: appPID)
+        return tty == nil ? nil : found
     }
 }
 
@@ -107,12 +124,9 @@ struct TerminalReading: Equatable {
 }
 
 /// The program running in the focused terminal pane. `key` is the terminal's
-/// identifier for it (the process's `argv[0]`); `name` is an alternative label
-/// (the kernel's process name when it differs, e.g. Claude Code's `2.1.318`).
-/// `pane` names the terminal instance (the pane's tty path, or, inside a
-/// multiplexer, the inner pane's tty, `zellij:<session>/<pane>` or `herdr:<pane>`), so
-/// moving to another pane running the same program is a new context. `tty` is
-/// the pane's own tty when known, which `isp:` commands are traced back to.
+/// identifier for it (the process's `argv[0]`); `name` is an alternative label.
+/// `pane` identifies the context, including Herdr addresses and multiplexer
+/// pane labels. `tty` is the pane's local tty when known, used by ISP commands.
 struct TerminalProgram: Equatable {
     let key: String
     let name: String?
@@ -222,14 +236,14 @@ extension TerminalProcess {
     static let queue = DispatchQueue(label: "dev.inputsourcepro.terminal-probe", qos: .userInitiated)
 
     /// The foreground program on the tty at `path` (e.g. `/dev/ttys008`), nil
-    /// for a shell prompt or an unreadable tty. Its pane is the tty path.
+    /// for a shell prompt or an unreadable tty. Its pane is `pane`, or the tty path.
     /// A multiplexer (tmux, zellij, herdr) is looked through to the program in its
     /// focused pane, nested up to `Multiplexer.maxDepth`; when it can't be asked,
     /// the multiplexer itself is the program. Spawns processes then, so call it
     /// on `queue`.
-    static func foregroundProgram(onTTY path: String) -> TerminalReading {
+    static func foregroundProgram(onTTY path: String, pane: String? = nil) -> TerminalReading {
         var trail = TerminalTrail()
-        var reading = foregroundProgram(onTTY: path, pane: nil, depth: 0, trail: &trail)
+        var reading = foregroundProgram(onTTY: path, pane: pane, depth: 0, trail: &trail)
         reading.trail = trail
         return reading
     }

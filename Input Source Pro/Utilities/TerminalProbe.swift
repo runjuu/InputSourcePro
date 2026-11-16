@@ -2,9 +2,9 @@ import AppKit
 import AXSwift
 import Darwin
 
-/// Reads the program in a terminal's focused pane: each terminal names the
-/// pane's tty its own way, and the kernel's process table names the tty's
-/// foreground job.
+/// Reads the program in the focused pane of a terminal ISP pulls from (every
+/// terminal but Herdr, which pushes): each terminal names the pane's tty its
+/// own way, and the kernel's process table names the tty's foreground job.
 /// Runs on `TerminalProcess.queue`, never on the main thread; scriptable
 /// terminals are asked with Apple Events sent from there (NSAppleScript is
 /// main-thread only).
@@ -21,6 +21,14 @@ enum TerminalProbe {
     static func program(_ terminal: Terminal, pid: pid_t) -> TerminalReading {
         let tty: String?
         switch terminal {
+        case .herdr:
+            // FIFO commands need a fresh pane lookup even before the view watcher fires.
+            guard let pane = HerdrDesktop.focusedPane(),
+                  let address = HerdrDesktop.terminal(ofPane: pane),
+                  let reading = terminal.paneProgram(pane: address, appPID: pid) else {
+                return TerminalReading(program: nil, pane: nil)
+            }
+            return reading
         case .ghostty:
             // The quick terminal belongs to no window; the front window is the one behind it.
             if terminal.isPanelFocused {

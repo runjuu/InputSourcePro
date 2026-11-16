@@ -44,6 +44,8 @@ final class ApplicationVM: ObservableObject {
         let focusRevision: UInt64
     }
     private let terminalRefreshes = PassthroughSubject<Void, Never>()
+    /// A newer Herdr pane notification cancels the previous pane lookup and its retries.
+    private let terminalLookups = PassthroughSubject<AnyPublisher<(Terminal, TerminalReading, TerminalLookup), Never>, Never>()
     private let terminalControlRechecks = PassthroughSubject<Terminal, Never>()
     private var terminalControlPendingTTYs = Set<String>()
     private let terminalWriterChanges = PassthroughSubject<Void, Never>()
@@ -52,7 +54,10 @@ final class ApplicationVM: ObservableObject {
     private let terminalProgramGate = TerminalProgramGate {
         Timer.delay(seconds: ApplicationVM.terminalShellConfirmationDelay).mapToVoid().eraseToAnyPublisher()
     }
-    private lazy var terminalWatcher = TerminalWatcher { [weak self] in self?.requestTerminalRefresh(paneMayHaveChanged: $0) }
+    private lazy var terminalWatcher = TerminalWatcher(
+        refresh: { [weak self] in self?.requestTerminalRefresh(paneMayHaveChanged: $0) },
+        focusHerdr: { [weak self] in self?.receiveHerdrPane($0) }
+    )
     /// Terminals whose program was forgotten and is being read again: the read publishes
     /// what it finds even when that is no change, and the wait publishes if no read answers.
     private var terminalRepublishes: [Terminal: AnyCancellable] = [:]
@@ -120,6 +125,7 @@ final class ApplicationVM: ObservableObject {
         appKind = .from(self.environment.frontmostApplication(), preferencesVM: preferencesVM)
 
         activateAccessibilitiesForCurrentApp()
+        watchTerminalLookups()
         watchApplicationChange()
         watchTerminalPanels()
         watchRuntimeRuleChange()
@@ -719,6 +725,66 @@ extension ApplicationVM {
         return nil
     }
 
+    /// Herdr's view file named another focused pane (`TerminalWatcher`): the
+    /// terminal it shows is read through `terminalLookups`, so an older read
+    /// never overwrites a newer one. Nothing is read when Herdr can't name the
+    /// terminal. A terminal it never gives a tty of ours for (finished, or on
+    /// another machine) reads as a shell once the tries are spent, so the pane
+    /// left doesn't stay the context.
+    private func receiveHerdrPane(_ pane: String) {
+        guard let app = watchedTerminalApp, Terminal(app) == .herdr else { return }
+        let pid = app.processIdentifier
+        terminalFocusDidChange()
+        CaretPalette.shared.markSampleStale()
+        let lookup = validatingPanel(for: app, terminal: .herdr, forControl: false) {
+            Self.retriedLookup { isLastTry in
+                HerdrDesktop.terminal(ofPane: pane).flatMap { terminal in
+                    Terminal.herdr.paneProgram(pane: terminal, appPID: pid)
+                        ?? (isLastTry ? TerminalReading(program: nil, pane: terminal) : nil)
+                }
+            }
+        }
+        terminalLookups.send(lookup().map { (.herdr, $0, lookup) }.eraseToAnyPublisher())
+    }
+
+    /// How many times a lookup that reads nothing is tried, and the wait between tries.
+    static let terminalLookupAttempts = 3
+    static let terminalLookupRetryDelay: TimeInterval = 0.3
+
+    /// `read` on `TerminalProcess.queue`, tried again after `delay` while it
+    /// reads nothing, up to `attempts` times (`read` is told its last): Herdr's CLIs sometimes time out
+    /// or don't list a new pane yet, and its view file won't name the pane
+    /// again while it keeps focus. Cancelled (a newer lookup), it stops, and a
+    /// read still queued is skipped rather than holding up the newer one.
+    static func retriedLookup(
+        attempts: Int = terminalLookupAttempts,
+        delay: @escaping () -> AnyPublisher<Void, Never> = {
+            Timer.delay(seconds: ApplicationVM.terminalLookupRetryDelay).mapToVoid().eraseToAnyPublisher()
+        },
+        _ read: @escaping (_ isLastTry: Bool) -> TerminalReading?
+    ) -> AnyPublisher<TerminalReading, Never> {
+        let flag = CancelFlag()
+        return TerminalProcess.onQueue { flag.isCancelled ? nil : read(attempts <= 1) }
+            .handleEvents(receiveCancel: flag.cancel)
+            .flatMap { reading -> AnyPublisher<TerminalReading, Never> in
+                if let reading { return Just(reading).eraseToAnyPublisher() }
+                guard attempts > 1 else { return Empty().eraseToAnyPublisher() }
+                return delay().first()
+                    .flatMap { _ in Self.retriedLookup(attempts: attempts - 1, delay: delay, read) }
+                    .eraseToAnyPublisher()
+            }
+            .eraseToAnyPublisher()
+    }
+
+    private func watchTerminalLookups() {
+        terminalLookups
+            .switchToLatest()
+            .sink { [weak self] terminal, reading, lookup in
+                self?.receiveTerminalProgram(reading, for: terminal, recheck: lookup)
+            }
+            .store(in: cancelBag)
+    }
+
     private func requestTerminalRefresh(paneMayHaveChanged: Bool) {
         // After a pane switch the last caret sample is the other pane's; the helper's resample
         // usually lands before the lookup resolves. A job starting or ending leaves the pane as it is.
@@ -808,21 +874,10 @@ extension ApplicationVM {
         return changed
     }
 
-    private func watchTerminalProgram(_ app: NSRunningApplication, _ terminal: Terminal) -> AnyPublisher<AppKind, Never> {
-        let preferencesVM = preferencesVM
+    private func activationLookups(for app: NSRunningApplication, terminal: Terminal) -> AnyPublisher<TerminalLookup, Never> {
+        guard terminal != .herdr else { return Empty().eraseToAnyPublisher() }
         let pid = app.processIdentifier
         let probedProgram = environment.probedProgram
-        // What was read before the terminal left the front may have ended, or be another
-        // pane's: the terminal is published once its focused pane has been read again.
-        awaitTerminalProgram(terminal)
-
-        // A refresh (`TerminalWatcher`) reads the remembered tty again, and once
-        // more a moment later in case the change it saw had not finished.
-        let refreshes = terminalRefreshes
-            .merge(with: terminalRefreshes.delay(for: .milliseconds(100), scheduler: DispatchQueue.main))
-            .throttle(for: .milliseconds(100), scheduler: DispatchQueue.main, latest: true)
-            .map { () -> TerminalLookup in { TerminalProcess.onQueue { terminal.refreshedProgram(pid: pid) } } }
-
         // Re-ask which pane has focus on activation and on AX changes: a tab
         // or split switch may announce itself only as a title change, and
         // Alacritty's only per-window signal is a window switch.
@@ -854,7 +909,7 @@ extension ApplicationVM {
         let settledFocusChanges = focusChanges
             .delay(for: settle, scheduler: DispatchQueue.main)
             .throttle(for: .milliseconds(300), scheduler: DispatchQueue.main, latest: true)
-        let probes = focusChanges
+        return focusChanges
             .throttle(for: .milliseconds(300), scheduler: DispatchQueue.main, latest: true)
             .merge(with: settledFocusChanges)
             .merge(with: titleChanges)
@@ -865,11 +920,29 @@ extension ApplicationVM {
             .merge(with: Just(()).delay(for: settle, scheduler: DispatchQueue.main))
             .prepend(())
             .map { () -> TerminalLookup in { TerminalProcess.onQueue { probedProgram(terminal, pid) } } }
+            .eraseToAnyPublisher()
+    }
+
+    private func watchTerminalProgram(_ app: NSRunningApplication, _ terminal: Terminal) -> AnyPublisher<AppKind, Never> {
+        let preferencesVM = preferencesVM
+        let pid = app.processIdentifier
+        // What was read before the terminal left the front may have ended, or be another
+        // pane's: the terminal is published once its focused pane has been read again.
+        awaitTerminalProgram(terminal)
+
+        // A refresh (`TerminalWatcher`) reads the remembered tty again, and once
+        // more a moment later in case the change it saw had not finished.
+        let refreshes = terminalRefreshes
+            .merge(with: terminalRefreshes.delay(for: .milliseconds(100), scheduler: DispatchQueue.main))
+            .throttle(for: .milliseconds(100), scheduler: DispatchQueue.main, latest: true)
+            .map { () -> TerminalLookup in
+                { TerminalProcess.onQueue { terminal.refreshedProgram(pid: pid) }.compactMap { $0 }.eraseToAnyPublisher() }
+            }
 
         // Lookups run in order on one queue, so the latest one has the newest
         // answer. Results publish through terminalProgramChanges, held or not.
         let lookedUp = refreshes
-            .merge(with: probes)
+            .merge(with: activationLookups(for: app, terminal: terminal))
             .map { [weak self] lookup in
                 let checked = self?.validatingPanel(for: app, terminal: terminal, forControl: false, lookup: lookup) ?? lookup
                 return checked().map { ($0, checked) }
@@ -917,6 +990,10 @@ extension ApplicationVM {
             .merge(with: controlRechecks)
             .merge(with: lookedUp, terminalWatcher.watching(terminal).setOutputType(to: Void.self),
                    watchTerminalWriter(terminal).setOutputType(to: Void.self))
+            // Leaving the front ends a Herdr pane lookup still retrying.
+            .handleEvents(receiveCancel: { [weak self] in
+                if terminal == .herdr { self?.terminalLookups.send(Empty().eraseToAnyPublisher()) }
+            })
             .map { AppKind.from(app, preferencesVM: preferencesVM) }
             .eraseToAnyPublisher()
     }
