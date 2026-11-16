@@ -164,6 +164,7 @@
 		A08CA64DB0D52070E8A1AB71 /* TerminalControlPipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C22825FF94EB9A33448407D0 /* TerminalControlPipe.swift */; };
 		AC1000010000000000000001 /* TerminalWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC1000020000000000000002 /* TerminalWatcher.swift */; };
 		AC1000050000000000000005 /* TerminalPanelFocus.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC1000060000000000000006 /* TerminalPanelFocus.swift */; };
+		AC1000090000000000000009 /* HerdrDesktop.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC10000A000000000000000A /* HerdrDesktop.swift */; };
 		F58F25E12BBB1E9EAAB3CC23 /* Terminal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D1EEFEEB99D21AF61ABDECC /* Terminal.swift */; };
 		D58168CA28943A5400E84058 /* Indicator-Near-Cursor-Demo-Dark.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = D58168C828943A5300E84058 /* Indicator-Near-Cursor-Demo-Dark.mp4 */; };
 		D58168CB28943A5400E84058 /* Indicator-Near-Cursor-Demo-Light.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = D58168C928943A5300E84058 /* Indicator-Near-Cursor-Demo-Light.mp4 */; };
@@ -409,6 +410,7 @@
 		C22825FF94EB9A33448407D0 /* TerminalControlPipe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalControlPipe.swift; sourceTree = "<group>"; };
 		AC1000020000000000000002 /* TerminalWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalWatcher.swift; sourceTree = "<group>"; };
 		AC1000060000000000000006 /* TerminalPanelFocus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPanelFocus.swift; sourceTree = "<group>"; };
+		AC10000A000000000000000A /* HerdrDesktop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HerdrDesktop.swift; sourceTree = "<group>"; };
 		7D1EEFEEB99D21AF61ABDECC /* Terminal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Terminal.swift; sourceTree = "<group>"; };
 		D58168C828943A5300E84058 /* Indicator-Near-Cursor-Demo-Dark.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Indicator-Near-Cursor-Demo-Dark.mp4"; sourceTree = "<group>"; };
 		D58168C928943A5300E84058 /* Indicator-Near-Cursor-Demo-Light.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Indicator-Near-Cursor-Demo-Light.mp4"; sourceTree = "<group>"; };
@@ -612,6 +614,7 @@
 				C22825FF94EB9A33448407D0 /* TerminalControlPipe.swift */,
 				AC1000020000000000000002 /* TerminalWatcher.swift */,
 				AC1000060000000000000006 /* TerminalPanelFocus.swift */,
+				AC10000A000000000000000A /* HerdrDesktop.swift */,
 				4A0930882867E91100232089 /* AppsDiff.swift */,
 				4A2A1761280BA7FA00E13249 /* UserDefault.swift */,
 				4A2A1763280BA7FA00E13249 /* CancelBag.swift */,
@@ -1222,6 +1225,7 @@
 				A08CA64DB0D52070E8A1AB71 /* TerminalControlPipe.swift in Sources */,
 				AC1000010000000000000001 /* TerminalWatcher.swift in Sources */,
 				AC1000050000000000000005 /* TerminalPanelFocus.swift in Sources */,
+				AC1000090000000000000009 /* HerdrDesktop.swift in Sources */,
 				4A4E035C2DB97534008E5C2F /* PromotionBadge.swift in Sources */,
 				4A09307B285F31E800232089 /* NSToolbarItem+Identifier.swift in Sources */,
 				4A2A1788280BA7FA00E13249 /* NSImage+Extension.swift in Sources */,

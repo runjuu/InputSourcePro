@@ -324,6 +324,100 @@ final class MultiplexerTests: XCTestCase {
         XCTAssertNil(Multiplexer.herdrShell(fromProcessInfo: #"{"id":"cli:pane:process_info","error":{"code":"server_not_running","message":"no server"}}"#))
         XCTAssertNil(Multiplexer.herdrShell(fromProcessInfo: "not json"))
     }
+
+    func testRefreshReadsTheRememberedTTYUntilItIsForgotten() {
+        TerminalProcess.queue.sync {
+            // /dev/null runs no foreground job, so it reads as a shell prompt in that pane.
+            let shell = TerminalReading(program: nil, pane: "/dev/null")
+            XCTAssertEqual(Terminal.herdr.focusedProgram(onTTY: "/dev/null", pid: getpid()), shell)
+            XCTAssertEqual(Terminal.herdr.refreshedProgram(pid: getpid()), shell)
+
+            XCTAssertEqual(Terminal.herdr.focusedProgram(onTTY: nil, pid: getpid()), TerminalReading(program: nil, pane: nil))
+            XCTAssertNil(Terminal.herdr.refreshedProgram(pid: getpid()))
+        }
+    }
+
+    // MARK: Herdr's desktop app
+
+    func testHerdrViewNamesTheActiveSpacesFocusedPane() {
+        let view = #"{"active":"sp1","spaces":{"sp1":"tb1","sp2":"tb2"},"tabs":{"tb1":{"focused":"p1","before":["p0"],"zoomed":null,"settled":null},"tb2":{"focused":"p2","before":[]}}}"#
+        XCTAssertEqual(HerdrDesktop.focusedPane(fromView: Data(view.utf8)), "p1")
+        XCTAssertNil(HerdrDesktop.focusedPane(fromView: Data(#"{"active":"sp3","spaces":{"sp1":"tb1"},"tabs":{"tb1":{"focused":"p1"}}}"#.utf8)))
+        XCTAssertNil(HerdrDesktop.focusedPane(fromView: Data(#"{"active":"sp1","spaces":{"sp1":"tb1"},"tabs":{"tb1":{"focused":null}}}"#.utf8)))
+        XCTAssertNil(HerdrDesktop.focusedPane(fromView: Data("{\"active\":".utf8)), "A partial file")
+    }
+
+    func testHerdrListNamesThePanesTerminal() {
+        let list = #"{"spaces":[{"id":"sp1","active":false,"tabs":[{"id":"tb1","terminals":[{"terminal":"t1","pane":"p1","status":null,"app":null,"name":null,"sub_agents":[]}]}]},{"id":"sp2","tabs":[{"id":"tb2","terminals":[{"terminal":"t2k","pane":"p2","status":"working","app":"claude-code"},{"terminal":"t3","pane":"p3"}]}]}]}"#
+        XCTAssertEqual(HerdrDesktop.terminal(ofPane: "p3", fromList: list), "t3")
+        XCTAssertEqual(HerdrDesktop.terminal(ofPane: "p1", fromList: list), "t1")
+        XCTAssertNil(HerdrDesktop.terminal(ofPane: "p9", fromList: list))
+        XCTAssertNil(HerdrDesktop.terminal(ofPane: "p1", fromList: "not json"))
+    }
+
+    func testHerdrTerminalGivesItsForegroundPidElseTheShells() {
+        XCTAssertEqual(HerdrDesktop.pid(fromTerminal: #"{"address":"t2d","argv":["/bin/zsh","-l"],"foreground":{"argv":["claude"],"name":"2.1.319","pid":17225},"pid":2861,"state":"live"}"#), 17225)
+        XCTAssertEqual(HerdrDesktop.pid(fromTerminal: #"{"address":"t2d","foreground":{"pid":null},"pid":2861}"#), 2861)
+        XCTAssertEqual(HerdrDesktop.pid(fromTerminal: #"{"address":"t2d","foreground":null,"pid":2861}"#), 2861)
+        XCTAssertNil(HerdrDesktop.pid(fromTerminal: #"{"address":"t2d","foreground":null,"pid":null}"#))
+        XCTAssertNil(HerdrDesktop.pid(fromTerminal: "error: no such terminal"))
+    }
+
+    func testHerdrCLIsLeadFromThePaneToAPid() {
+        let list = #"{"spaces":[{"tabs":[{"terminals":[{"terminal":"t2d","pane":"p1"}]}]}]}"#
+        let get = #"{"address":"t2d","foreground":{"pid":17225},"pid":2861}"#
+        var runs: [[String]] = []
+        func run(_ output: String?) -> (String, [String]) -> String? {
+            { path, arguments in
+                runs.append([(path as NSString).lastPathComponent] + arguments)
+                return output
+            }
+        }
+
+        XCTAssertEqual(HerdrDesktop.terminal(ofPane: "p1", run: run(list)), "t2d")
+        XCTAssertEqual(HerdrDesktop.pid(ofTerminal: "t2d", run: run(get)), 17225)
+        XCTAssertEqual(runs, [["herdr-app", "ls"], ["hc", "get", "t2d", "--json"]])
+
+        XCTAssertNil(HerdrDesktop.terminal(ofPane: "p1", run: run(nil)), "ls failed")
+        XCTAssertNil(HerdrDesktop.terminal(ofPane: "p9", run: run(list)), "pane not listed")
+        XCTAssertNil(HerdrDesktop.pid(ofTerminal: "t2d", run: run(nil)), "get failed")
+    }
+
+    /// A Herdr pane asks hc for its pid; when hc can't tell, nothing is read
+    /// (not a shell), and the tty is forgotten.
+    func testHerdrPaneAsksHerdrForItsPid() {
+        TerminalProcess.queue.sync {
+            var asked: [String] = []
+            func read(pane: String, hcPID: pid_t?) -> TerminalReading? {
+                Terminal.herdr.paneProgram(pane: pane, appPID: getpid(), herdrPID: { asked.append($0); return hcPID }) {
+                    // /dev/null runs no foreground job: a shell prompt.
+                    $0 == 2861 ? "/dev/null" : nil
+                }
+            }
+
+            XCTAssertEqual(read(pane: "tA", hcPID: 2861), TerminalReading(program: nil, pane: "tA"))
+            XCTAssertEqual(asked, ["tA"])
+            XCTAssertEqual(Terminal.herdr.refreshedProgram(pid: getpid()), TerminalReading(program: nil, pane: "tA"), "Its tty is remembered")
+
+            XCTAssertNil(read(pane: "tC", hcPID: nil), "hc failed")
+            XCTAssertNil(Terminal.herdr.refreshedProgram(pid: getpid()), "No pid anywhere: nothing to read")
+            XCTAssertEqual(asked, ["tA", "tC"])
+        }
+    }
+
+    /// A refresh reads the tty the latest pane led to.
+    func testHerdrRefreshStaysOnTheLatestPane() {
+        TerminalProcess.queue.sync {
+            let shell = { (pane: String) in TerminalReading(program: nil, pane: pane) }
+            let dev = { (_: pid_t) in "/dev/null" }
+            XCTAssertEqual(Terminal.herdr.paneProgram(pane: "tA", appPID: getpid(), herdrPID: { _ in 1 }, ttyPath: dev), shell("tA"))
+            XCTAssertEqual(Terminal.herdr.paneProgram(pane: "tB", appPID: getpid(), herdrPID: { _ in 2 }, ttyPath: dev), shell("tB"))
+            XCTAssertEqual(Terminal.herdr.refreshedProgram(pid: getpid()), shell("tB"))
+            XCTAssertEqual(Terminal.herdr.refreshedProgram(pid: getpid())?.tty, "/dev/null")
+            XCTAssertNil(Terminal.herdr.refreshedProgram(pid: getpid() + 1), "Another process cannot reuse this pane")
+            _ = Terminal.herdr.focusedProgram(onTTY: nil, pid: getpid())
+        }
+    }
 }
 
 @MainActor
@@ -404,7 +498,7 @@ final class TerminalProgramGateTests: XCTestCase {
         gate.receive(
             TerminalReading(program: program, pane: pane),
             current: current,
-            for: .ghostty,
+            for: .herdr,
             recheck: { [unowned self] in
                 self.rechecks += 1
                 return Just(TerminalReading(program: recheckReads, pane: pane)).eraseToAnyPublisher()

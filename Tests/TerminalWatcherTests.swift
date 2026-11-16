@@ -29,7 +29,20 @@ final class TerminalWatcherTests: XCTestCase {
             }
         }
 
+        /// One watch of Herdr's view file.
+        final class HerdrView {
+            let send: (String?) -> Void
+            var isCancelled = false
+
+            init(send: @escaping (String?) -> Void) {
+                self.send = send
+            }
+        }
+
         var polls: [Poll] = []
+        var herdrViews: [HerdrView] = []
+        /// Whether Herdr's view directory can be opened.
+        var herdrViewOpens = true
         var foregroundPgids: [pid_t: pid_t] = [:]
         /// Processes that have exited.
         var ended: Set<pid_t> = []
@@ -43,6 +56,7 @@ final class TerminalWatcherTests: XCTestCase {
         var closed: [TerminalWatcher.Connection] = []
         var timers: [(seconds: TimeInterval, subject: PassthroughSubject<Date, Never>)] = []
         var refreshes = 0
+        var focusedHerdrPanes: [String] = []
         /// Refreshes that said the pane may have changed.
         var paneChanges = 0
         private var front: AnyCancellable?
@@ -72,12 +86,19 @@ final class TerminalWatcherTests: XCTestCase {
                     let subject = PassthroughSubject<Date, Never>()
                     self?.timers.append((seconds, subject))
                     return subject.eraseToAnyPublisher()
+                },
+                herdrView: { [unowned self] send in
+                    guard herdrViewOpens else { return nil }
+                    let view = HerdrView(send: send)
+                    herdrViews.append(view)
+                    return AnyCancellable { view.isCancelled = true }
                 }
             ),
             refresh: { [unowned self] paneMayHaveChanged in
                 refreshes += 1
                 paneChanges += paneMayHaveChanged ? 1 : 0
-            }
+            },
+            focusHerdr: { [unowned self] in focusedHerdrPanes.append($0) }
         )
 
         var livePolls: [Poll] { polls.filter { !$0.isCancelled && !$0.isDone } }
@@ -113,7 +134,7 @@ final class TerminalWatcherTests: XCTestCase {
         harness.bringToFront(.ghostty)
         XCTAssertEqual(harness.livePolls.map(\.interval), [TerminalWatcher.libprocInterval], "Picks up the remembered trail")
 
-        harness.watcher.follow(trail(ttys: [(20, 200)]), for: .iterm)
+        harness.watcher.follow(trail(ttys: [(20, 200)]), for: .herdr)
         XCTAssertEqual(harness.livePolls.count, 1, "Another terminal's lookup changes nothing")
 
         harness.leaveFront()
@@ -311,6 +332,131 @@ final class TerminalWatcherTests: XCTestCase {
         harness.zellijPane = .program(TerminalProgram(key: "nvim", pane: "zellij:s/terminal_1"), label: "zellij:s/terminal_1")
         harness.tick()
         XCTAssertEqual(harness.refreshes, 1)
+    }
+
+    // MARK: Herdr view file
+
+    func testHerdrViewFocusesEachNewPane() throws {
+        let harness = Harness()
+        harness.bringToFront(.herdr)
+        let view = try XCTUnwrap(harness.herdrViews.first)
+        XCTAssertEqual(harness.herdrViews.count, 1)
+
+        view.send("pA")
+        XCTAssertEqual(harness.focusedHerdrPanes, ["pA"], "The first read is Herdr's focus on coming to the front")
+        view.send("pA") // another file in the directory changed
+        view.send(nil) // unreadable
+        XCTAssertEqual(harness.focusedHerdrPanes, ["pA"])
+
+        view.send("pB")
+        view.send("pB")
+        view.send(nil)
+        view.send("pB")
+        XCTAssertEqual(harness.focusedHerdrPanes, ["pA", "pB"], "Same pane after an unreadable read: nothing")
+        view.send("pA")
+        XCTAssertEqual(harness.focusedHerdrPanes, ["pA", "pB", "pA"])
+        XCTAssertEqual(harness.refreshes, 0, "A pane switch is a focus, not a refresh of the remembered tty")
+
+        harness.watcher.follow(trail(ttys: [(10, 100)]), for: .herdr)
+        XCTAssertEqual(harness.herdrViews.count, 1, "A lookup leaves the view watch alone")
+    }
+
+    /// Coming to the front, the view watch's first read is the only lookup of
+    /// Herdr's focus: a switch made right after it is a change from that read,
+    /// never a baseline taken after another lookup already read the old pane.
+    func testHerdrSwitchRightAfterComingToTheFrontIsFocused() throws {
+        let harness = Harness()
+        harness.bringToFront(.herdr)
+        let view = try XCTUnwrap(harness.herdrViews.last)
+        view.send("pA") // read on coming to the front
+        view.send("pB") // switched at once
+        XCTAssertEqual(harness.focusedHerdrPanes, ["pA", "pB"], "The latest focus is pB")
+    }
+
+    func testHerdrViewIsWatchedOnlyWhileHerdrIsFrontmost() throws {
+        let harness = Harness()
+        harness.bringToFront(.ghostty)
+        XCTAssertTrue(harness.herdrViews.isEmpty, "Only Herdr's desktop app has a view file")
+
+        harness.bringToFront(.herdr)
+        let first = try XCTUnwrap(harness.herdrViews.last)
+        first.send(nil) // unreadable
+        first.send("pA")
+        XCTAssertEqual(harness.focusedHerdrPanes, ["pA"], "Focused once readable")
+
+        harness.leaveFront()
+        XCTAssertTrue(first.isCancelled, "Leaving the front stops at once")
+        first.send("pB") // already queued for the main thread
+        XCTAssertEqual(harness.focusedHerdrPanes, ["pA"])
+
+        harness.bringToFront(.herdr)
+        let second = try XCTUnwrap(harness.herdrViews.last)
+        XCTAssertEqual(harness.herdrViews.count, 2)
+        second.send("pA")
+        XCTAssertEqual(harness.focusedHerdrPanes, ["pA", "pA"], "Back in front: focused again, whatever was pushed meanwhile")
+        second.send("pC")
+        XCTAssertEqual(harness.focusedHerdrPanes, ["pA", "pA", "pC"])
+    }
+
+    /// Herdr's first launch: its directory isn't there yet, so the next time
+    /// Herdr comes to the front the watch is tried again.
+    func testAViewWatchThatCouldNotOpenIsTriedAgain() throws {
+        let harness = Harness()
+        harness.herdrViewOpens = false
+        harness.bringToFront(.herdr)
+        XCTAssertTrue(harness.herdrViews.isEmpty)
+
+        harness.herdrViewOpens = true
+        harness.leaveFront()
+        harness.bringToFront(.herdr)
+        try XCTUnwrap(harness.herdrViews.last).send("pA")
+        XCTAssertEqual(harness.focusedHerdrPanes, ["pA"])
+    }
+
+    func testWatchDirectoryIsNilUntilTheDirectoryExists() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var reads: [String?] = []
+        let watch = { TerminalWatcher.Environment.watchDirectory(directory.path, read: { "pA" }, send: { reads.append($0) }) }
+        XCTAssertNil(watch())
+
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let opened = try XCTUnwrap(watch())
+        defer { opened.cancel() }
+        waitUntil("the first read") { reads == ["pA"] }
+    }
+
+    /// The live watch on a real (temporary) directory: Herdr replaces its view
+    /// file by rename, which the directory reports and the old file never would.
+    func testWatchDirectorySeesAFileReplacedByRename() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("view.json")
+        func view(_ pane: String) -> Data {
+            Data(#"{"active":"s","spaces":{"s":"t"},"tabs":{"t":{"focused":"\#(pane)","before":[]}}}"#.utf8)
+        }
+        try view("pA").write(to: file)
+
+        var reads: [String?] = []
+        let watch = try XCTUnwrap(TerminalWatcher.Environment.watchDirectory(
+            directory.path,
+            read: { FileManager.default.contents(atPath: file.path).flatMap(HerdrDesktop.focusedPane(fromView:)) },
+            send: { reads.append($0) }
+        ))
+        defer { watch.cancel() }
+        waitUntil("the first read") { reads == ["pA"] }
+
+        try view("pB").write(to: file, options: .atomic) // a temporary file renamed over it
+        waitUntil("a read after the rename") { reads.last == "pB" }
+    }
+
+    private func waitUntil(_ what: String, timeout: TimeInterval = 5, _ condition: () -> Bool, file: StaticString = #filePath, line: UInt = #line) {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !condition() {
+            guard Date() < deadline else { return XCTFail("Timed out: \(what)", file: file, line: line) }
+            RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+        }
     }
 
     // MARK: Connections
@@ -747,7 +893,7 @@ final class TerminalWatcherTests: XCTestCase {
         let config = try JSONDecoder().decode(Config.self, from: Data(json.utf8))
         final class Counter { var refreshes = 0 }
         let counter = Counter()
-        let watcher = TerminalWatcher(environment: .live(tmuxSocket: config.tmux), refresh: { _ in counter.refreshes += 1 })
+        let watcher = TerminalWatcher(environment: .live(tmuxSocket: config.tmux), refresh: { _ in counter.refreshes += 1 }, focusHerdr: { _ in })
 
         let tmux = { (arguments: [String]) in Self.cli("/opt/homebrew/bin/tmux", ["-L", config.tmux] + arguments) }
         let windowSize = { tmux(["display", "-p", "-t", "A", "#{window_width}x#{window_height}"]) }
