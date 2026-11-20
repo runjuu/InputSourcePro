@@ -319,8 +319,15 @@ extension TerminalProcess {
         else { return nil }
         let dev = entry.kp_eproc.e_tdev
         // NODEV: no controlling tty
-        let tty = dev == -1 ? nil : devname(dev, S_IFCHR).map { "/dev/" + String(cString: $0) }
-        return (entry.kp_eproc.e_ppid, tty, entry.kp_eproc.e_pgid == entry.kp_eproc.e_tpgid)
+        return (entry.kp_eproc.e_ppid, ttyPath(forDevice: dev), entry.kp_eproc.e_pgid == entry.kp_eproc.e_tpgid)
+    }
+
+    static func ttyPath(forDevice device: dev_t) -> String? {
+        guard device != -1 else { return nil }
+        var name = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        let capacity = Int32(name.count)
+        guard devname_r(device, S_IFCHR, &name, capacity) != nil else { return nil }
+        return "/dev/" + String(cString: name)
     }
 
     /// The paths the unix sockets of `pid` are connected to, e.g. a multiplexer
@@ -527,84 +534,88 @@ extension TerminalProcess {
 
 // MARK: - Program control
 
-/// Panes whose program (nvim, ...) took over the input source with `isp:` commands,
-/// per tty, in memory only. A controlled pane skips Terminal and App rules: it
-/// goes back to `current`, which follows every change made while it has focus,
-/// so the program can `push` the source it wants, `pop` back to what was there,
-/// and `release` the pane to the rules. The last program to command a tty is
-/// its `pid`, and the pane is controlled only while that process is the tty's
-/// foreground job: in the background (Ctrl-Z) the entry waits for `fg`, and it is
-/// dropped once the process is gone, whether or not it let go. Only a program
-/// the pane runs is a context of its own (`AppKind.from`): a shell commanding
-/// its own pane from a hook switches it, and stays the terminal's App Rule context.
-/// A pane inside Zellij is never controlled: Zellij names its focused pane
-/// without a tty, so a command can't be traced to it.
+/// A tty has one controlling writer in the foreground. Stopped jobs keep their
+/// own keyboard and stack until they resume, release control, or exit.
 struct TerminalControlTracker<Source> {
     static var maxStack: Int { 16 }
 
     private struct Entry {
+        let pid: pid_t
+        var current: Source
         var stack: [Source] = []
-        var current: Source?
-        var pid: pid_t = 0
         var isSuspended = false
     }
 
-    private var entries: [String: Entry] = [:]
+    private var entries: [String: [Entry]] = [:]
 
-    func isControlled(_ tty: String) -> Bool {
-        entries[tty].map { !$0.isSuspended } ?? false
+    private func activeEntry(on tty: String) -> Entry? {
+        entries[tty]?.last { !$0.isSuspended }
     }
 
-    /// The source the pane should have, kept while it is suspended; nil for an
-    /// uncontrolled pane, or when none is known.
+    func activePID(on tty: String) -> pid_t? {
+        activeEntry(on: tty)?.pid
+    }
+
+    func isControlled(_ tty: String) -> Bool {
+        activePID(on: tty) != nil
+    }
+
     func current(on tty: String) -> Source? {
-        entries[tty]?.current
+        activeEntry(on: tty)?.current
+    }
+
+    /// The last writer in a foreground job takes over. Other jobs can resume later.
+    private mutating func activate(_ entry: Entry, on tty: String) {
+        entries[tty, default: []].removeAll { $0.pid == entry.pid || !$0.isSuspended }
+        entries[tty, default: []].append(entry)
     }
 
     mutating func select(_ source: Source, on tty: String, pid: pid_t) {
-        entries[tty] = Entry(stack: entries[tty]?.stack ?? [], current: source, pid: pid)
+        let stack = entries[tty]?.first { $0.pid == pid }?.stack ?? []
+        activate(Entry(pid: pid, current: source, stack: stack), on: tty)
     }
 
-    /// Stacks the pane's source, `live` when none is recorded yet and nil when unknown, then makes `source` current.
     mutating func push(_ source: Source, on tty: String, pid: pid_t, live: Source?) {
-        var entry = entries[tty] ?? Entry()
-        entry.pid = pid
-        entry.isSuspended = false
-        if let base = entry.current ?? live {
+        let previous = entries[tty]?.first { $0.pid == pid }
+        var entry = Entry(pid: pid, current: source, stack: previous?.stack ?? [])
+        if let base = previous?.current ?? live {
             entry.stack.append(base)
             if entry.stack.count > Self.maxStack { entry.stack.removeFirst() }
         }
-        entry.current = source
-        entries[tty] = entry
+        activate(entry, on: tty)
     }
 
-    /// The source `pop` returns to, now current; nil, changing nothing, for an empty stack.
     mutating func pop(on tty: String, pid: pid_t) -> Source? {
-        guard let popped = entries[tty]?.stack.popLast() else { return nil }
-        entries[tty]?.current = popped
-        entries[tty]?.pid = pid
-        entries[tty]?.isSuspended = false
-        return popped
+        guard var entry = entries[tty]?.first(where: { $0.pid == pid }),
+              let source = entry.stack.popLast()
+        else { return nil }
+        entry.current = source
+        entry.isSuspended = false
+        activate(entry, on: tty)
+        return source
     }
 
-    /// The pane has focus and its source changed, whoever changed it.
     mutating func follow(_ source: Source, on tty: String) {
-        guard isControlled(tty) else { return }
-        entries[tty]?.current = source
+        guard let index = entries[tty]?.lastIndex(where: { !$0.isSuspended }) else { return }
+        entries[tty]?[index].current = source
     }
 
-    /// The program let go.
-    mutating func release(_ tty: String) {
-        entries[tty] = nil
+    mutating func release(_ tty: String, pid: pid_t) {
+        entries[tty]?.removeAll { $0.pid == pid }
+        if entries[tty]?.isEmpty == true { entries[tty] = nil }
     }
 
-    /// The pane was read: `state` tells where its program's process stands on it.
     mutating func check(_ tty: String, state: (pid_t, String) -> TerminalProcess.JobState) {
-        guard let pid = entries[tty]?.pid else { return }
-        switch state(pid, tty) {
-        case .gone: entries[tty] = nil
-        case .background: entries[tty]?.isSuspended = true
-        case .foreground: entries[tty]?.isSuspended = false
+        guard let writers = entries[tty] else { return }
+        let surviving = writers.compactMap { writer -> Entry? in
+            var writer = writer
+            switch state(writer.pid, tty) {
+            case .gone: return nil
+            case .background: writer.isSuspended = true
+            case .foreground: writer.isSuspended = false
+            }
+            return writer
         }
+        entries[tty] = surviving.isEmpty ? nil : surviving
     }
 }

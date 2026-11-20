@@ -557,7 +557,7 @@ final class TerminalControlTrackerTests: XCTestCase {
     func testReleaseDropsStateOfThatTTYOnly() {
         control.select("rime", on: tty, pid: 10)
         control.select("abc", on: "/dev/ttys002", pid: 11)
-        control.release(tty)
+        control.release(tty, pid: 10)
 
         XCTAssertFalse(control.isControlled(tty))
         XCTAssertNil(control.current(on: tty))
@@ -590,7 +590,7 @@ final class TerminalControlTrackerTests: XCTestCase {
 
         XCTAssertFalse(control.isControlled(tty))
         control.follow("rime", on: tty)
-        XCTAssertEqual(control.current(on: tty), "abc")
+        XCTAssertNil(control.current(on: tty))
 
         control.check(tty) { _, _ in .foreground }
         XCTAssertTrue(control.isControlled(tty))
@@ -608,6 +608,19 @@ final class TerminalControlTrackerTests: XCTestCase {
         control.check(tty) { _, _ in .background }
         control.select("rime", on: tty, pid: 10)
         XCTAssertTrue(control.isControlled(tty))
+    }
+
+    func testSuspendedEditorsKeepSeparateStacksWhenTheyShareAPane() {
+        control.push("ABC", on: tty, pid: 10, live: "French")
+        control.check(tty) { _, _ in .background }
+        control.push("ABC", on: tty, pid: 20, live: "Pinyin")
+        XCTAssertEqual(control.pop(on: tty, pid: 20), "Pinyin")
+        control.release(tty, pid: 20)
+        XCTAssertFalse(control.isControlled(tty))
+
+        control.check(tty) { _, _ in .foreground }
+        XCTAssertEqual(control.current(on: tty), "ABC")
+        XCTAssertEqual(control.pop(on: tty, pid: 10), "French")
     }
 
     func testAnotherPIDTakesOverTheTTY() {

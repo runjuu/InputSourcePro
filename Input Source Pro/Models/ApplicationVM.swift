@@ -171,8 +171,10 @@ extension ApplicationVM {
                     .eraseToAnyPublisher()
             }
         )
-            .removeDuplicates(by: { $0.isSameAppOrWebsite(with: $1, detectAddressBar: true) })
-            .sink { [weak self] in self?.appKind = $0 }
+            .sink { [weak self] next in
+                guard let self, !next.isSameAppOrWebsite(with: self.appKind, detectAddressBar: true) else { return }
+                self.appKind = next
+            }
             .store(in: cancelBag)
     }
 }
@@ -280,11 +282,33 @@ extension ApplicationVM {
         }
     }
 
+    /// Re-resolve the writer on each read. A tty-less helper can exit while its
+    /// foreground ancestor still owns the tty.
+    private func terminalWriterState(_ pid: pid_t, on tty: String) -> TerminalProcess.JobState {
+        guard let owner = environment.ttyOwner(pid), owner.tty == tty else { return .gone }
+        return environment.jobState(owner.pid, tty)
+    }
+
+    /// A terminal activation publishes its AppKind after its pane lookup. During
+    /// that wait the previous app's pane is still cached, but can no longer switch.
+    private func focusedTerminalApp(on tty: String) -> NSRunningApplication? {
+        guard let app = appKind?.getApp(), let terminal = Terminal(app),
+              preferencesVM.focusedTerminalTTY(terminal) == tty
+        else { return nil }
+        let front = environment.frontmostApplication()
+        let panel = preferencesVM.terminalPanel
+        guard front == app || panel == app else { return nil }
+        let focused = Self.ruledApp(front: front, isOwn: front?.processIdentifier == getpid(), panel: panel) {
+            environment.focusedApplication() ?? front
+        }
+        return focused == app ? app : nil
+    }
+
     /// A program's command to its pane's input source (see `TerminalControlTracker`).
     /// On the focused pane it switches like a shortcut would, through the same
     /// select path as rules; elsewhere it only updates the state.
     private func receiveTerminalControl(_ message: TerminalControlCommand) {
-        // A program's helper (`nvim --embed`) has no tty; its ancestor does, and must be the recorded pid.
+        // Use the tty owner for foreground checks and the writer PID for its lifetime.
         guard let owner = environment.ttyOwner(message.pid) else { return }
         let tty = owner.tty
         // Only the pane's foreground job controls it: one in the background (`bg`, `&`)
@@ -293,13 +317,9 @@ extension ApplicationVM {
             IndicatorDiagnostics.record("terminal.isp ignored pid=\(owner.pid) tty=\(tty) cmd=\(message.command.name) background")
             return
         }
-        // The pane's latest reading, a shell's too: a program's first command comes before ISP has seen it start.
-        let terminal = appKind.flatMap { Terminal($0.getApp()) }
-        // Accepted: for one lookup after a pane switch, the pane just left still counts as focused.
-        let isFocused = terminal.flatMap(preferencesVM.focusedTerminalTTY) == tty
-        let wasControlled = preferencesVM.terminalControl.isControlled(tty)
-        // A program that died since the pane was last read must not leave this one its stack.
-        preferencesVM.terminalControl.check(tty, state: environment.jobState)
+        let focusedApp = focusedTerminalApp(on: tty)
+        let previousPID = preferencesVM.terminalControl.activePID(on: tty)
+        preferencesVM.terminalControl.check(tty, state: terminalWriterState)
         var target: InputSource?
 
         func resolve(_ id: String) -> InputSource? {
@@ -312,26 +332,34 @@ extension ApplicationVM {
 
         switch message.command {
         case let .select(id):
-            guard let source = resolve(id) else { return }
-            preferencesVM.terminalControl.select(source, on: tty, pid: owner.pid)
-            target = source
+            if let source = resolve(id) {
+                preferencesVM.terminalControl.select(source, on: tty, pid: message.pid)
+                target = source
+            }
         case let .push(id):
-            guard let source = resolve(id) else { return }
-            preferencesVM.terminalControl.push(source, on: tty, pid: owner.pid, live: isFocused ? InputSource.getCurrentInputSource() : nil)
-            target = source
+            if let source = resolve(id) {
+                let live = focusedApp == nil ? nil : InputSourceSwitcher.inputSourceForReconciliation()
+                preferencesVM.terminalControl.push(source, on: tty, pid: message.pid, live: live)
+                target = source
+            }
         case .pop:
-            target = preferencesVM.terminalControl.pop(on: tty, pid: owner.pid)
+            target = preferencesVM.terminalControl.pop(on: tty, pid: message.pid)
         case .release:
-            preferencesVM.terminalControl.release(tty)
-            if isFocused { preferencesVM.runtimeRuleChangeNotifier.notify() }
+            preferencesVM.terminalControl.release(tty, pid: message.pid)
         }
-        // A program without a rule is its own context only while it controls its pane
-        // (see `AppKind.from`), so taking or giving up control re-evaluates the front app.
-        if isFocused, let terminal, preferencesVM.terminalControl.isControlled(tty) != wasControlled {
-            terminalProgramChanges.send(terminal)
+
+        IndicatorDiagnostics.record("terminal.isp pid=\(message.pid) owner=\(owner.pid) tty=\(tty) cmd=\(message.command.name) focused=\(focusedApp != nil) source=\(target?.persistentIdentifier ?? "-")")
+        guard let focusedApp else { return }
+        if previousPID != preferencesVM.terminalControl.activePID(on: tty) {
+            let context = AppKind.from(focusedApp, preferencesVM: preferencesVM)
+            // Publishing a program context selects its saved source through the
+            // reducer. A shell hook stays in the app context and switches directly.
+            if context.getTerminalInfo() != nil || !preferencesVM.terminalControl.isControlled(tty) {
+                appKind = context
+                return
+            }
         }
-        if isFocused, let target { terminalSwitches.send(target) }
-        IndicatorDiagnostics.record("terminal.isp pid=\(owner.pid)\(owner.pid == message.pid ? "" : " from=\(message.pid)") tty=\(tty) cmd=\(message.command.name) focused=\(isFocused) source=\(isFocused ? target?.persistentIdentifier ?? "-" : "-")")
+        if let target { terminalSwitches.send(target) }
     }
 
     private func requestTerminalRefresh(paneMayHaveChanged: Bool) {
@@ -396,9 +424,9 @@ extension ApplicationVM {
         // that predates it, since a just-started program is already the foreground job.
         var controlChanged = false
         if let tty = reading.tty {
-            let wasControlled = preferencesVM.terminalControl.isControlled(tty)
-            preferencesVM.terminalControl.check(tty, state: environment.jobState)
-            controlChanged = preferencesVM.terminalControl.isControlled(tty) != wasControlled
+            let previousPID = preferencesVM.terminalControl.activePID(on: tty)
+            preferencesVM.terminalControl.check(tty, state: terminalWriterState)
+            controlChanged = preferencesVM.terminalControl.activePID(on: tty) != previousPID
         }
         let changed = preferencesVM.terminalPrograms[terminal] != program
         IndicatorDiagnostics.record("terminal.program bundle=\(terminal.rawValue) program=\(program?.id ?? "shell") pane=\(reading.pane ?? "-") changed=\(changed)")

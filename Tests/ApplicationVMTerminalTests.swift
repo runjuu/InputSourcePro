@@ -289,8 +289,9 @@ final class ApplicationVMTerminalTests: XCTestCase {
 
     /// A program that dies without `release` hands its pane back to the rules, even when
     /// the next reading of that tty already shows another program (here another htop).
-    func testAProgramThatDiesWithoutReleasingLeavesItsPaneUncontrolled() throws {
+    func testAWriterThatDiesWhileItsTTYAncestorLivesLeavesItsPaneUncontrolled() throws {
         let pid: pid_t = 999_010
+        let parent: pid_t = 999_020
         let tty = "/dev/ttys998"
 
         let ghostty = FakeApp(bundleIdentifier: Terminal.ghostty.rawValue, pid: 999_009)
@@ -315,8 +316,11 @@ final class ApplicationVMTerminalTests: XCTestCase {
             terminalPanelFocus: TerminalPanelFocus.Environment(
                 read: { _, _ in AnyCancellable {} }
             ),
-            ttyOwner: { _ in (pid, tty) },
-            jobState: { _, _ in state.lock.withLock { state.isAlive ? .foreground : .gone } }
+            ttyOwner: { writer in
+                guard writer == parent || (writer == pid && state.lock.withLock({ state.isAlive })) else { return nil }
+                return (parent, tty)
+            },
+            jobState: { owner, _ in owner == parent ? .foreground : .gone }
         )
         let preferencesVM = try Self.inMemoryPreferencesVM()
         let restore = Self.setTerminalPreferences(preferencesVM, enabled: .ghostty, rules: ["claude"])
@@ -348,6 +352,39 @@ final class ApplicationVMTerminalTests: XCTestCase {
         Self.waitUntil("the reading is delivered") { state.lock.withLock { state.isDelivered } }
         XCTAssertFalse(preferencesVM.terminalControl.isControlled(tty))
         Self.waitUntil("htop's pane goes back to the terminal's context") { program() == nil }
+    }
+
+    func testCommandFromPreviousTerminalWhileActivatedTerminalIsBeingRead() throws {
+        let old = FakeApp(bundleIdentifier: Terminal.ghostty.rawValue, pid: 999_091)
+        let new = FakeApp(bundleIdentifier: Terminal.iterm.rawValue, pid: 999_092)
+        var front: NSRunningApplication = old
+        let tty = "/dev/ttys-review"
+        let preferencesVM = try Self.inMemoryPreferencesVM()
+        let restore = Self.setTerminalPreferences(preferencesVM, enabled: .ghostty, rules: [])
+        defer { restore() }
+        preferencesVM.setTerminal(.iterm, enabled: true)
+        let vm = ApplicationVM(preferencesVM: preferencesVM, environment: .init(
+            frontmostApplication: { front },
+            focusedApplication: { nil },
+            runningApplications: Just([old, new]).eraseToAnyPublisher(),
+            isTerminalEnabled: { _ in true },
+            probedProgram: { terminal in
+                let path = terminal == .ghostty ? tty : "/dev/ttys-other"
+                return TerminalReading(program: nil, pane: path, tty: path)
+            },
+            terminalPanelFocus: .init(read: { _, _ in AnyCancellable {} }),
+            ttyOwner: { ($0, tty) }, jobState: { _, _ in .foreground }
+        ))
+        Self.waitUntil("first tty") { preferencesVM.focusedTerminalTTY(.ghostty) == tty }
+        var switches = 0
+        let subscription = vm.terminalSwitches.sink { _ in switches += 1 }
+        defer { subscription.cancel() }
+        front = new
+        NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didActivateApplicationNotification, object: NSWorkspace.shared, userInfo: [NSWorkspace.applicationUserInfoKey: new])
+        let source = InputSource.getCurrentInputSource().persistentIdentifier
+        vm.receiveTerminalControl(lines: "isp:1234:select:\(source)\n")
+        XCTAssertTrue(preferencesVM.terminalControl.isControlled(tty))
+        XCTAssertEqual(switches, 0, "old terminal's command should only update its pane")
     }
 
     func testRulesAreSavedByIdAndSwitchesAreStoredOnce() throws {
