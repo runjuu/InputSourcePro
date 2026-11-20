@@ -450,9 +450,7 @@ extension ApplicationVM {
         // A change to the verified pane that did not switch live is still owed.
         guard focusedTTY == nil || currentApp != initialApp || changedTTYs.contains(where: { $0 == focusedTTY }) else { return }
         terminalControlPendingTTYs.formUnion(changedTTYs)
-        if let app = currentApp, let terminal = Terminal(app) {
-            terminalControlRechecks.send(terminal)
-        }
+        terminalControlRechecks.send(watched)
     }
 
     private func terminalFocusDidChange() {
@@ -861,13 +859,18 @@ extension ApplicationVM {
                 self?.terminalFocusDidChange()
             })
             .filter { [weak self] in self?.terminalControlPendingTTYs.isEmpty == false }
-            .flatMapLatest { [weak self] _ -> AnyPublisher<Void, Never> in
-                self?.settledHandback(for: app) ?? Empty().eraseToAnyPublisher()
-            }
         let controlRechecks = terminalControlRechecks
             .filter { $0 == terminal }
             .mapToVoid()
             .merge(with: restoredFocus)
+            // A nonactivating panel can return the keyboard without an app or pane
+            // change. Wait for the recipient before probing this terminal again.
+            .flatMapLatest { [weak self] _ in
+                Timer.interval(seconds: 0.25).prepend(Date()).first { _ in
+                    guard let self, !self.environment.temporaryInputWindowInProgress() else { return false }
+                    return self.currentTerminalForControl() == app
+                }
+            }
             .debounce(for: settle, scheduler: DispatchQueue.main)
             .flatMapLatest { [weak self] _ in
                 let revision = self?.terminalFocusRevision
@@ -875,8 +878,8 @@ extension ApplicationVM {
                 return lookup().map(Optional.some).replaceEmpty(with: nil).map { ($0, lookup, revision) }
             }
             .compactMap { [weak self] reading, lookup, revision -> Void? in
-                guard let self, self.currentTerminalForControl() == app else { return nil }
-                guard revision == self.terminalFocusRevision else {
+                guard let self, !self.terminalControlPendingTTYs.isEmpty else { return nil }
+                guard self.currentTerminalForControl() == app, revision == self.terminalFocusRevision else {
                     self.terminalControlRechecks.send(terminal)
                     return nil
                 }
