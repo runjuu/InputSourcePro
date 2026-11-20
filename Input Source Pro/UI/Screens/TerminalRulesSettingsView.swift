@@ -76,7 +76,7 @@ struct TerminalRulesSettingsView: View {
                 }
             }
 
-            Text("<pid> is a process running in that pane; <id> is an input source ID such as com.apple.keylayout.ABC. Alacritty needs distinguishable window titles. Panes inside Zellij are not supported.".i18n())
+            Text("<pid> is a process running in that pane; <id> is an input source ID such as com.apple.keylayout.ABC. For program control in Alacritty, use one window per Alacritty process. Panes inside Zellij are not supported.".i18n())
                 .foregroundColor(.secondary)
         }
         .textSelection(.enabled)

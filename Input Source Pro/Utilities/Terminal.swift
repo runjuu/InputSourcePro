@@ -72,6 +72,9 @@ extension Terminal {
     /// The focused pane, read again on the remembered tty; the terminal is
     /// probed for its tty when none is remembered. Call on `TerminalProcess.queue`.
     func refreshedProgram(pid: pid_t) -> TerminalReading {
+        // A second Alacritty window can open since the last lookup. Only a fresh
+        // inventory can establish that the cached tty still identifies the window.
+        if self == .alacritty { return TerminalProbe.program(self, pid: pid) }
         let cached = Self.focusedTTYs[self]
         let focused = cached?.pid == pid ? cached?.path : nil
         IndicatorDiagnostics.record("terminal.refresh bundle=\(rawValue) tty=\(focused ?? "-")")
@@ -556,16 +559,20 @@ extension TerminalProcess {
 
 /// A tty has one controlling writer in the foreground. Stopped jobs keep their
 /// own keyboard and stack until they resume, release control, or exit.
-struct TerminalControlTracker<Source> {
+struct TerminalControlTracker<Source: Equatable> {
     typealias Writer = TerminalProcess.Identity
     static var maxStack: Int { 16 }
 
-    private struct Entry {
-        let writer: Writer
+    private struct History {
         var current: Source
         var stack: [Source] = []
+    }
+
+    private struct Entry {
+        let writer: Writer
+        // A shared tmux pane may have been controlled before one emulator opted in.
+        var histories: [Terminal: History]
         var isSuspended = false
-        var epoch: UInt64
     }
 
     private var entries: [String: [Entry]] = [:]
@@ -583,14 +590,13 @@ struct TerminalControlTracker<Source> {
             epoch += 1
             for terminal in added { enabledAt[terminal] = epoch }
         }
-        // A stack kept for another emulator can be dropped once the last
-        // terminal that was enabled for it turns its switch off.
-        guard let oldest = enabledAt.values.min() else {
-            entries.removeAll()
-            return
-        }
+        // Switching an emulator off forgets only its own history.
         entries = entries.compactMapValues { writers in
-            let remaining = writers.filter { $0.epoch >= oldest }
+            let remaining = writers.compactMap { writer -> Entry? in
+                var entry = writer
+                entry.histories = entry.histories.filter { enabled.contains($0.key) }
+                return entry.histories.isEmpty ? nil : entry
+            }
             return remaining.isEmpty ? nil : remaining
         }
     }
@@ -609,7 +615,7 @@ struct TerminalControlTracker<Source> {
 
     func activeWriter(on tty: String, in terminal: Terminal? = nil) -> Writer? {
         guard let entry = activeEntry(on: tty) else { return nil }
-        if let terminal, !acceptsCommands(from: entry.epoch, in: terminal) { return nil }
+        if let terminal, entry.histories[terminal] == nil { return nil }
         return entry.writer
     }
 
@@ -617,8 +623,8 @@ struct TerminalControlTracker<Source> {
         activeWriter(on: tty, in: terminal) != nil
     }
 
-    func current(on tty: String) -> Source? {
-        activeEntry(on: tty)?.current
+    func current(on tty: String, in terminal: Terminal) -> Source? {
+        activeEntry(on: tty)?.histories[terminal]?.current
     }
 
     /// The last writer in a foreground job takes over. Other jobs can resume later.
@@ -628,34 +634,57 @@ struct TerminalControlTracker<Source> {
     }
 
     mutating func select(_ source: Source, on tty: String, writer: Writer, epoch: UInt64? = nil) {
-        let stack = entries[tty]?.first { $0.writer == writer }?.stack ?? []
-        activate(Entry(writer: writer, current: source, stack: stack, epoch: epoch ?? self.epoch), on: tty)
+        setSource(source, on: tty, writer: writer, epoch: epoch ?? self.epoch, push: false, live: nil)
     }
 
     mutating func push(_ source: Source, on tty: String, writer: Writer, live: Source?, epoch: UInt64? = nil) {
+        setSource(source, on: tty, writer: writer, epoch: epoch ?? self.epoch, push: true, live: live)
+    }
+
+    private mutating func setSource(_ source: Source, on tty: String, writer: Writer, epoch: UInt64, push: Bool, live: Source?) {
         let previous = entries[tty]?.first { $0.writer == writer }
-        var entry = Entry(writer: writer, current: source, stack: previous?.stack ?? [], epoch: epoch ?? self.epoch)
-        if let base = previous?.current ?? live ?? activeEntry(on: tty)?.current {
-            entry.stack.append(base)
-            if entry.stack.count > Self.maxStack { entry.stack.removeFirst() }
+        var histories = [Terminal: History]()
+        for (terminal, since) in enabledAt where since <= epoch {
+            let history = previous?.histories[terminal]
+            var stack = history?.stack ?? []
+            if push, let base = history?.current ?? live ?? current(on: tty, in: terminal) {
+                stack.append(base)
+                if stack.count > Self.maxStack { stack.removeFirst() }
+            }
+            histories[terminal] = History(current: source, stack: stack)
         }
-        activate(entry, on: tty)
+        guard !histories.isEmpty else { return }
+        activate(Entry(writer: writer, histories: histories), on: tty)
     }
 
-    mutating func pop(on tty: String, writer: Writer, epoch: UInt64? = nil) -> Source? {
-        guard var entry = entries[tty]?.first(where: { $0.writer == writer }),
-              let source = entry.stack.popLast()
-        else { return nil }
-        entry.current = source
+    /// Pop each eligible emulator's stack. Without a verified terminal, a result
+    /// means a pane changed and should be rechecked when focus is known.
+    mutating func pop(on tty: String, writer: Writer, in terminal: Terminal? = nil, epoch: UInt64? = nil) -> Source? {
+        guard var entry = entries[tty]?.first(where: { $0.writer == writer }) else { return nil }
+        var restored = [Terminal: Source]()
+        let received = epoch ?? self.epoch
+        for (client, since) in enabledAt where since <= received {
+            guard let source = entry.histories[client]?.stack.popLast() else { continue }
+            entry.histories[client]?.current = source
+            restored[client] = source
+        }
+        guard !restored.isEmpty else { return nil }
         entry.isSuspended = false
-        entry.epoch = epoch ?? self.epoch
         activate(entry, on: tty)
-        return source
+        if let terminal { return restored[terminal] }
+        return restored.values.first
     }
 
-    mutating func follow(_ source: Source, on tty: String) {
-        guard let index = entries[tty]?.lastIndex(where: { !$0.isSuspended }) else { return }
-        entries[tty]?[index].current = source
+    mutating func follow(_ source: Source, on tty: String, in terminal: Terminal) {
+        guard let index = entries[tty]?.lastIndex(where: { !$0.isSuspended }),
+              var histories = entries[tty]?[index].histories,
+              let current = histories[terminal]?.current, source != current else { return }
+        // A manual change follows the shared pane. Reapplying one emulator's
+        // already-current source on focus leaves the other histories alone.
+        for client in histories.keys {
+            histories[client]?.current = source
+        }
+        entries[tty]?[index].histories = histories
     }
 
     mutating func release(_ tty: String, writer: Writer) {

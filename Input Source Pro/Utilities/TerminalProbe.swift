@@ -194,12 +194,18 @@ enum TerminalProbe {
 
     // MARK: - Alacritty
 
-    /// Alacritty has no scripting interface, but each window's shell is a child
-    /// of its process with its own tty; with several windows, the focused
-    /// window's title picks one.
+    /// Each Alacritty window's shell is a child with its own tty. Window titles
+    /// can suggest a program for Terminal Rules, but a shell can set any title.
     private static func alacrittyReading(ofPID pid: pid_t) -> TerminalReading {
         let ttys = childTTYs(of: pid)
-        guard ttys.count > 1 else { return Terminal.alacritty.focusedProgram(onTTY: ttys.first, pid: pid) }
+        guard !ttys.isEmpty else { return Terminal.alacritty.focusedProgram(onTTY: nil, pid: pid) }
+        let app = Application(forProcessID: pid)
+        app?.messagingTimeout = 0.25
+        if ttys.count == 1 {
+            let windows: [UIElement]? = try? app?.attribute(.windows)
+            if windows?.count == 1 { return Terminal.alacritty.focusedProgram(onTTY: ttys[0], pid: pid) }
+            return alacrittyRuleReading(onTTY: ttys[0], pid: pid)
+        }
         var trail = TerminalTrail()
         let programs = ttys.map { tty in
             let processes = TerminalProcess.processes(onTTY: tty)
@@ -210,26 +216,26 @@ enum TerminalProbe {
                 TerminalProcess.program(comm: $0.comm, arguments: TerminalProcess.arguments(pid: $0.pid))
             })
         }
-        var reading = alacrittyReading(titled: focusedWindowTitle(of: pid), among: programs, pid: pid)
+        let window: UIElement? = try? app?.attribute(.focusedWindow)
+        window?.messagingTimeout = 0.25
+        var reading = alacrittyReading(titled: try? window?.attribute(.title), among: programs, pid: pid)
         // If a job exits, an ambiguous title can start identifying one window.
         if reading.pane == nil { reading.trail = trail }
         return reading
     }
 
-    /// Several windows can put the same program in their titles. A shared program
-    /// can still match a Terminal Rule, but none of those ttys identifies the focused pane.
+    /// A title-only match may name a program running in another window. Retain
+    /// the ordinary rule context without exposing a tty to FIFO commands or caching one for refresh.
     static func alacrittyReading(
         titled title: String?, among programs: [(tty: String, program: TerminalProgram?)], pid: pid_t
     ) -> TerminalReading {
-        let terminal = Terminal.alacritty
-        guard programs.count > 1 else { return terminal.focusedProgram(onTTY: programs.first?.tty, pid: pid) }
         let matches = programs.filter { candidate in
             guard let title, let program = candidate.program else { return false }
             return title.localizedCaseInsensitiveContains(program.key)
         }
-        if matches.count == 1 { return terminal.focusedProgram(onTTY: matches[0].tty, pid: pid) }
+        if matches.count == 1 { return alacrittyRuleReading(onTTY: matches[0].tty, pid: pid) }
 
-        let unknown = terminal.focusedProgram(onTTY: nil, pid: pid)
+        let unknown = Terminal.alacritty.focusedProgram(onTTY: nil, pid: pid)
         let candidates = matches.compactMap(\.program)
         guard let first = candidates.first, candidates.allSatisfy({ Multiplexer(rawValue: $0.key) == nil }) else { return unknown }
         // Keep exactly the identifiers every candidate can match. For example,
@@ -241,6 +247,13 @@ enum TerminalProbe {
         }
         guard let key = common.first else { return unknown }
         return TerminalReading(program: TerminalProgram(key: key, name: common.dropFirst().first), pane: nil)
+    }
+
+    private static func alacrittyRuleReading(onTTY tty: String, pid: pid_t) -> TerminalReading {
+        _ = Terminal.alacritty.focusedProgram(onTTY: nil, pid: pid)
+        let reading = TerminalProcess.foregroundProgram(onTTY: tty)
+        let program = reading.program.map { TerminalProgram(key: $0.key, name: $0.name, pane: $0.pane) }
+        return TerminalReading(program: program, pane: reading.pane, trail: reading.trail)
     }
 
     /// The controlling ttys of `pid`'s children. They are `login`, owned by
@@ -260,14 +273,5 @@ enum TerminalProbe {
             guard entry.kp_eproc.e_ppid == pid else { return nil }
             return TerminalProcess.ttyPath(forDevice: entry.kp_eproc.e_tdev)
         }
-    }
-
-    private static func focusedWindowTitle(of pid: pid_t) -> String? {
-        guard let app = Application(forProcessID: pid) else { return nil }
-        // A hung terminal must not hold up the probes behind it.
-        app.messagingTimeout = 0.25
-        let window: UIElement? = try? app.attribute(.focusedWindow)
-        window?.messagingTimeout = 0.25
-        return try? window?.attribute(.title)
     }
 }

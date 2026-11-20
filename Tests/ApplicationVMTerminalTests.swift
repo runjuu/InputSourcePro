@@ -298,7 +298,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
         let refocused = try XCTUnwrap(vm.appKind)
         XCTAssertEqual(preferencesVM.getAppAutoSwitchKeyboard(refocused)?.inputSource, secondSource)
         preferencesVM.cacheKeyboardFor(refocused, keyboard: firstSource)
-        XCTAssertEqual(preferencesVM.terminalControl.current(on: secondTTY), firstSource)
+        XCTAssertEqual(preferencesVM.terminalControl.current(on: secondTTY, in: .ghostty), firstSource)
         XCTAssertNil(preferencesVM.appKeyboardCache.retrieve(refocused))
 
         await vm.receiveTerminalControl(lines: "isp:102:release\n")
@@ -308,7 +308,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
 
         await vm.receiveTerminalControl(lines: "isp:102:select:\(secondSource.persistentIdentifier)\n")
         try await Self.waitFor("the shell took control from the terminal's app rule") { vm.appKind?.controlledShellTTY == secondTTY }
-        XCTAssertEqual(preferencesVM.terminalControl.current(on: secondTTY), secondSource)
+        XCTAssertEqual(preferencesVM.terminalControl.current(on: secondTTY, in: .ghostty), secondSource)
     }
 
     func testCommandsOnlyControlTerminalsEnabledWhenTheyArrived() async throws {
@@ -336,10 +336,17 @@ final class ApplicationVMTerminalTests: XCTestCase {
         XCTAssertFalse(prefs.terminalControl.isControlled(tty, in: .ghostty))
         await vm.receiveTerminalControl(lines: select)
         XCTAssertTrue(prefs.terminalControl.isControlled(tty, in: .ghostty))
+        await vm.receiveTerminalControl(lines: "isp:113:push:\(source.persistentIdentifier)\n")
 
         prefs.setTerminal(.iterm, enabled: true)
         try await Self.waitFor("iTerm reads the shared pane") { prefs.focusedTerminalTTY(.iterm) == tty }
         XCTAssertNil(vm.appKind?.getTerminalInfo())
+        XCTAssertFalse(prefs.terminalControl.isControlled(tty, in: .iterm))
+        var switches = 0
+        let subscription = vm.terminalSwitches.sink { _ in switches += 1 }
+        defer { subscription.cancel() }
+        await vm.receiveTerminalControl(lines: "isp:113:pop\n")
+        XCTAssertEqual(switches, 0, "The earlier push belongs to Ghostty")
         XCTAssertFalse(prefs.terminalControl.isControlled(tty, in: .iterm))
         // Even though the writer did not change, its first new command creates
         // a program context in the newly enabled terminal.
@@ -386,7 +393,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
         await applicationVM.receiveTerminalControl(lines: "isp:\(pid):select:\(source)\nisp:\(pid):push:\(source)\n")
 
         XCTAssertFalse(preferencesVM.terminalControl.isControlled(tty))
-        XCTAssertNil(preferencesVM.terminalControl.current(on: tty))
+        XCTAssertNil(preferencesVM.terminalControl.current(on: tty, in: .ghostty))
     }
 
     func testBackgroundWriterCanReleaseItsOwnSavedStack() async throws {
@@ -565,7 +572,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
         let switches = vm.terminalSwitches.sink { _ in liveSwitches += 1 }
         defer { switches.cancel() }
         await vm.receiveTerminalControl(lines: "isp:1234:select:\(source.persistentIdentifier)\n")
-        XCTAssertEqual(prefs.terminalControl.current(on: oldTTY), source)
+        XCTAssertEqual(prefs.terminalControl.current(on: oldTTY, in: .ghostty), source)
         XCTAssertEqual(prefs.focusedTerminalTTY(.ghostty), newTTY)
         XCTAssertNil(vm.appKind?.controlledShellTTY)
         XCTAssertEqual(liveSwitches, 0)
@@ -604,7 +611,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
         // The writer already lost focus, but Ghostty still reports its pane.
         lock.withLock { arrivingPaneVisibleAt = ProcessInfo.processInfo.systemUptime + 0.020 }
         await vm.receiveTerminalControl(lines: lines)
-        XCTAssertEqual(prefs.terminalControl.current(on: departedTTY), source)
+        XCTAssertEqual(prefs.terminalControl.current(on: departedTTY, in: .ghostty), source)
         XCTAssertEqual(prefs.focusedTerminalTTY(.ghostty), arrivingTTY)
         XCTAssertTrue(controlledPanes.isEmpty, "The departed pane's command must never publish a live switch")
     }
@@ -713,6 +720,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
         let lock = NSLock()
         var probes = 0
         var pane = tty
+        var pauseNextProbe: (() -> Void)?
         let vm = ApplicationVM(preferencesVM: prefs, environment: .init(
             frontmostApplication: { front }, focusedApplication: {
                 if front == terminal && focused == temporaryWindow { laggingFocusReads += 1 }
@@ -720,10 +728,13 @@ final class ApplicationVMTerminalTests: XCTestCase {
             },
             runningApplications: Just([terminal]).eraseToAnyPublisher(), isTerminalEnabled: { $0 == .iterm },
             probedProgram: { _, _ in
-                lock.withLock {
+                let (reading, pause) = lock.withLock {
                     probes += 1
-                    return TerminalReading(program: pane == tty ? program : nil, pane: pane, tty: pane)
+                    defer { pauseNextProbe = nil }
+                    return (TerminalReading(program: pane == tty ? program : nil, pane: pane, tty: pane), pauseNextProbe)
                 }
+                pause?()
+                return reading
             },
             terminalPanelFocus: .init(read: { _, _ in AnyCancellable {} }),
             ttyOwner: { writerAlive ? ($0, tty, 0) : nil }, jobState: { _, _ in .foreground },
@@ -806,6 +817,42 @@ final class ApplicationVMTerminalTests: XCTestCase {
         XCTAssertEqual(prefs.focusedTerminalTTY(.iterm), otherTTY)
         XCTAssertEqual(publishedProgramSources, beforeAnotherPane)
         XCTAssertNil(vm.appKind?.getTerminalInfo())
+
+        // A focus-gained hook can arrive after the restoration notification.
+        // Its first push still needs the actual source once AX catches up.
+        prefs.terminalControl.release(tty, writer: writer)
+        openWindow()
+        lock.withLock { pane = tty }
+        handBackWindow()
+        let beforeLatePush = laggingFocusReads
+        let latePush = Task { await vm.receiveTerminalControl(lines: "isp:111:push:\(source.persistentIdentifier)\n") }
+        try await Self.waitFor("the focus-gained hook checks AX") { laggingFocusReads > beforeLatePush }
+        focused = terminal
+        await latePush.value
+        XCTAssertEqual(prefs.terminalControl.pop(on: tty, writer: writer), source)
+
+        // A lookup can span the entire temporary window's lifetime. Its old
+        // pane must not decide whether the returning pane's first push is live.
+        prefs.terminalControl.release(tty, writer: writer)
+        let probeStarted = expectation(description: "command lookup read the old pane")
+        let resumeProbe = DispatchSemaphore(value: 0)
+        lock.withLock {
+            pane = otherTTY
+            pauseNextProbe = {
+                probeStarted.fulfill()
+                _ = resumeProbe.wait(timeout: .now() + 5)
+            }
+        }
+        let overlappingPush = Task { await vm.receiveTerminalControl(lines: "isp:111:push:\(source.persistentIdentifier)\n") }
+        await fulfillment(of: [probeStarted], timeout: 5)
+        openWindow()
+        lock.withLock { pane = tty }
+        handBackWindow()
+        focused = terminal
+        resumeProbe.signal()
+        await overlappingPush.value
+        XCTAssertEqual(prefs.focusedTerminalTTY(.iterm), tty)
+        XCTAssertEqual(prefs.terminalControl.pop(on: tty, writer: writer), source)
     }
 
     func testRulesAreSavedByIdAndSwitchesAreStoredOnce() throws {

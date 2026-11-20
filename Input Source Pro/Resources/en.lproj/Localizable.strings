@@ -267,4 +267,4 @@
 "Remember the current input source, then switch" = "Remember the current input source, then switch";
 "Switch back to the remembered input source" = "Switch back to the remembered input source";
 "Hand the pane back to the rules" = "Hand the pane back to the rules";
-"<pid> is a process running in that pane; <id> is an input source ID such as com.apple.keylayout.ABC. Alacritty needs distinguishable window titles. Panes inside Zellij are not supported." = "<pid> is a process running in that pane; <id> is an input source ID such as com.apple.keylayout.ABC. Alacritty needs distinguishable window titles. Panes inside Zellij are not supported.";
+"<pid> is a process running in that pane; <id> is an input source ID such as com.apple.keylayout.ABC. For program control in Alacritty, use one window per Alacritty process. Panes inside Zellij are not supported." = "<pid> is a process running in that pane; <id> is an input source ID such as com.apple.keylayout.ABC. For program control in Alacritty, use one window per Alacritty process. Panes inside Zellij are not supported.";
