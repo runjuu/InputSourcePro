@@ -430,6 +430,31 @@ final class TerminalProgramGateTests: XCTestCase {
 }
 
 final class TerminalProbeTests: XCTestCase {
+    func testWezTermQueriesTheSameGUIInstanceForItsClientAndPane() throws {
+        // Both servers have a pane zero, on different ttys. The CLI receives
+        // the socket through its environment just as the bundled executable does.
+        let cli = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let script = """
+        #!/bin/sh
+        case "$WEZTERM_UNIX_SOCKET" in
+            */.local/share/wezterm/gui-sock-46286) pid=46286; tty=/dev/ttys014 ;;
+            */.local/share/wezterm/gui-sock-51000) pid=51000; tty=/dev/ttys016 ;;
+            *) exit 1 ;;
+        esac
+        case "$3" in
+            list-clients) printf '[{"pid":%s,"focused_pane_id":0}]' "$pid" ;;
+            list) printf '[{"pane_id":0,"tty_name":"%s"}]' "$tty" ;;
+            *) exit 1 ;;
+        esac
+        """
+        try script.write(to: cli, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: cli) }
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: cli.path)
+
+        XCTAssertEqual(TerminalProbe.weztermTTY(pid: 46286, executable: cli.path), "/dev/ttys014")
+        XCTAssertEqual(TerminalProbe.weztermTTY(pid: 51000, executable: cli.path), "/dev/ttys016")
+    }
+
     func testWezTermFocusedPaneComesFromTheFrontGUIClient() {
         let clients = """
         [{"pid": 46286, "workspace": "default", "focused_pane_id": 2},
@@ -462,6 +487,18 @@ final class TerminalProbeTests: XCTestCase {
             XCTAssertNil(TerminalProbe.alacrittyReading(titled: "user@host: ~", among: [shell, claude], pid: getpid()).tty)
             XCTAssertNil(TerminalProbe.alacrittyReading(titled: nil, among: [shell, claude], pid: getpid()).tty)
             XCTAssertNil(TerminalProbe.alacrittyReading(titled: "claude", among: [], pid: getpid()).tty)
+        }
+    }
+
+    func testAmbiguousAlacrittyWindowsKeepOnlyTheirSharedProgramIdentifiers() {
+        let old = TerminalProgram(key: "claude", name: "2.1.310")
+        let updated = TerminalProgram(key: "claude", name: "2.1.318")
+        TerminalProcess.queue.sync {
+            let reading = TerminalProbe.alacrittyReading(
+                titled: "Claude Code", among: [("old", old), ("new", updated)], pid: getpid()
+            )
+            XCTAssertEqual(reading.program, TerminalProgram(key: "claude"))
+            XCTAssertNil(reading.tty)
         }
     }
 

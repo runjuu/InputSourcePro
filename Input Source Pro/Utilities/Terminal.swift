@@ -444,12 +444,12 @@ extension TerminalProcess {
 extension TerminalProcess {
     /// ISP's environment for the CLIs. zellij keeps its sockets under $TMPDIR,
     /// which a GUI app may lack.
-    private static let environment: [String] = {
+    private static let environment: [String: String] = {
         var environment = ProcessInfo.processInfo.environment
         if environment["TMPDIR"] == nil {
             environment["TMPDIR"] = URL(fileURLWithPath: NSTemporaryDirectory()).path
         }
-        return environment.map { "\($0)=\($1)" }
+        return environment
     }()
 
     /// Where package managers install CLIs (Homebrew on Apple silicon and Intel,
@@ -478,6 +478,7 @@ extension TerminalProcess {
     static func output(
         of path: String,
         arguments: [String],
+        overridingEnvironment: [String: String] = [:],
         timeout: TimeInterval = 1,
         watchdog: (TimeInterval, @escaping () -> Void) -> Void = { DispatchQueue.global().asyncAfter(deadline: .now() + $0, execute: $1) }
     ) -> String? {
@@ -498,7 +499,8 @@ extension TerminalProcess {
         posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT))
 
         let argv = ([path] + arguments).map { strdup($0) } + [nil]
-        let envp = environment.map { strdup($0) } + [nil]
+        let childEnvironment = environment.merging(overridingEnvironment) { _, override in override }
+        let envp = childEnvironment.map { strdup("\($0.key)=\($0.value)") } + [nil]
         defer { (argv + envp).forEach { free($0) } }
         var pid: pid_t = 0
         let spawned = posix_spawn(&pid, path, &actions, &attributes, argv, envp)

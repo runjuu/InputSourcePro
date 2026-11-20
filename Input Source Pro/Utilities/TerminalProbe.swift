@@ -35,7 +35,7 @@ enum TerminalProbe {
             // tty of selected tab of window 1
             tty = askTTY(terminal, pid: pid, property("ttty", of: property("tcnt", of: element("cwin", at: 1))))
         case .wezterm:
-            tty = weztermTTY(pid: pid)
+            tty = weztermExecutable(pid: pid).flatMap { weztermTTY(pid: pid, executable: $0) }
         case .alacritty:
             return alacrittyReading(ofPID: pid)
         }
@@ -147,10 +147,15 @@ enum TerminalProbe {
 
     /// The focused pane's tty from `wezterm cli`, which talks to the running
     /// GUI; nil when it isn't running (`--no-auto-start`: never start a mux server).
-    private static func weztermTTY(pid: pid_t) -> String? {
-        guard let wezterm = weztermExecutable(pid: pid) else { return nil }
+    static func weztermTTY(pid: pid_t, executable: String) -> String? {
+        // Each macOS GUI listens here, including an unpublished --always-new-process
+        // instance. Pane IDs belong to that socket, so both queries must use it.
+        let socket = NSHomeDirectory() + "/.local/share/wezterm/gui-sock-\(pid)"
         let cli = { (command: String) in
-            TerminalProcess.output(of: wezterm, arguments: ["cli", "--no-auto-start", command, "--format", "json"])
+            TerminalProcess.output(
+                of: executable, arguments: ["cli", "--no-auto-start", command, "--format", "json"],
+                overridingEnvironment: ["WEZTERM_UNIX_SOCKET": socket]
+            )
         }
         guard let clients = cli("list-clients"),
               let pane = focusedPaneID(fromClients: clients, pid: pid),
@@ -225,9 +230,17 @@ enum TerminalProbe {
         if matches.count == 1 { return terminal.focusedProgram(onTTY: matches[0].tty, pid: pid) }
 
         let unknown = terminal.focusedProgram(onTTY: nil, pid: pid)
-        guard let shared = matches.first?.program, Multiplexer(rawValue: shared.key) == nil,
-              matches.allSatisfy({ $0.program == shared }) else { return unknown }
-        return TerminalReading(program: shared, pane: nil)
+        let candidates = matches.compactMap(\.program)
+        guard let first = candidates.first, candidates.allSatisfy({ Multiplexer(rawValue: $0.key) == nil }) else { return unknown }
+        // Keep exactly the identifiers every candidate can match. For example,
+        // two versions of Claude Code share “claude” but have different kernel names.
+        let common = [first.key, first.name].compactMap { $0 }.filter { identifier in
+            candidates.allSatisfy { candidate in
+                [candidate.key, candidate.name].contains { $0?.caseInsensitiveCompare(identifier) == .orderedSame }
+            }
+        }
+        guard let key = common.first else { return unknown }
+        return TerminalReading(program: TerminalProgram(key: key, name: common.dropFirst().first), pane: nil)
     }
 
     /// The controlling ttys of `pid`'s children. They are `login`, owned by
