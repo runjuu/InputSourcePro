@@ -97,6 +97,9 @@ struct TerminalReading: Equatable {
     let pane: String?
     var trail = TerminalTrail()
     var tty: String? = nil
+    /// The terminal identified a configuration without pane control. An
+    /// unanswered lookup also lacks a tty, but a pending command can retry it.
+    var paneControlUnavailable = false
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.program == rhs.program && lhs.pane == rhs.pane
@@ -258,7 +261,7 @@ extension TerminalProcess {
             paneTTY = tty
             inner = foregroundProgram(onTTY: tty, pane: label, depth: depth + 1, trail: &trail)
         case let .program(paneProgram, label)?:
-            inner = TerminalReading(program: paneProgram, pane: label)
+            inner = TerminalReading(program: paneProgram, pane: label, paneControlUnavailable: true)
         }
         IndicatorDiagnostics.record("terminal.mux kind=\(multiplexer.rawValue) client=\(path) pane=\(inner.pane ?? "-") paneTTY=\(paneTTY ?? "-") program=\(inner.program?.id ?? "shell")")
         return inner

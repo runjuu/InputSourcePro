@@ -225,7 +225,9 @@ enum TerminalProbe {
         if ttys.count == 1 {
             let windows: [UIElement]? = try? app?.attribute(.windows)
             if windows?.count == 1 { return Terminal.alacritty.focusedProgram(onTTY: ttys[0], pid: pid) }
-            return alacrittyRuleReading(onTTY: ttys[0], pid: pid)
+            var reading = alacrittyRuleReading(onTTY: ttys[0], pid: pid)
+            reading.paneControlUnavailable = (windows?.count ?? 0) > 1
+            return reading
         }
         var trail = TerminalTrail()
         let programs = ttys.map { tty in
@@ -240,6 +242,7 @@ enum TerminalProbe {
         let window: UIElement? = try? app?.attribute(.focusedWindow)
         window?.messagingTimeout = 0.25
         var reading = alacrittyReading(titled: try? window?.attribute(.title), among: programs, pid: pid)
+        reading.paneControlUnavailable = true
         // If a job exits, an ambiguous title can start identifying one window.
         if reading.pane == nil { reading.trail = trail }
         return reading
