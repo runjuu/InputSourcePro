@@ -30,6 +30,7 @@ enum AppKind {
     case normal(app: NSRunningApplication, info: NormalInfo)
     case browser(app: NSRunningApplication, info: BrowserInfo)
     case terminal(app: NSRunningApplication, info: TerminalInfo)
+    case controlledShell(app: NSRunningApplication, tty: String, info: NormalInfo)
 
     func getId() -> String? {
         switch self {
@@ -49,12 +50,14 @@ enum AppKind {
         case let .terminal(app, info):
             guard let bundleId = app.bundleId() else { return nil }
             return "\(bundleId)_\(info.rule?.id.uuidString ?? info.program.id)"
+        case let .controlledShell(app, tty, _):
+            return app.bundleId().map { "\($0)_shell:\(tty)" }
         }
     }
 
     func getApp() -> NSRunningApplication {
         switch self {
-        case let .normal(app, _):
+        case let .normal(app, _), let .controlledShell(app, _, _):
             return app
         case let .browser(app, _):
             return app
@@ -65,7 +68,7 @@ enum AppKind {
 
     func getBrowserInfo() -> BrowserInfo? {
         switch self {
-        case .normal, .terminal:
+        case .normal, .terminal, .controlledShell:
             return nil
         case let .browser(_, info):
             return info
@@ -74,16 +77,21 @@ enum AppKind {
 
     func getTerminalInfo() -> TerminalInfo? {
         switch self {
-        case .normal, .browser:
+        case .normal, .browser, .controlledShell:
             return nil
         case let .terminal(_, info):
             return info
         }
     }
 
+    var controlledShellTTY: String? {
+        guard case let .controlledShell(_, tty, _) = self else { return nil }
+        return tty
+    }
+
     func isFocusOnInputContainer() -> Bool {
         switch self {
-        case let .normal(_, info):
+        case let .normal(_, info), let .controlledShell(_, _, info):
             return info.isFocusOnInputContainer
         case let .browser(_, info):
             return info.isFocusOnInputContainer
@@ -94,7 +102,7 @@ enum AppKind {
 
     func getFocusedElement() -> UIElement? {
         switch self {
-        case let .normal(_, info):
+        case let .normal(_, info), let .controlledShell(_, _, info):
             return info.focusedElement
         case let .browser(_, info):
             return info.focusedElement
@@ -107,6 +115,7 @@ enum AppKind {
         guard let otherKind = otherKind else { return false }
         guard getApp() == otherKind.getApp() else { return false }
         guard getTerminalInfo()?.program == otherKind.getTerminalInfo()?.program else { return false }
+        guard controlledShellTTY == otherKind.controlledShellTTY else { return false }
 
         switch (getBrowserInfo(), otherKind.getBrowserInfo()) {
         case (nil, nil):
@@ -195,25 +204,24 @@ extension AppKind {
             }
         }
 
-        // Only a program a rule matches is its own context. A shell prompt, a program
-        // not yet known and a program without a rule stay the terminal's App Rule
-        // context, so running a command does not re-apply the app's keyboard. A pane an
-        // `isp:` program controls is its own context too, rule or not.
-        if let terminal = Terminal(app),
-           preferencesVM.isTerminalEnabled(terminal),
-           let program = preferencesVM.terminalPrograms[terminal]
-        {
-            let rule = preferencesVM.getTerminalRule(program: program)
-            if rule != nil || program.tty.map { preferencesVM.terminalControl.isControlled($0) } == true {
-                return .terminal(
-                    app: app,
-                    info: (
-                        focusedElement: focusedElement,
-                        isFocusOnInputContainer: isFocusOnInputContainer,
-                        program: program,
-                        rule: rule
+        // Programs with a rule and panes controlled through `isp:` have their own context.
+        // Other programs and shell prompts share the terminal's App Rule.
+        if let terminal = Terminal(app), preferencesVM.isTerminalEnabled(terminal) {
+            if let program = preferencesVM.terminalPrograms[terminal] {
+                let rule = preferencesVM.getTerminalRule(program: program)
+                if rule != nil || program.tty.map { preferencesVM.terminalControl.isControlled($0) } == true {
+                    return .terminal(
+                        app: app,
+                        info: (
+                            focusedElement: focusedElement,
+                            isFocusOnInputContainer: isFocusOnInputContainer,
+                            program: program,
+                            rule: rule
+                        )
                     )
-                )
+                }
+            } else if let tty = preferencesVM.terminalTTYs[terminal], preferencesVM.terminalControl.isControlled(tty) {
+                return .controlledShell(app: app, tty: tty, info: (focusedElement, isFocusOnInputContainer))
             }
         }
 
