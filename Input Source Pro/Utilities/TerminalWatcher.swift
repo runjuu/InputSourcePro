@@ -39,6 +39,7 @@ struct TerminalTrail: Equatable {
     /// Herdr emits no event for popup terminals; their PTY master appears and disappears.
     var herdrMasters: [pid_t: Set<UInt32>] = [:]
     var herdrInventoryIncomplete = false
+    var herdrExecPIDs = Set<pid_t>()
     var zellij: Zellij?
 
     /// The foreground process group of `pid`'s controlling tty, from libproc;
@@ -160,6 +161,7 @@ final class TerminalWatcher {
     /// Attaches dropped in a row since a connection's last handshake; each one waits longer.
     private var drops: [Connection: Int] = [:]
     private var activeConnections = Set<Connection>()
+    private var execWatches: [pid_t: AnyCancellable] = [:]
     private var closing: [Connection: AnyCancellable] = [:]
     private var herdrView: AnyCancellable?
     /// The last pane and displayed terminal reported in the current watch.
@@ -261,6 +263,13 @@ final class TerminalWatcher {
             polls.append(environment.poll(1, check) { [weak self] path in
                 self?.trigger(src: "herdr-client", path, paneMayHaveChanged: true, generation: generation)
             })
+        }
+
+        execWatches = execWatches.filter { trail.herdrExecPIDs.contains($0.key) }
+        for pid in trail.herdrExecPIDs where execWatches[pid] == nil {
+            execWatches[pid] = Environment.watchExec(pid: pid) { [weak self] in
+                self?.trigger(src: "herdr-exec", "pid=\(pid)", paneMayHaveChanged: false)
+            }
         }
 
         activeConnections = Set(trail.herdrSockets.map(Connection.herdr))
@@ -575,6 +584,21 @@ extension TerminalWatcher.Environment {
         }
         timer.resume()
         return AnyCancellable { timer.cancel() }
+    }
+
+    /// Refresh once registration is effective and whenever the executable changes.
+    /// The first refresh covers an exec between the original lookup and registration.
+    static func watchExec(pid: pid_t, send: @escaping () -> Void) -> AnyCancellable {
+        let flag = CancelFlag()
+        let source = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exec, queue: .main)
+        let refresh = { if !flag.isCancelled { send() } }
+        source.setRegistrationHandler(handler: refresh)
+        source.setEventHandler(handler: refresh)
+        source.resume()
+        return AnyCancellable {
+            flag.cancel()
+            source.cancel()
+        }
     }
 
     /// Watches directory `path` on `queue` (a file there replaced by rename
