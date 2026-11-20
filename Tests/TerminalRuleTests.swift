@@ -551,6 +551,23 @@ final class TerminalControlTrackerTests: XCTestCase {
     private let second = TerminalProcess.Identity(pid: 20, startTime: 2)
     private let tty = "/dev/ttys001"
 
+    func testBatchKeepsItsArrivalEpochWhenTerminalSwitchesChange() {
+        control.setEnabledTerminals([.ghostty, .iterm])
+        let received = control.epoch
+        control.setEnabledTerminals([.iterm])
+        control.setEnabledTerminals([.iterm, .ghostty])
+
+        // A lookup for this batch finished after Ghostty was re-enabled.
+        XCTAssertTrue(control.acceptsCommands(from: received))
+        control.push("ABC", on: tty, writer: first, live: "French", epoch: received)
+        XCTAssertFalse(control.isControlled(tty, in: .ghostty))
+        XCTAssertTrue(control.isControlled(tty, in: .iterm))
+
+        control.setEnabledTerminals([.ghostty])
+        XCTAssertFalse(control.acceptsCommands(from: received))
+        XCTAssertNil(control.pop(on: tty, writer: first))
+    }
+
     func testSelectTakesControlAndSetsCurrent() {
         XCTAssertFalse(control.isControlled(tty))
         control.select("abc", on: tty, writer: first)
@@ -737,6 +754,8 @@ final class TerminalControlFramerTests: XCTestCase {
 final class FocusedTerminalTTYTests: XCTestCase {
     func testReusedHelperPIDOnTheSameTTYDoesNotInheritControl() async throws {
         let preferences = try ApplicationVMTerminalTests.inMemoryPreferencesVM()
+        let restore = ApplicationVMTerminalTests.setTerminalPreferences(preferences, enabled: .ghostty, rules: [])
+        defer { restore() }
         let tty = "/dev/ttys220"
         let writer: pid_t = 220
         let parent: pid_t = 200

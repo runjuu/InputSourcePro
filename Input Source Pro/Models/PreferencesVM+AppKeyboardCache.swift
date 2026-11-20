@@ -3,8 +3,9 @@ import AppKit
 extension PreferencesVM {
     /// The tty of the pane a program controls, which skips rules and the cache.
     func controlledTerminalTTY(_ appKind: AppKind) -> String? {
+        guard let terminal = Terminal(appKind.getApp()) else { return nil }
         let tty = appKind.getTerminalInfo()?.program.tty ?? appKind.controlledShellTTY
-        return tty.flatMap { terminalControl.isControlled($0) ? $0 : nil }
+        return tty.flatMap { terminalControl.isControlled($0, in: terminal) ? $0 : nil }
     }
 
     func appNeedCacheKeyboard(_ appKind: AppKind) -> Bool {
