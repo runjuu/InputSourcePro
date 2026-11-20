@@ -708,6 +708,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
         var windowOpen = false
         var handbackWaits = 0
         var laggingFocusReads = 0
+        var writerAlive = true
         let restored = PassthroughSubject<Void, Never>()
         let lock = NSLock()
         var probes = 0
@@ -725,7 +726,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
                 }
             },
             terminalPanelFocus: .init(read: { _, _ in AnyCancellable {} }),
-            ttyOwner: { ($0, tty, 0) }, jobState: { _, _ in .foreground },
+            ttyOwner: { writerAlive ? ($0, tty, 0) : nil }, jobState: { _, _ in .foreground },
             temporaryInputWindowInProgress: { windowOpen },
             temporaryInputWindowRestored: restored.handleEvents(receiveSubscription: { _ in handbackWaits += 1 }).eraseToAnyPublisher()
         ))
@@ -772,6 +773,22 @@ final class ApplicationVMTerminalTests: XCTestCase {
         handBackWindow()
         await push.value
         XCTAssertEqual(prefs.terminalControl.pop(on: tty, writer: writer), source)
+
+        // A writer can also exit while the temporary window is in front, with
+        // no further command to prompt a fresh probe after handback.
+        openWindow()
+        writerAlive = false
+        let beforeExit = publishedProgramSources
+        let beforeExitProbe = lock.withLock { probes }
+        try await Self.waitFor("the writer exits and its recheck runs") {
+            !prefs.terminalControl.isControlled(tty) && lock.withLock { probes > beforeExitProbe }
+        }
+        let beforeExitHandback = laggingFocusReads
+        handBackWindow()
+        try await Self.waitFor("AX still reports ISP after the writer exits") { laggingFocusReads > beforeExitHandback }
+        focused = terminal
+        try await Self.waitFor("the writer's exit reapplies its program rule") { publishedProgramSources == beforeExit + 1 }
+        writerAlive = true
         let beforeAnotherPane = publishedProgramSources
 
         // An independent command while the window is frontmost stays with its
