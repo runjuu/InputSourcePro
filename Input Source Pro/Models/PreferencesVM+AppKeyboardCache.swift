@@ -3,14 +3,15 @@ import AppKit
 extension PreferencesVM {
     /// The tty of the pane a program controls, which skips rules and the cache.
     func controlledTerminalTTY(_ appKind: AppKind) -> String? {
-        appKind.getTerminalInfo()?.program.tty.flatMap { terminalControl.isControlled($0) ? $0 : nil }
+        let tty = appKind.getTerminalInfo()?.program.tty ?? appKind.controlledShellTTY
+        return tty.flatMap { terminalControl.isControlled($0) ? $0 : nil }
     }
 
     func appNeedCacheKeyboard(_ appKind: AppKind) -> Bool {
         // A program rule is a forced default: switching by hand inside claude
         // must not be remembered, or the rule stops working after one use.
         // A controlled pane keeps its own source instead (`TerminalControlTracker`).
-        if appKind.getTerminalInfo() != nil {
+        if appKind.getTerminalInfo() != nil || appKind.controlledShellTTY != nil {
             return false
         }
 
@@ -43,10 +44,7 @@ extension PreferencesVM {
     }
 
     func cacheKeyboardFor(_ appKind: AppKind, keyboard: InputSource) {
-        // The pane has focus, so this is what it uses now, however it got there.
-        // A pane showing a shell for a moment (a program just started) counts too.
-        let focusedTTY = controlledTerminalTTY(appKind) ?? Terminal(appKind.getApp()).flatMap(focusedTerminalTTY)
-        if let tty = focusedTTY, terminalControl.isControlled(tty) {
+        if let tty = controlledTerminalTTY(appKind) {
             terminalControl.follow(keyboard, on: tty)
             return
         }

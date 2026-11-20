@@ -687,3 +687,107 @@ final class FocusedTerminalTTYTests: XCTestCase {
         XCTAssertNil(preferencesVM.focusedTerminalTTY(.iterm))
     }
 }
+
+@MainActor
+final class TerminalControlPipeTests: XCTestCase {
+    private func makeDirectory() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        addTeardownBlock { try FileManager.default.removeItem(at: directory) }
+        return directory
+    }
+
+    func testOnlyTheOwnerCanRemoveOrReplaceThePipe() throws {
+        let directory = try makeDirectory()
+        let url = directory.appendingPathComponent("terminal-control")
+        let delivered = expectation(description: "first instance still receives commands")
+        let first = try XCTUnwrap(TerminalControlPipe(directory: directory) { lines in
+            XCTAssertEqual(lines, "isp:1:pop\n")
+            delivered.fulfill()
+        })
+        XCTAssertNil(TerminalControlPipe(directory: directory) { _ in XCTFail("second reader") })
+        let writer = try FileHandle(forWritingTo: url)
+        try writer.write(contentsOf: Data("isp:1:pop\n".utf8))
+        try writer.close()
+        wait(for: [delivered], timeout: 2)
+
+        first.remove()
+        let next = try XCTUnwrap(TerminalControlPipe(directory: directory) { _ in })
+        first.remove()
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+        next.remove()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    func testReopensAnExistingFIFOForWritersThatAlreadyHaveItOpen() throws {
+        let directory = try makeDirectory()
+        let url = directory.appendingPathComponent("terminal-control")
+        XCTAssertEqual(mkfifo(url.path, 0o600), 0)
+        let writer = try FileHandle(forUpdating: url)
+        defer { try? writer.close() }
+        let delivered = expectation(description: "existing writer reaches restarted app")
+        let pipe = try XCTUnwrap(TerminalControlPipe(directory: directory) { lines in
+            XCTAssertEqual(lines, "isp:2:pop\n")
+            delivered.fulfill()
+        })
+        defer { pipe.remove() }
+        try writer.write(contentsOf: Data("isp:2:pop\n".utf8))
+        wait(for: [delivered], timeout: 2)
+    }
+
+    func testPreservesFilesAtStartupAndWhenThePathChangesBeforeRemoval() throws {
+        let directory = try makeDirectory()
+        let url = directory.appendingPathComponent("terminal-control")
+        let text = "created while ISP was closed"
+        try text.write(to: url, atomically: true, encoding: .utf8)
+        let pipe = try XCTUnwrap(TerminalControlPipe(directory: directory) { _ in })
+        let entries = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+        let saved = try XCTUnwrap(entries.first { $0.lastPathComponent.hasPrefix("terminal-control.") })
+        XCTAssertEqual(try String(contentsOf: saved, encoding: .utf8), text)
+
+        try FileManager.default.removeItem(at: url)
+        try "replacement".write(to: url, atomically: true, encoding: .utf8)
+        pipe.remove()
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "replacement")
+    }
+
+    func testLeavesAnExistingSymlinkAlone() throws {
+        let directory = try makeDirectory()
+        let url = directory.appendingPathComponent("terminal-control")
+        let destination = directory.appendingPathComponent("unrelated")
+        try FileManager.default.createSymbolicLink(at: url, withDestinationURL: destination)
+        XCTAssertNil(TerminalControlPipe(directory: directory) { _ in })
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: url.path), destination.path)
+    }
+
+    func testDeliveryWaitsForThePreviousBatchToFinish() async throws {
+        let directory = try makeDirectory()
+        let started = expectation(description: "first batch started")
+        let overlapped = expectation(description: "second batch ran while the first was suspended")
+        overlapped.isInverted = true
+        let finished = expectation(description: "second batch finished")
+        var resumeFirst: CheckedContinuation<Void, Never>?
+        let pipe = try XCTUnwrap(TerminalControlPipe(directory: directory) { lines in
+            if lines == "first\n" {
+                await withCheckedContinuation {
+                    resumeFirst = $0
+                    started.fulfill()
+                }
+            } else {
+                XCTAssertEqual(lines, "second\n")
+                if resumeFirst != nil { overlapped.fulfill() }
+                finished.fulfill()
+            }
+        })
+        defer { pipe.remove() }
+        let writer = try FileHandle(forWritingTo: directory.appendingPathComponent("terminal-control"))
+        defer { try? writer.close() }
+        try writer.write(contentsOf: Data("first\n".utf8))
+        await fulfillment(of: [started], timeout: 2)
+        try writer.write(contentsOf: Data("second\n".utf8))
+        await fulfillment(of: [overlapped], timeout: 0.1)
+        resumeFirst?.resume()
+        resumeFirst = nil
+        await fulfillment(of: [finished], timeout: 2)
+    }
+}

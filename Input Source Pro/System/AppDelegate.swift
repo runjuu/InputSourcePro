@@ -70,7 +70,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         terminalControlPipe = TerminalControlPipe { [weak self] lines in
-            self?.applicationVM.receiveTerminalControl(lines: lines)
+            await self?.applicationVM.receiveTerminalControl(lines: lines)
         }
 
         statusItemController = StatusItemController(

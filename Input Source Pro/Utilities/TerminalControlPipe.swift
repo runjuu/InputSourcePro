@@ -5,58 +5,121 @@ import Foundation
 /// builtin (`echo … 1<>…`) writes it in microseconds.
 final class TerminalControlPipe {
     private let path: String
+    private var ownership: (lockFD: Int32, fifo: stat)?
     private let source: DispatchSourceRead
 
-    /// Makes the pipe at `~/Library/Application Support/Input Source Pro/terminal-control`,
-    /// replacing what was left there (the last run's pipe, or a plain file a
-    /// program created while ISP wasn't running), and calls `onReceive` on the
-    /// main queue with the complete lines written since the last call. nil, logged,
-    /// when the pipe can't be made.
-    init?(onReceive: @escaping @MainActor (String) -> Void) {
+    /// Listens on the per-user pipe and delivers complete lines on the main queue.
+    convenience init?(onReceive: @escaping @MainActor (String) async -> Void) {
         guard let directory = try? FileManager.default
             .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
             .appendingPathComponent("Input Source Pro", isDirectory: true)
         else { return nil }
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let path = directory.appendingPathComponent("terminal-control").path
+        self.init(directory: directory, onReceive: onReceive)
+    }
 
-        unlink(path)
-        guard mkfifo(path, 0o600) == 0 else {
-            NSLog("Terminal control pipe unavailable: mkfifo failed (\(String(cString: strerror(errno)))).")
-            return nil
-        }
-        // Read-write, so the pipe always has a writer: no EOF, and opening never waits for one.
-        let fd = open(path, O_RDWR | O_NONBLOCK)
-        guard fd >= 0 else {
-            NSLog("Terminal control pipe unavailable: open failed (\(String(cString: strerror(errno)))).")
-            unlink(path)
+    init?(directory: URL, onReceive: @escaping @MainActor (String) async -> Void) {
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        } catch {
+            NSLog("Terminal control directory unavailable: %@", error.localizedDescription)
             return nil
         }
 
-        self.path = path
-        // Drained off the main thread, so a busy main thread doesn't leave writers waiting on a full pipe.
+        // All instances lock the same inode through startup and removal. Leave the
+        // lock file in place so a new process cannot lock a replacement inode.
+        let lockPath = directory.appendingPathComponent(".terminal-control.lock").path
+        let lockFD = open(lockPath, O_CREAT | O_RDWR | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC, 0o600)
+        guard lockFD >= 0 else { return nil }
+        var info = stat()
+        guard fstat(lockFD, &info) == 0, info.st_mode & S_IFMT == S_IFREG,
+              info.st_uid == geteuid(), flock(lockFD, LOCK_EX | LOCK_NB) == 0 else {
+            close(lockFD)
+            return nil
+        }
+
+        let url = directory.appendingPathComponent("terminal-control")
+        let fd: Int32
+        do {
+            (fd, info) = try Self.openFIFO(at: url)
+        } catch {
+            close(lockFD)
+            NSLog("Terminal control pipe unavailable: %@", error.localizedDescription)
+            return nil
+        }
+
+        path = url.path
+        ownership = (lockFD, info)
         source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: DispatchQueue(label: "dev.inputsourcepro.terminal-control"))
         var framer = TerminalControlFramer()
-        source.setEventHandler {
+        source.setEventHandler { [weak self] in
+            guard let source = self?.source else { return }
             var buffer = [UInt8](repeating: 0, count: 4096)
-            var lines = ""
-            // Bounded per event; the source fires again while data remains.
-            for _ in 0 ..< 16 {
-                let count = read(fd, &buffer, buffer.count)
-                guard count > 0 else { break }
-                lines += framer.append(buffer.prefix(count))
-            }
+            let count = read(fd, &buffer, buffer.count)
+            guard count > 0 else { return }
+            let lines = framer.append(buffer.prefix(count))
             guard !lines.isEmpty else { return }
-            DispatchQueue.main.async { onReceive(lines) }
+            // One delivery in flight. If the main queue falls behind, the
+            // kernel FIFO provides backpressure while preserving command order.
+            source.suspend()
+            Task { @MainActor in
+                defer { source.resume() }
+                if !source.isCancelled { await onReceive(lines) }
+            }
         }
         source.setCancelHandler { close(fd) }
         source.resume()
     }
 
-    /// Closes and removes the pipe.
+    private static func openFIFO(at url: URL) throws -> (Int32, stat) {
+        let path = url.path
+        var info = stat()
+        if lstat(path, &info) == 0 {
+            guard info.st_uid == geteuid() else { throw POSIXError(.EACCES) }
+            switch info.st_mode & S_IFMT {
+            case S_IFIFO:
+                // A previous run may have crashed. Reuse its inode so writers
+                // that are already opening it receive a reader.
+                break
+            case S_IFREG:
+                // Shell redirection can create a file while ISP is closed.
+                // Preserve its contents even if it came from another source.
+                let saved = url.appendingPathExtension(UUID().uuidString)
+                try FileManager.default.moveItem(at: url, to: saved)
+                NSLog("Preserved existing terminal control file at %@", saved.path)
+            default:
+                throw POSIXError(.EEXIST)
+            }
+        } else if errno != ENOENT {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
+        if mkfifo(path, 0o600) != 0 && errno != EEXIST {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
+        let fd = open(path, O_RDWR | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC)
+        guard fd >= 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+        guard fstat(fd, &info) == 0, info.st_mode & S_IFMT == S_IFIFO,
+              info.st_uid == geteuid(), info.st_nlink == 1,
+              info.st_mode & 0o777 == 0o600 else {
+            close(fd)
+            throw POSIXError(.EACCES)
+        }
+        return (fd, info)
+    }
+
     func remove() {
+        guard let ownership else { return }
+        self.ownership = nil
+        var current = stat()
+        if lstat(path, &current) == 0,
+           current.st_dev == ownership.fifo.st_dev, current.st_ino == ownership.fifo.st_ino {
+            unlink(path)
+        }
         source.cancel()
-        unlink(path)
+        close(ownership.lockFD)
+    }
+
+    deinit {
+        remove()
     }
 }
 
