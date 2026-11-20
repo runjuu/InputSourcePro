@@ -20,9 +20,18 @@ import Combine
 /// evaluations asked meanwhile become one more.
 @MainActor
 final class TerminalPanelFocus {
+    enum Focus { case background, window, panel }
+
     struct Attributes: Equatable {
         var isFrontmost: Bool
         var focusedWindowSubrole: String?
+
+        var focus: Focus? {
+            guard isFrontmost else { return .background }
+            guard let focusedWindowSubrole, !focusedWindowSubrole.isEmpty,
+                  focusedWindowSubrole != kAXUnknownSubrole else { return nil }
+            return focusedWindowSubrole == kAXFloatingWindowSubrole ? .panel : .window
+        }
     }
 
     struct Environment {
@@ -32,6 +41,7 @@ final class TerminalPanelFocus {
         var read: (_ pid: pid_t, _ answer: @escaping (Attributes?) -> Void) -> AnyCancellable
         /// A fresh read alongside a FIFO pane probe, on its background queue.
         var controlAttributes: (pid_t) -> Attributes? = TerminalPanelFocus.attributes
+        var ghosttyHasOnlyWindowSurfaces: (pid_t) -> Bool = TerminalProbe.ghosttyHasOnlyWindowSurfaces
     }
 
     /// Notifications that may come with the panel showing or hiding; each one
@@ -88,11 +98,12 @@ final class TerminalPanelFocus {
             // One unanswered read of the terminal with the panel (busy for longer than the
             // messaging timeout) keeps the panel; the recheck while it has focus asks again,
             // and a second one in a row (permission revoked, hung) counts as no panel.
-            if attributes == nil, self.focusedPID == pid, self.unanswered != pid {
+            let focus = attributes?.focus
+            if focus == nil, self.focusedPID == pid, self.unanswered != pid {
                 self.unanswered = pid
             } else {
                 self.unanswered = nil
-                self.apply(pid, isFocused: attributes.map(Self.isPanelFocused) ?? false)
+                self.apply(pid, isFocused: focus == .panel)
             }
             if self.rereads.remove(pid) != nil { self.evaluate(pid) }
         }
@@ -106,10 +117,6 @@ final class TerminalPanelFocus {
         rereads.remove(pid)
         if unanswered == pid { unanswered = nil }
         apply(pid, isFocused: isFocused)
-    }
-
-    static func isPanelFocused(_ attributes: Attributes) -> Bool {
-        attributes.isFrontmost && attributes.focusedWindowSubrole == kAXFloatingWindowSubrole
     }
 
     private func apply(_ pid: pid_t, isFocused: Bool) {

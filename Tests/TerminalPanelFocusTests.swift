@@ -280,6 +280,47 @@ final class TerminalPanelFocusTests: XCTestCase {
         try await checkHiddenPanel(overGhostty: false, writerExits: true)
     }
 
+    func testUnansweredPanelReadCannotAuthorizeTheGhosttyWindowBehindIt() async throws {
+        let ghostty = ApplicationVMTerminalTests.FakeApp(bundleIdentifier: Terminal.ghostty.rawValue, pid: 999_203)
+        let tty = "/dev/ttys203"
+        let writer = TerminalProcess.Identity(pid: 203, startTime: 0)
+        let source = InputSource.getCurrentInputSource()
+        let prefs = try ApplicationVMTerminalTests.inMemoryPreferencesVM()
+        let restore = ApplicationVMTerminalTests.setTerminalPreferences(prefs, enabled: .ghostty, rules: ["vim"])
+        defer { restore() }
+        let lock = NSLock()
+        var attributes: TerminalPanelFocus.Attributes?
+        var onlyWindowSurfaces = false
+        let vm = ApplicationVM(preferencesVM: prefs, environment: .init(
+            frontmostApplication: { ghostty }, focusedApplication: { ghostty },
+            runningApplications: Just([ghostty]).eraseToAnyPublisher(), isTerminalEnabled: prefs.isTerminalEnabled,
+            probedProgram: { _, _ in
+                TerminalReading(program: TerminalProgram(key: "vim", pane: tty, tty: tty), pane: tty, tty: tty)
+            },
+            terminalPanelFocus: .init(
+                read: { _, _ in AnyCancellable {} },
+                controlAttributes: { _ in lock.withLock { attributes } },
+                ghosttyHasOnlyWindowSurfaces: { _ in lock.withLock { onlyWindowSurfaces } }
+            ),
+            ttyOwner: { ($0, tty, 0) }, jobState: { _, _ in .foreground }
+        ))
+        try await ApplicationVMTerminalTests.waitFor("ordinary rules read the window") {
+            vm.appKind?.getTerminalInfo()?.program.tty == tty
+        }
+        // The quick terminal opens over this window without a notification.
+        // Apple Events still return the window, and AX cannot confirm it.
+        await vm.receiveTerminalControl(lines: "isp:203:push:\(source.persistentIdentifier)\n")
+        XCTAssertTrue(prefs.terminalControl.isControlled(tty, in: .ghostty))
+        XCTAssertNil(prefs.terminalControl.pop(on: tty, writer: writer), "The hidden window must not capture the live source")
+
+        lock.withLock { attributes = .init(isFrontmost: true, focusedWindowSubrole: nil) }
+        let ambiguous = await vm.verifiedTerminalReading(for: ghostty)
+        XCTAssertNil(ambiguous)
+        lock.withLock { onlyWindowSurfaces = true }
+        let verified = await vm.verifiedTerminalReading(for: ghostty)
+        XCTAssertEqual(verified?.tty, tty, "With only regular window surfaces the Apple Event identifies the pane")
+    }
+
     private func checkHiddenPanel(overGhostty: Bool, writerExits: Bool) async throws {
         let ghostty = ApplicationVMTerminalTests.FakeApp(bundleIdentifier: Terminal.ghostty.rawValue, pid: 999_201)
         let other = ApplicationVMTerminalTests.FakeApp(bundleIdentifier: "com.apple.TextEdit", pid: 999_202)
@@ -350,10 +391,11 @@ final class TerminalPanelFocusTests: XCTestCase {
 
     func testOnlyAFloatingWindowOfTheFrontmostAppIsAPanel() {
         typealias Attributes = TerminalPanelFocus.Attributes
-        XCTAssertTrue(TerminalPanelFocus.isPanelFocused(Self.panel))
-        XCTAssertFalse(TerminalPanelFocus.isPanelFocused(Attributes(isFrontmost: false, focusedWindowSubrole: "AXFloatingWindow")))
-        XCTAssertFalse(TerminalPanelFocus.isPanelFocused(Attributes(isFrontmost: true, focusedWindowSubrole: "AXStandardWindow")))
-        XCTAssertFalse(TerminalPanelFocus.isPanelFocused(Attributes(isFrontmost: true, focusedWindowSubrole: nil)))
+        XCTAssertEqual(Self.panel.focus, .panel)
+        XCTAssertEqual(Attributes(isFrontmost: false, focusedWindowSubrole: "AXFloatingWindow").focus, .background)
+        XCTAssertEqual(Attributes(isFrontmost: true, focusedWindowSubrole: "AXStandardWindow").focus, .window)
+        XCTAssertNil(Attributes(isFrontmost: true, focusedWindowSubrole: nil).focus)
+        XCTAssertNil(Attributes(isFrontmost: true, focusedWindowSubrole: "AXUnknown").focus)
     }
 
     func testIndicatorOverAPanelFollowsItsCaretUntilHidden() {

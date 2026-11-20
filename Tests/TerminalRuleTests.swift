@@ -766,6 +766,15 @@ final class TerminalControlTrackerTests: XCTestCase {
         XCTAssertEqual(control.current(on: tty, in: .ghostty), "French")
     }
 
+    func testReconcilingTheActiveWritersPushPreservesOtherEmulatorsHistory() {
+        control.setEnabledTerminals([.iterm, .ghostty])
+        control.select("French", on: tty, writer: first)
+        control.push("Spanish", on: tty, writer: first, live: (.iterm, "Pinyin"), useLiveForCurrentWriter: true)
+
+        XCTAssertEqual(control.pop(on: tty, writer: first, in: .iterm), "Pinyin")
+        XCTAssertEqual(control.current(on: tty, in: .ghostty), "French")
+    }
+
     func testAnotherPIDTakesOverTheTTY() {
         control.select("abc", on: tty, writer: first)
         control.select("rime", on: tty, writer: second)

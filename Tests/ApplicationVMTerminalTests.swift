@@ -70,9 +70,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
                     return state.reading
                 }
             },
-            terminalPanelFocus: TerminalPanelFocus.Environment(
-                read: { _, _ in AnyCancellable {} }
-            )
+            terminalPanelFocus: Self.standardTerminalWindow
         )
         let preferencesVM = try Self.inMemoryPreferencesVM()
         let applicationVM = ApplicationVM(preferencesVM: preferencesVM, environment: environment)
@@ -208,9 +206,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
             runningApplications: Just([ghostty]).eraseToAnyPublisher(),
             isTerminalEnabled: { $0 == .ghostty },
             probedProgram: { _, _ in TerminalReading(program: htop, pane: tty, tty: tty) },
-            terminalPanelFocus: TerminalPanelFocus.Environment(
-                read: { _, _ in AnyCancellable {} }
-            ),
+            terminalPanelFocus: Self.standardTerminalWindow,
             ttyOwner: { _ in (pid, tty, 0) },
             jobState: { _, _ in .foreground }
         )
@@ -264,7 +260,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
                 }
                 return TerminalReading(program: nil, pane: tty, tty: tty)
             },
-            terminalPanelFocus: .init(read: { _, _ in AnyCancellable {} }),
+            terminalPanelFocus: Self.standardTerminalWindow,
             ttyOwner: { ($0, $0 == 101 ? firstTTY : secondTTY, 0) },
             jobState: { _, _ in .foreground }
         ))
@@ -334,7 +330,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
             frontmostApplication: { app }, focusedApplication: { app },
             runningApplications: Just([app]).eraseToAnyPublisher(), isTerminalEnabled: { $0 == .iterm },
             probedProgram: { _, _ in lock.withLock { TerminalReading(program: nil, pane: focusedTTY, tty: focusedTTY) } },
-            terminalPanelFocus: .init(read: { _, _ in AnyCancellable {} }),
+            terminalPanelFocus: Self.standardTerminalWindow,
             ttyOwner: { ($0, tty, 0) }, jobState: { _, _ in .foreground }, inputSourceForReconciliation: { live }
         ))
         try await Self.waitFor("the original pane has focus") { vm.appKind?.controlledShellTTY == tty }
@@ -351,6 +347,81 @@ final class ApplicationVMTerminalTests: XCTestCase {
         XCTAssertEqual(prefs.terminalControl.pop(on: tty, writer: writer, in: .iterm), live)
     }
 
+    func testFirstPushInTheFocusedPaneReadsTheSourceBeforeItsNotification() async throws {
+        let app = FakeApp(bundleIdentifier: Terminal.iterm.rawValue, pid: 999_120)
+        let tty = "/dev/ttys120"
+        let secondTTY = "/dev/ttys121"
+        let writer = TerminalProcess.Identity(pid: 120, startTime: 0)
+        let secondWriter = TerminalProcess.Identity(pid: 121, startTime: 0)
+        let selected = InputSource.getCurrentInputSource()
+        let manual = OtherInputSource(tisInputSource: selected.tisInputSource)
+        let prefs = try Self.inMemoryPreferencesVM()
+        let restore = Self.setTerminalPreferences(prefs, enabled: .iterm, rules: [])
+        defer { restore() }
+        prefs.terminalControl.select(selected, on: tty, writer: writer)
+        prefs.terminalControl.select(selected, on: secondTTY, writer: secondWriter)
+        let lock = NSLock()
+        var focusedTTY = tty
+        let vm = ApplicationVM(preferencesVM: prefs, environment: .init(
+            frontmostApplication: { app }, focusedApplication: { app },
+            runningApplications: Just([app]).eraseToAnyPublisher(), isTerminalEnabled: prefs.isTerminalEnabled,
+            probedProgram: { _, _ in lock.withLock { TerminalReading(program: nil, pane: focusedTTY, tty: focusedTTY) } },
+            terminalPanelFocus: Self.standardTerminalWindow,
+            ttyOwner: { ($0, $0 == writer.pid ? tty : secondTTY, 0) }, jobState: { _, _ in .foreground },
+            inputSourceForReconciliation: { manual }
+        ))
+        try await Self.waitFor("the writer controls the focused shell") { vm.appKind?.controlledShellTTY == tty }
+        let push = "isp:120:push:\(selected.persistentIdentifier)\n"
+        // The user switched sources before ISP received the TIS notification.
+        // The second push also beats the system applying the first selection.
+        await vm.receiveTerminalControl(lines: push + push)
+        XCTAssertEqual(prefs.terminalControl.pop(on: tty, writer: writer), selected)
+        XCTAssertEqual(prefs.terminalControl.pop(on: tty, writer: writer), manual)
+
+        // A resumed editor must first recover its source from before Ctrl-Z.
+        prefs.terminalControl.select(selected, on: tty, writer: writer)
+        prefs.terminalControl.check(tty) { _, _ in .background }
+        await vm.receiveTerminalControl(lines: push)
+        XCTAssertEqual(prefs.terminalControl.pop(on: tty, writer: writer), selected)
+
+        // A focus-gained hook arrives before ISP discovers the other split.
+        lock.withLock { focusedTTY = secondTTY }
+        await vm.receiveTerminalControl(lines: "isp:121:push:\(selected.persistentIdentifier)\n")
+        XCTAssertEqual(prefs.terminalControl.pop(on: secondTTY, writer: secondWriter), selected)
+    }
+
+    func testUnderlyingTerminalCannotSwitchAfterAnotherAppsPanelTakesKeyboardFocus() async throws {
+        let app = FakeApp(bundleIdentifier: Terminal.iterm.rawValue, pid: 999_120)
+        let overlay = FakeApp(bundleIdentifier: Terminal.ghostty.rawValue, pid: 999_121)
+        let writer = TerminalProcess.Identity(pid: 120, startTime: 0)
+        let tty = "/dev/ttys120"
+        let target = InputSource.getCurrentInputSource()
+        let overlaySource = OtherInputSource(tisInputSource: target.tisInputSource)
+        let prefs = try Self.inMemoryPreferencesVM()
+        let restore = Self.setTerminalPreferences(prefs, enabled: .iterm, rules: [])
+        defer { restore() }
+        var keyboardPID = app.processIdentifier
+        let vm = ApplicationVM(preferencesVM: prefs, environment: .init(
+            frontmostApplication: { app }, focusedApplication: { nil },
+            runningApplications: Just([app, overlay]).eraseToAnyPublisher(), isTerminalEnabled: prefs.isTerminalEnabled,
+            probedProgram: { _, _ in TerminalReading(program: nil, pane: tty, tty: tty) },
+            terminalPanelFocus: Self.standardTerminalWindow,
+            ttyOwner: { ($0, tty, 0) }, jobState: { _, _ in .foreground },
+            inputSourceForReconciliation: { overlaySource }, hasKeyboardFocus: { $0 == keyboardPID }
+        ))
+        try await Self.waitFor("the regular window has been read") { prefs.focusedTerminalTTY(.iterm) == tty }
+        var switched = false
+        let switches = vm.terminalSwitches.sink { _ in switched = true }
+        defer { switches.cancel() }
+        // NSWorkspace still reports iTerm2 and the panel watcher has not fired.
+        keyboardPID = overlay.processIdentifier
+        await vm.receiveTerminalControl(lines: "isp:120:push:\(target.persistentIdentifier)\n")
+        XCTAssertTrue(prefs.terminalControl.isControlled(tty, in: .iterm))
+        XCTAssertNil(prefs.terminalControl.pop(on: tty, writer: writer, in: .iterm))
+        XCTAssertNil(vm.appKind?.controlledShellTTY)
+        XCTAssertFalse(switched)
+    }
+
     func testCommandsOnlyControlTerminalsEnabledWhenTheyArrived() async throws {
         let app = FakeApp(bundleIdentifier: Terminal.iterm.rawValue, pid: 999_113)
         let tty = "/dev/ttys113"
@@ -363,7 +434,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
             frontmostApplication: { app }, focusedApplication: { nil },
             runningApplications: Just([app]).eraseToAnyPublisher(), isTerminalEnabled: prefs.isTerminalEnabled,
             probedProgram: { _, _ in TerminalReading(program: program, pane: tty, tty: tty) },
-            terminalPanelFocus: .init(read: { _, _ in AnyCancellable {} }),
+            terminalPanelFocus: Self.standardTerminalWindow,
             ttyOwner: { ($0, tty, 0) }, jobState: { _, _ in .foreground }
         ))
         let source = InputSource.getCurrentInputSource()
@@ -418,9 +489,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
             runningApplications: Just([ghostty]).eraseToAnyPublisher(),
             isTerminalEnabled: { $0 == .ghostty },
             probedProgram: { _, _ in TerminalReading(program: nil, pane: tty, tty: tty) },
-            terminalPanelFocus: TerminalPanelFocus.Environment(
-                read: { _, _ in AnyCancellable {} }
-            ),
+            terminalPanelFocus: Self.standardTerminalWindow,
             ttyOwner: { _ in (pid, tty, 0) },
             jobState: { _, _ in .background }
         )
@@ -447,7 +516,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
             frontmostApplication: { app }, focusedApplication: { nil },
             runningApplications: Just([app]).eraseToAnyPublisher(), isTerminalEnabled: { _ in false },
             probedProgram: { _, _ in TerminalReading(program: nil, pane: nil) },
-            terminalPanelFocus: .init(read: { _, _ in AnyCancellable {} }),
+            terminalPanelFocus: Self.standardTerminalWindow,
             ttyOwner: { ($0, tty, 0) }, jobState: { _, _ in .background }
         ))
         prefs.terminalControl.select(InputSource.getCurrentInputSource(), on: tty, writer: .init(pid: writer, startTime: 0))
@@ -473,9 +542,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
             runningApplications: Just([ghostty]).eraseToAnyPublisher(),
             isTerminalEnabled: { $0 == .ghostty },
             probedProgram: { _, _ in TerminalReading(program: nil, pane: nil) },
-            terminalPanelFocus: TerminalPanelFocus.Environment(
-                read: { _, _ in AnyCancellable {} }
-            ),
+            terminalPanelFocus: Self.standardTerminalWindow,
             ttyOwner: { ($0, tty, 0) },
             jobState: { pid, _ in pid == alive || state.lock.withLock { state.isAlive } ? .foreground : .gone }
         )
@@ -517,9 +584,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
                 state.lock.withLock { state.probes += 1 }
                 return TerminalReading(program: htop, pane: tty, tty: tty)
             },
-            terminalPanelFocus: TerminalPanelFocus.Environment(
-                read: { _, _ in AnyCancellable {} }
-            ),
+            terminalPanelFocus: Self.standardTerminalWindow,
             ttyOwner: { writer in
                 guard writer == parent || (writer == pid && state.lock.withLock({ state.isAlive })) else { return nil }
                 return (parent, tty, 0)
@@ -570,7 +635,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
                 let path = terminal == .ghostty ? tty : "/dev/ttys-other"
                 return TerminalReading(program: nil, pane: path, tty: path)
             },
-            terminalPanelFocus: .init(read: { _, _ in AnyCancellable {} }),
+            terminalPanelFocus: Self.standardTerminalWindow,
             ttyOwner: { ($0, tty, 0) }, jobState: { _, _ in .foreground }
         ))
         try await Self.waitFor("first tty") { preferencesVM.focusedTerminalTTY(.ghostty) == tty }
@@ -601,7 +666,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
                 let tty = lock.withLock { focusedTTY }
                 return TerminalReading(program: nil, pane: tty, tty: tty)
             },
-            terminalPanelFocus: .init(read: { _, _ in AnyCancellable {} }),
+            terminalPanelFocus: Self.standardTerminalWindow,
             ttyOwner: { ($0, oldTTY, 0) }, jobState: { _, _ in .foreground }
         ))
         try await Self.waitFor("old pane read") { prefs.focusedTerminalTTY(.ghostty) == oldTTY }
@@ -638,7 +703,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
                 }
                 return TerminalReading(program: nil, pane: tty, tty: tty)
             },
-            terminalPanelFocus: .init(read: { _, _ in AnyCancellable {} }),
+            terminalPanelFocus: Self.standardTerminalWindow,
             ttyOwner: { ($0, departedTTY, 0) }, jobState: { _, _ in .foreground }
         ))
         try await Self.waitFor("both activation probes") { lock.withLock { probeCount >= 2 } }
@@ -675,7 +740,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
                     return TerminalReading(program: foreground, pane: tty, tty: tty)
                 }
             },
-            terminalPanelFocus: .init(read: { _, _ in AnyCancellable {} }),
+            terminalPanelFocus: Self.standardTerminalWindow,
             ttyOwner: { ($0, tty, 0) }, jobState: { _, _ in .foreground }
         ))
         try await Self.waitFor("shell's activation probes") { lock.withLock { probes >= 2 } }
@@ -724,7 +789,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
                 terminal == .iterm ? TerminalReading(program: program, pane: tty, tty: tty)
                     : TerminalReading(program: nil, pane: "/dev/ttys105", tty: "/dev/ttys105")
             },
-            terminalPanelFocus: .init(read: { _, _ in AnyCancellable {} }),
+            terminalPanelFocus: Self.standardTerminalWindow,
             ttyOwner: { ($0, tty, 0) }, jobState: { _, _ in .foreground }
         ))
         var reappliedRule = false
@@ -777,7 +842,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
                 pause?()
                 return reading
             },
-            terminalPanelFocus: .init(read: { _, _ in AnyCancellable {} }),
+            terminalPanelFocus: Self.standardTerminalWindow,
             ttyOwner: { writerAlive ? ($0, tty, 0) : nil }, jobState: { _, _ in .foreground },
             temporaryInputWindowInProgress: { windowOpen },
             temporaryInputWindowRestored: restored.handleEvents(receiveSubscription: { _ in handbackWaits += 1 }).eraseToAnyPublisher(),
@@ -925,6 +990,13 @@ final class ApplicationVMTerminalTests: XCTestCase {
         preferencesVM.setTerminal(.ghostty, enabled: false)
         XCTAssertFalse(preferencesVM.isTerminalEnabled(.ghostty))
         XCTAssertTrue(preferencesVM.isTerminalEnabled(.iterm))
+    }
+
+    private static var standardTerminalWindow: TerminalPanelFocus.Environment {
+        .init(
+            read: { _, _ in AnyCancellable {} },
+            controlAttributes: { _ in .init(isFrontmost: true, focusedWindowSubrole: "AXStandardWindow") }
+        )
     }
 
     static func inMemoryPreferencesVM() throws -> PreferencesVM {

@@ -638,13 +638,18 @@ struct TerminalControlTracker<Source: Equatable> {
     }
 
     mutating func push(
-        _ source: Source, on tty: String, writer: Writer, live: (terminal: Terminal, source: Source)?, epoch: UInt64? = nil
+        _ source: Source, on tty: String, writer: Writer, live: (terminal: Terminal, source: Source)?,
+        useLiveForCurrentWriter: Bool = false, epoch: UInt64? = nil
     ) {
-        setSource(source, on: tty, writer: writer, epoch: epoch ?? self.epoch, push: true, live: live)
+        setSource(
+            source, on: tty, writer: writer, epoch: epoch ?? self.epoch,
+            push: true, live: live, useLiveForCurrentWriter: useLiveForCurrentWriter
+        )
     }
 
     private mutating func setSource(
-        _ source: Source, on tty: String, writer: Writer, epoch: UInt64, push: Bool, live: (terminal: Terminal, source: Source)?
+        _ source: Source, on tty: String, writer: Writer, epoch: UInt64, push: Bool,
+        live: (terminal: Terminal, source: Source)?, useLiveForCurrentWriter: Bool = false
     ) {
         let previous = entries[tty]?.first { $0.writer == writer }
         var histories = [Terminal: History]()
@@ -654,7 +659,8 @@ struct TerminalControlTracker<Source: Equatable> {
             // On takeover the focused emulator can tell us its actual source.
             // Other emulators may remember a different source for the same tmux pane.
             let focusedSource = live?.terminal == terminal ? live?.source : nil
-            if push, let base = history?.current ?? focusedSource ?? current(on: tty, in: terminal) ?? live?.source {
+            let previousSource = (useLiveForCurrentWriter ? focusedSource : nil) ?? history?.current
+            if push, let base = previousSource ?? focusedSource ?? current(on: tty, in: terminal) ?? live?.source {
                 stack.append(base)
                 if stack.count > Self.maxStack { stack.removeFirst() }
             }
