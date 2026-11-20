@@ -33,6 +33,9 @@ struct TerminalTrail: Equatable {
     var tmux = false
     /// Sockets used by the herdr TUI clients on this trail.
     var herdrSockets: [String] = []
+    /// Herdr's SSH catalogs on the trail and whether each allowed a local pane lookup.
+    var herdrCatalogs: [String: Bool] = [:]
+    var herdrClients: [Multiplexer.HerdrClient: Bool] = [:]
     var zellij: Zellij?
 
     /// The foreground process group of `pid`'s controlling tty, from libproc;
@@ -109,7 +112,7 @@ final class TerminalWatcher {
         var connect: (Connection, _ send: @escaping (ConnectionEvent) -> Void) -> AnyCancellable?
         var delay: (TimeInterval) -> AnyPublisher<Date, Never>
         /// Focus reports from Herdr's mod, delivered on the main thread until cancellation.
-        var herdrView: (_ send: @escaping (HerdrDesktop.Focus?) -> Void) -> AnyCancellable?
+        var herdrView: (_ pid: pid_t, _ send: @escaping (HerdrDesktop.Focus?) -> Void) -> AnyCancellable?
     }
 
     static let libprocInterval: TimeInterval = 0.1
@@ -170,12 +173,12 @@ final class TerminalWatcher {
     }
 
     /// Watches `terminal` for as long as the result is subscribed: while it is frontmost.
-    func watching(_ terminal: Terminal) -> AnyPublisher<Never, Never> {
+    func watching(_ terminal: Terminal, pid: pid_t) -> AnyPublisher<Never, Never> {
         Deferred { () -> AnyPublisher<Never, Never> in
             var session = 0
             return Empty(completeImmediately: false)
                 .handleEvents(
-                    receiveSubscription: { [weak self] _ in session = self?.start(terminal) ?? 0 },
+                    receiveSubscription: { [weak self] _ in session = self?.start(terminal, pid: pid) ?? 0 },
                     receiveCancel: { [weak self] in self?.stop(session: session) }
                 )
                 .eraseToAnyPublisher()
@@ -190,10 +193,10 @@ final class TerminalWatcher {
         watch(trail)
     }
 
-    private func start(_ terminal: Terminal) -> Int {
+    private func start(_ terminal: Terminal, pid: pid_t) -> Int {
         session += 1
         active = terminal
-        watchHerdrView(terminal == .herdr)
+        watchHerdrView(pid: terminal == .herdr ? pid : nil)
         // A stale baseline reads as a change, which looks the pane up again.
         watch(trails[terminal] ?? TerminalTrail())
         return session
@@ -203,7 +206,7 @@ final class TerminalWatcher {
         guard session == self.session, active != nil else { return }
         active = nil
         watch(TerminalTrail())
-        watchHerdrView(false)
+        watchHerdrView(pid: nil)
     }
 
     private func watch(_ trail: TerminalTrail) {
@@ -240,6 +243,18 @@ final class TerminalWatcher {
             })
         }
 
+        if !trail.herdrCatalogs.isEmpty || !trail.herdrClients.isEmpty {
+            let check = { () -> String? in
+                if let changed = trail.herdrCatalogs.first(where: { Multiplexer.herdrIsLocalOnly(catalog: $0.key) != $0.value }) {
+                    return changed.key
+                }
+                return trail.herdrClients.first { $0.key.isOnlyClient() != $0.value }?.key.socket
+            }
+            polls.append(environment.poll(1, check) { [weak self] path in
+                self?.trigger(src: "herdr-client", path, paneMayHaveChanged: true, generation: generation)
+            })
+        }
+
         activeConnections = Set(trail.herdrSockets.map(Connection.herdr))
         if trail.tmux { activeConnections.insert(.tmux) }
         for connection in activeConnections {
@@ -253,11 +268,16 @@ final class TerminalWatcher {
     }
 
     /// Starts or stops the Herdr focus mod.
-    private func watchHerdrView(_ isOn: Bool) {
-        guard isOn != (herdrView != nil) else { return }
+    private func watchHerdrView(pid: pid_t?) {
+        herdrView = nil
         herdrPane = nil
-        herdrView = isOn ? environment.herdrView { [weak self] in self?.receiveHerdrView($0) } : nil
-        record(src: "herdr-view", isOn ? (herdrView == nil ? "unavailable" : "start") : "stop")
+        guard let pid else { return }
+        let generation = session
+        herdrView = environment.herdrView(pid) { [weak self] in
+            guard let self, self.session == generation else { return }
+            self.receiveHerdrView($0)
+        }
+        record(src: "herdr-view", herdrView == nil ? "unavailable" : "start")
     }
 
     /// A lost report clears the prior pane. The same pane can show a different terminal.
@@ -410,6 +430,7 @@ final class TerminalWatcher {
         {
             guard let now = pane(zellij.session), now != zellij.pane else { return nil }
             switch now {
+            case .clientOnly: return "client only"
             case let .tty(_, label), let .program(_, label):
                 return "pane=\(label)"
             }
@@ -548,17 +569,17 @@ extension TerminalWatcher.Environment {
 
     /// Watches directory `path` on `queue` (a file there replaced by rename
     /// changes the directory, not the old file): `send` gets what `read` finds
-    /// once at once, then after each change; on the main thread, none once the
+    /// initially and after each change on the delivery queue, none once the
     /// result is cancelled. Nil when the directory can't be opened.
     /// A directory deleted or renamed while watched goes unnoticed until it is watched again.
-    static func watchDirectory<Value>(_ path: String, read: @escaping () -> Value, send: @escaping (Value) -> Void) -> AnyCancellable? {
+    static func watchDirectory<Value>(_ path: String, receiveOn deliveryQueue: DispatchQueue = .main, read: @escaping () -> Value, send: @escaping (Value) -> Void) -> AnyCancellable? {
         // O_EVTONLY on a local directory doesn't block, so the caller learns at once whether it opened.
         let fd = Darwin.open(path, O_EVTONLY)
         guard fd >= 0 else { return nil }
         let flag = CancelFlag()
         let deliver = {
             let value = read()
-            DispatchQueue.main.async { if !flag.isCancelled { send(value) } }
+            deliveryQueue.async { if !flag.isCancelled { send(value) } }
         }
         let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: .write, queue: queue)
         source.setEventHandler(handler: deliver)
@@ -645,6 +666,37 @@ extension TerminalWatcher.Environment {
         guard let fd = connectUnix(path) else { return false }
         Darwin.close(fd)
         return true
+    }
+
+    /// Connect once so peer identification and the request act on the same server.
+    static func withUnixPeer<Value>(at path: String, _ body: (Int32, pid_t) -> Value?) -> Value? {
+        guard let fd = connectUnix(path) else { return nil }
+        defer { Darwin.close(fd) }
+        var peer: pid_t = 0
+        var size = socklen_t(MemoryLayout.size(ofValue: peer))
+        guard getsockopt(fd, SOL_LOCAL, LOCAL_PEERPID, &peer, &size) == 0, peer > 0 else { return nil }
+        return body(fd, peer)
+    }
+
+    /// Herdr's local desktop and TUI APIs both use one newline-delimited JSON reply.
+    static func jsonReply(to payload: [String: Any], on fd: Int32) -> Data? {
+        guard var message = try? JSONSerialization.data(withJSONObject: payload) else { return nil }
+        message.append(0x0a)
+        guard message.withUnsafeBytes({ Darwin.write(fd, $0.baseAddress, $0.count) }) == message.count else { return nil }
+
+        var reply = Data()
+        var bytes = [UInt8](repeating: 0, count: 4096)
+        let deadline = ProcessInfo.processInfo.systemUptime + 0.5
+        while reply.count < 1 << 20 {
+            let remaining = deadline - ProcessInfo.processInfo.systemUptime
+            var event = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+            guard remaining > 0, Darwin.poll(&event, 1, Int32(remaining * 1000)) > 0 else { return nil }
+            let count = Darwin.read(fd, &bytes, bytes.count)
+            guard count > 0 else { return nil }
+            reply.append(contentsOf: bytes.prefix(count))
+            if reply.last == 0x0a { return reply }
+        }
+        return nil
     }
 
     /// A non-blocking stream socket connected to `path`; nil when nothing

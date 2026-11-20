@@ -284,6 +284,8 @@ extension TerminalProcess {
         switch focusedPane(multiplexer, &trail) {
         case nil:
             inner = reading
+        case .clientOnly?:
+            inner = TerminalReading(program: program, pane: pane, paneControlUnavailable: true)
         case let .tty(tty, label)?:
             paneTTY = tty
             inner = foregroundProgram(onTTY: tty, pane: label, depth: depth + 1, trail: &trail)
@@ -386,24 +388,50 @@ extension TerminalProcess {
     /// The paths the unix sockets of `pid` are connected to, e.g. a multiplexer
     /// client's server socket; empty when the process is gone or not ours.
     static func unixSocketPeers(ofPID pid: pid_t) -> [String] {
+        unixSocketPaths(ofPID: pid, listening: false)
+    }
+
+    /// Listening sockets identify a specific Herdr Desktop instance and its configuration directory.
+    static func unixSocketPaths(ofPID pid: pid_t, listening: Bool) -> [String] {
+        unixSockets(ofPID: pid).compactMap { socket in
+            let path = listening ? (socket.listening ? socket.path : "") : socket.peerPath
+            return path.isEmpty ? nil : path
+        }
+    }
+
+    /// The kernel's socket and peer identifiers distinguish connections from duplicate FDs.
+    struct UnixSocket {
+        let id: UInt64
+        let peerID: UInt64
+        let path: String
+        let peerPath: String
+        let listening: Bool
+    }
+
+    static func unixSockets(ofPID pid: pid_t) -> [UnixSocket] {
         let stride = Int32(MemoryLayout<proc_fdinfo>.stride)
         let size = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, nil, 0)
         guard size > 0 else { return [] }
         var fds = [proc_fdinfo](repeating: proc_fdinfo(), count: Int(size / stride) + 8)
-        let read = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, &fds, Int32(fds.count) * stride)
-        guard read > 0 else { return [] }
+        let capacity = Int32(fds.count) * stride
+        let read = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, &fds, capacity)
+        guard read > 0, read < capacity else { return [] }
 
-        return fds.prefix(Int(read / stride)).compactMap { fd -> String? in
+        func path(_ address: sockaddr_un) -> String {
+            withUnsafeBytes(of: address.sun_path) { bytes in
+                String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self)
+            }
+        }
+        return fds.prefix(Int(read / stride)).compactMap { fd in
             guard fd.proc_fdtype == PROX_FDTYPE_SOCKET else { return nil }
             var info = socket_fdinfo()
             let infoSize = Int32(MemoryLayout<socket_fdinfo>.size)
             guard proc_pidfdinfo(pid, fd.proc_fd, PROC_PIDFDSOCKETINFO, &info, infoSize) == infoSize,
-                  info.psi.soi_family == AF_UNIX
-            else { return nil }
-            let peer = withUnsafeBytes(of: info.psi.soi_proto.pri_un.unsi_caddr.ua_sun.sun_path) { bytes in
-                String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self)
-            }
-            return peer.isEmpty ? nil : peer
+                  info.psi.soi_family == AF_UNIX else { return nil }
+            let connection = info.psi.soi_proto.pri_un
+            return UnixSocket(id: info.psi.soi_so, peerID: connection.unsi_conn_so,
+                              path: path(connection.unsi_addr.ua_sun), peerPath: path(connection.unsi_caddr.ua_sun),
+                              listening: Int32(info.psi.soi_options) & SO_ACCEPTCONN != 0)
         }
     }
 
@@ -438,38 +466,61 @@ extension TerminalProcess {
 
     /// The argv of `pid`, empty when it can't be read.
     static func arguments(pid: pid_t) -> [String] {
+        procArgs(pid).map(arguments(fromProcArgs:)) ?? []
+    }
+
+    /// Reads only requested values from the environment following the process's argv.
+    /// A restricted process can expose argv alone. Its environment is then unknown.
+    static func environment(ofPID pid: pid_t, keys: Set<String>) -> [String: String]? {
+        procArgs(pid).flatMap { environment(fromProcArgs: $0, keys: keys) }
+    }
+
+    private static func procArgs(_ pid: pid_t) -> ArraySlice<UInt8>? {
         var argMaxMib: [Int32] = [CTL_KERN, KERN_ARGMAX]
         var argMax: Int32 = 0
         var argMaxSize = MemoryLayout<Int32>.size
-        guard sysctl(&argMaxMib, 2, &argMax, &argMaxSize, nil, 0) == 0, argMax > 0 else { return [] }
+        guard sysctl(&argMaxMib, 2, &argMax, &argMaxSize, nil, 0) == 0, argMax > 0 else { return nil }
 
         var mib: [Int32] = [CTL_KERN, KERN_PROCARGS2, pid]
         var buffer = [UInt8](repeating: 0, count: Int(argMax))
         var size = buffer.count
-        guard sysctl(&mib, 3, &buffer, &size, nil, 0) == 0 else { return [] }
-
-        return arguments(fromProcArgs: buffer.prefix(size))
+        guard sysctl(&mib, 3, &buffer, &size, nil, 0) == 0 else { return nil }
+        return buffer.prefix(size)
     }
 
     /// Parses a `KERN_PROCARGS2` buffer: `argc` (Int32), the executable path,
     /// NUL padding, then `argc` NUL-terminated arguments (the environment follows).
     static func arguments(fromProcArgs buffer: ArraySlice<UInt8>) -> [String] {
+        argumentFields(buffer)?.arguments.map { String(decoding: $0, as: UTF8.self) } ?? []
+    }
+
+    private static func argumentFields(_ buffer: ArraySlice<UInt8>) -> (arguments: [ArraySlice<UInt8>], environment: ArraySlice<UInt8>)? {
         let countSize = MemoryLayout<Int32>.size
-        guard buffer.count > countSize else { return [] }
-        let argc = Array(buffer.prefix(countSize)).withUnsafeBytes { $0.load(as: Int32.self) }
-        var index = buffer.startIndex + countSize
-
-        while index < buffer.endIndex, buffer[index] != 0 { index += 1 }
-        while index < buffer.endIndex, buffer[index] == 0 { index += 1 }
-
-        var arguments: [String] = []
-        while arguments.count < argc, index < buffer.endIndex {
-            let start = index
-            while index < buffer.endIndex, buffer[index] != 0 { index += 1 }
-            arguments.append(String(decoding: buffer[start ..< index], as: UTF8.self))
-            index += 1
+        guard buffer.count > countSize else { return nil }
+        let count = Array(buffer.prefix(countSize)).withUnsafeBytes { $0.load(as: Int32.self) }
+        guard count > 0 else { return nil }
+        var fields = buffer.dropFirst(countSize).drop(while: { $0 != 0 }).drop(while: { $0 == 0 })
+        var arguments: [ArraySlice<UInt8>] = []
+        for _ in 0..<count {
+            guard let end = fields.firstIndex(of: 0) else { return nil }
+            arguments.append(fields[..<end])
+            fields = fields[(end + 1)...]
         }
-        return arguments
+        return (arguments, fields)
+    }
+
+    static func environment(fromProcArgs buffer: ArraySlice<UInt8>, keys: Set<String>) -> [String: String]? {
+        guard var fields = argumentFields(buffer)?.environment, fields.first.map({ $0 != 0 }) == true else { return nil }
+        var values: [String: String] = [:]
+        while fields.first != 0, let end = fields.firstIndex(of: 0) {
+            let field = fields[..<end]
+            if let equal = field.firstIndex(of: UInt8(ascii: "=")),
+               let key = keys.first(where: { field[..<equal].elementsEqual($0.utf8) }) {
+                values[key] = String(decoding: field[(equal + 1)...], as: UTF8.self)
+            }
+            fields = fields[(end + 1)...]
+        }
+        return values
     }
 }
 

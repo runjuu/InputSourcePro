@@ -1,5 +1,6 @@
 import Combine
 import Darwin
+import JavaScriptCore
 import XCTest
 @testable import Input_Source_Pro
 
@@ -89,7 +90,7 @@ final class TerminalWatcherTests: XCTestCase {
                     self?.timers.append((seconds, subject))
                     return subject.eraseToAnyPublisher()
                 },
-                herdrView: { [unowned self] send in
+                herdrView: { [unowned self] _, send in
                     guard herdrViewOpens else { return nil }
                     let view = HerdrView(send: send)
                     herdrViews.append(view)
@@ -106,7 +107,7 @@ final class TerminalWatcherTests: XCTestCase {
         var livePolls: [Poll] { polls.filter { !$0.isCancelled && !$0.isDone } }
 
         func bringToFront(_ terminal: Terminal) {
-            front = watcher.watching(terminal).sink { _ in }
+            front = watcher.watching(terminal, pid: getpid()).sink { _ in }
         }
 
         func leaveFront() { front = nil }
@@ -391,6 +392,7 @@ final class TerminalWatcherTests: XCTestCase {
         harness.bringToFront(.herdr)
         let second = try XCTUnwrap(harness.herdrViews.last)
         XCTAssertEqual(harness.herdrViews.count, 2)
+        first.send("old") // still queued when the next instance came to the front
         second.send("pA")
         XCTAssertEqual(harness.focusedHerdrPanes, ["pA", "pA"], "Back in front: focused again, whatever was pushed meanwhile")
         second.send("pC")
@@ -763,6 +765,49 @@ final class TerminalWatcherTests: XCTestCase {
         connection.cancel()
     }
 
+    func testHerdrDesktopConnectsOnlyToTheSpecifiedInstance() throws {
+        let directory = URL(fileURLWithPath: "/tmp").appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let socket = directory.appendingPathComponent("herdr-app.sock")
+        let listener = try XCTUnwrap(Self.listen(at: socket.path))
+        defer { Darwin.close(listener) }
+        let endpoint = try XCTUnwrap(HerdrDesktop.Endpoint.resolve(pid: getpid()))
+        XCTAssertEqual(endpoint.socket.path, socket.path)
+        XCTAssertNil(HerdrDesktop.Endpoint(pid: getpid() + 1, socket: socket).request(["status": true]))
+
+        let served = expectation(description: "answered status for the process that owns the socket")
+        DispatchQueue.global().async {
+            // The client with the wrong PID connected and closed without sending a command.
+            for _ in 0..<2 {
+                let fd = Darwin.accept(listener, nil, nil)
+                guard fd >= 0 else { break }
+                var byte = UInt8(0)
+                if Darwin.read(fd, &byte, 1) == 1 {
+                    let reply = Array("{\"overlays\":[\"input-source-pro\"]}\n".utf8)
+                    _ = Darwin.write(fd, reply, reply.count)
+                }
+                Darwin.close(fd)
+            }
+            served.fulfill()
+        }
+        XCTAssertTrue(endpoint.status()?.running == true)
+        wait(for: [served], timeout: 2)
+    }
+
+    func testHerdrDesktopClearsAnObscuredPaneButRecognizesAFocusedPeek() {
+        let name = HerdrDesktop.modName
+        let pane = HerdrDesktop.Focus(pane: "p1", terminal: "t1")
+        let peek = HerdrDesktop.Focus(pane: nil, terminal: "t2")
+        XCTAssertEqual(HerdrDesktop.Status(overlays: [name]).focus(pane), pane)
+        XCTAssertEqual(HerdrDesktop.Status(overlays: [name, "toast"]).focus(pane), pane)
+        XCTAssertNil(HerdrDesktop.Status(overlays: [name, "settings", "toast"]).focus(pane)?.terminal)
+        XCTAssertEqual(HerdrDesktop.Status(overlays: [name, "layout"]).focus(peek), peek)
+        XCTAssertNil(HerdrDesktop.Status(overlays: [name, "layout"]).focus(pane)?.terminal)
+        XCTAssertNil(HerdrDesktop.Status(overlays: [name, "layout", "settings"]).focus(peek)?.terminal)
+        XCTAssertNil(HerdrDesktop.Status(overlays: ["settings"]).focus(pane))
+    }
+
     /// A server that listens but never accepts: the missing handshake ends in `.dropped`.
     func testAServerThatNeverAnswersIsDropped() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -875,12 +920,61 @@ final class TerminalWatcherTests: XCTestCase {
 
     // MARK: herdr sessions
 
+    func testChangingTheSavedMachinesRefreshesTheVisibleTUI() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("endpoints.json")
+        let harness = Harness()
+        harness.bringToFront(.ghostty)
+        harness.watcher.follow(TerminalTrail(herdrCatalogs: [file.path: true]), for: .ghostty)
+        harness.tick()
+        XCTAssertEqual(harness.refreshes, 0)
+
+        try Data(#"{"version":1,"ssh":[{"enabled":true}]}"#.utf8).write(to: file, options: .atomic)
+        harness.tick()
+        XCTAssertEqual(harness.paneChanges, 1)
+        harness.watcher.follow(TerminalTrail(herdrCatalogs: [file.path: false]), for: .ghostty)
+        harness.tick()
+        XCTAssertEqual(harness.refreshes, 1)
+
+        try Data(#"{"version":1,"ssh":[]}"#.utf8).write(to: file, options: .atomic)
+        harness.tick()
+        XCTAssertEqual(harness.paneChanges, 2)
+    }
+
+    func testHerdrRequiresOneDistinctClientConnection() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let path = folder.appendingPathComponent("c.sock").path
+        let server = try XCTUnwrap(Self.listen(at: path))
+        defer { close(server) }
+        let client = Multiplexer.HerdrClient(pid: getpid(), server: getpid(), socket: path)
+        XCTAssertFalse(client.isOnlyClient())
+        let first = try XCTUnwrap(TerminalWatcher.Environment.connectUnix(path))
+        defer { close(first) }
+        let a = accept(server, nil, nil)
+        XCTAssertGreaterThanOrEqual(a, 0)
+        defer { close(a) }
+        let duplicate = dup(a)
+        defer { close(duplicate) }
+        XCTAssertTrue(client.isOnlyClient(), "Herdr duplicates its transport FDs")
+        let second = try XCTUnwrap(TerminalWatcher.Environment.connectUnix(path))
+        let b = accept(server, nil, nil)
+        XCTAssertGreaterThanOrEqual(b, 0)
+        XCTAssertFalse(client.isOnlyClient(), "Two clients can show different tabs")
+        close(second)
+        close(b)
+        XCTAssertTrue(client.isOnlyClient())
+    }
+
     func testHerdrSessionFromItsClientArguments() {
-        XCTAssertNil(Multiplexer.herdrSession(fromArguments: ["herdr"]))
-        XCTAssertEqual(Multiplexer.herdrSession(fromArguments: ["herdr", "--session", "work"]), "work")
-        XCTAssertEqual(Multiplexer.herdrSession(fromArguments: ["herdr", "--session=work"]), "work")
-        XCTAssertEqual(Multiplexer.herdrSession(fromArguments: ["herdr", "session", "attach", "work"]), "work")
-        XCTAssertNil(Multiplexer.herdrSession(fromArguments: ["herdr", "session", "attach"]))
+        XCTAssertNil(Multiplexer.HerdrLaunch(arguments: ["herdr"])?.session)
+        XCTAssertEqual(Multiplexer.HerdrLaunch(arguments: ["herdr", "--session", "work"])?.session, "work")
+        XCTAssertEqual(Multiplexer.HerdrLaunch(arguments: ["herdr", "--session=work"])?.session, "work")
+        XCTAssertEqual(Multiplexer.HerdrLaunch(arguments: ["herdr", "session", "attach", "work"])?.session, "work")
+        XCTAssertNil(Multiplexer.HerdrLaunch(arguments: ["herdr", "session", "attach"]))
 
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         XCTAssertEqual(Multiplexer.herdrSocket(session: nil), home + "/.config/herdr/herdr.sock")
@@ -902,9 +996,9 @@ final class TerminalWatcherTests: XCTestCase {
             let tmux: String
             let tmuxClient: String
             let zellij: String
-            let herdr: String
-            let herdrPanes: [[String]]
-            let herdrTabs: [[String]]
+            let herdr: String?
+            let herdrPanes: [[String]]?
+            let herdrTabs: [[String]]?
         }
         let config = try JSONDecoder().decode(Config.self, from: Data(json.utf8))
         final class Counter { var refreshes = 0 }
@@ -921,7 +1015,9 @@ final class TerminalWatcherTests: XCTestCase {
                let foregroundPgid = TerminalTrail.foregroundPgid(ofPID: pid) {
                 trail.ttys = [TerminalTrail.TTY(pid: pid, foregroundPgid: foregroundPgid)]
             }
-            trail.herdrSockets = Multiplexer.herdrSocket(session: config.herdr).map { [$0] } ?? []
+            if let session = config.herdr, let socket = Multiplexer.herdrSocket(session: session) {
+                trail.herdrSockets = [socket]
+            }
             trail.zellij = Multiplexer.zellijPane(session: config.zellij).map { TerminalTrail.Zellij(session: config.zellij, pane: $0) }
             return trail
         }
@@ -979,7 +1075,7 @@ final class TerminalWatcherTests: XCTestCase {
         cpuPerCall("zellij client-list query") { _ = Multiplexer.zellijPane(session: config.zellij) }
 
         let sizeBefore = windowSize()
-        var front: AnyCancellable? = watcher.watching(.ghostty).sink { _ in }
+        var front: AnyCancellable? = watcher.watching(.ghostty, pid: getpid()).sink { _ in }
         watcher.follow(lookup(), for: .ghostty)
         let connected = waitForRefresh(after: 0, timeout: 5)
         spin(1)
@@ -994,11 +1090,14 @@ final class TerminalWatcherTests: XCTestCase {
         step("tmux: switch-client to another session") { tmux(["switch-client", "-c", config.tmuxClient, "-t", "B"]) }
         step("tmux: switch-client back") { tmux(["switch-client", "-c", config.tmuxClient, "-t", "A"]) }
         step("tmux: rename-window (ignored)", expect: false) { tmux(["rename-window", "-t", "A:0", "renamed"]) }
-        for (index, arguments) in config.herdrPanes.enumerated() {
-            step("herdr: pane focus #\(index + 1)") { Self.cli("/opt/homebrew/bin/herdr", arguments) }
-        }
-        for (index, arguments) in config.herdrTabs.enumerated() {
-            step("herdr: tab focus #\(index + 1)") { Self.cli("/opt/homebrew/bin/herdr", arguments) }
+        if config.herdr != nil {
+            let cli = try XCTUnwrap(Multiplexer.herdr.executable)
+            for (index, arguments) in (config.herdrPanes ?? []).enumerated() {
+                step("herdr: pane focus #\(index + 1)") { Self.cli(cli, arguments) }
+            }
+            for (index, arguments) in (config.herdrTabs ?? []).enumerated() {
+                step("herdr: tab focus #\(index + 1)") { Self.cli(cli, arguments) }
+            }
         }
         for direction in ["left", "right"] {
             step("zellij: move-focus \(direction)") { Self.cli("/opt/homebrew/bin/zellij", ["-s", config.zellij, "action", "move-focus", direction]) }
@@ -1020,7 +1119,7 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertTrue(controlClient().isEmpty)
 
         let count = counter.refreshes
-        front = watcher.watching(.ghostty).sink { _ in }
+        front = watcher.watching(.ghostty, pid: getpid()).sink { _ in }
         let back = waitForRefresh(after: count, timeout: 5)
         print("PROBE back to the front: refresh after \(back.map { "\(Int($0 * 1000)) ms" } ?? "none") (reattached, picked up the stored trail)")
 
@@ -1035,6 +1134,53 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertNotNil(reconnected)
         front = nil
         _ = front
+    }
+
+    func testBundledHerdrModReportsTheTerminalReceivingTheKeyboard() throws {
+        let resource = try XCTUnwrap(Bundle.main.url(forResource: HerdrDesktop.modName, withExtension: nil))
+        // JavaScriptCore supplies the language runtime. Replace the two host modules
+        // with the live snapshots and shared-state sink the mod reads and writes.
+        let source = try String(contentsOf: resource.appendingPathComponent("main.js"), encoding: .utf8)
+            .components(separatedBy: .newlines)
+            .filter { !$0.hasPrefix("import ") }
+            .joined(separator: "\n")
+            .replacingOccurrences(of: "export default ", with: "")
+        let context = try XCTUnwrap(JSContext())
+        context.exceptionHandler = { _, error in XCTFail(error?.toString() ?? "JavaScript exception") }
+        let resolve = try XCTUnwrap(context.evaluateScript("""
+            class View {}
+            let snapshot, tree, report;
+            const focused = () => snapshot;
+            const layout = () => tree;
+            const terminals = () => [];
+            const setShared = (_, value) => { report = value; };
+            \(source)
+            const mod = new InputSourceFocus();
+            (focus, root) => {
+                snapshot = focus;
+                tree = root;
+                mod.publish("query", "test");
+                return report.focus.terminal;
+            }
+            """))
+        func address(_ focus: [String: String], in tree: [String: Any]) -> String? {
+            let value = resolve.call(withArguments: [focus, tree])
+            return value?.isNull == true ? nil : value?.toString()
+        }
+
+        let focus = ["pane": "p1", "terminal": "t1", "agent": "t2"]
+        let tab: [String: Any] = ["id": "panes", "type": "block", "content": ["tab": "active"]]
+        let agent: [String: Any] = ["id": "agents", "type": "block", "content": ["agent": "focused"]]
+        XCTAssertEqual(address(focus, in: tab), "t1")
+        XCTAssertEqual(address(focus.merging(["shown": "t3"]) { $1 }, in: tab), "t3")
+        XCTAssertEqual(address(["terminal": "t3"], in: tab), "t3", "A peek reports its own terminal with no model pane")
+        XCTAssertEqual(address(focus, in: ["type": "stack", "active": "panes", "children": [tab, agent]]), "t1")
+        XCTAssertEqual(address(focus, in: ["type": "stack", "active": "agents", "children": [tab, agent]]), "t2")
+        XCTAssertNil(address(focus, in: ["type": "row", "children": [tab, agent]]))
+        XCTAssertEqual(address(["terminal": "t3"], in: ["type": "row", "children": [tab, agent]]), "t3")
+        let float = ["content": ["terminal": "t3"]]
+        XCTAssertNil(address(focus, in: tab.merging(["floating": [float]]) { $1 }))
+        XCTAssertEqual(address(focus, in: tab.merging(["floating": [["hidden": true, "content": ["terminal": "t3"]]]]) { $1 }), "t1")
     }
 
     /// Runs `path` with the multiplexers' session variables removed, and returns its trimmed output.

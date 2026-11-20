@@ -2,9 +2,9 @@ import Foundation
 
 /// Terminal multiplexers whose focused pane Terminal Rules look into, so a rule
 /// follows the program inside tmux, zellij or the herdr TUI rather than the
-/// multiplexer itself. Each is asked through its own CLI, looked up where
-/// package managers install it: ISP runs without a login PATH.
-// shortcut: only tmux's default server is asked (no -L/-S socket), and for a multiplexer with several clients only the first or focused one counts; upgrade when those setups are in use.
+/// multiplexer itself. Herdr reports focus through its socket. The other
+/// multiplexers use their CLIs, looked up where package managers install them.
+// Only tmux's default server is asked (no -L/-S socket); zellij's CLI identifies the first client.
 enum Multiplexer: String {
     case tmux, zellij, herdr
 
@@ -17,14 +17,12 @@ enum Multiplexer: String {
     enum Pane: Equatable {
         case tty(String, label: String)
         case program(TerminalProgram?, label: String)
+        /// Keep the client's own Terminal Rule; this mode cannot establish a local pane tty.
+        case clientOnly
     }
 
     /// Where the CLI is installed, nil when it is in none of the usual places.
     var executable: String? {
-        if self == .herdr {
-            let localBin = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin").path
-            return TerminalProcess.executable(named: rawValue, in: [localBin] + TerminalProcess.executableDirectories)
-        }
         return TerminalProcess.executable(named: rawValue)
     }
 
@@ -59,7 +57,12 @@ enum Multiplexer: String {
             trail.zellij = TerminalTrail.Zellij(session: session, pane: pane)
             return pane
         case .herdr:
-            return Self.herdrPane(arguments: arguments, trail: &trail, run: run)
+            guard let environment = TerminalProcess.environment(ofPID: clientPID, keys: [
+                "HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME", "HERDR_SESSION", "HERDR_SOCKET_PATH", "HERDR_CLIENT_SOCKET_PATH",
+            ]) else { return nil }
+            return Self.herdrPane(arguments: arguments, environment: environment, trail: &trail) { socket, trail in
+                Self.herdrFocusedPane(socket: socket, clientPID: clientPID, trail: &trail)
+            }
         }
     }
 
@@ -68,23 +71,87 @@ enum Multiplexer: String {
     /// yet is still subscribed to, and its handshake reads the pane again.
     static func herdrPane(
         arguments: [String],
+        environment: [String: String],
         trail: inout TerminalTrail,
-        run: ([String]) -> String?,
-        ttyPath: (pid_t) -> String? = TerminalProcess.ttyPath(ofPID:)
+        read: (String, inout TerminalTrail) -> Pane?
     ) -> Pane? {
-        // A --remote client draws the remote server locally. Its session name
-        // can also exist on this Mac, where it identifies a different pane.
-        guard !arguments.dropFirst().contains(where: { $0 == "--remote" || $0.hasPrefix("--remote=") }) else { return nil }
-        let session = herdrSession(fromArguments: arguments)
-        guard let socket = herdrSocket(session: session) else { return nil }
+        guard let launch = HerdrLaunch(arguments: arguments) else { return .clientOnly }
+        guard let home = environment["HOME"] else { return nil }
+        let session = launch.session ?? environment["HERDR_SESSION"]
+        let config = environment["XDG_CONFIG_HOME"] ?? home + "/.config"
+        let state = environment["XDG_STATE_HOME"] ?? home + "/.local/state"
+        guard config.hasPrefix("/"), state.hasPrefix("/") else { return nil }
+        let socket: String
+        if launch.session == nil, let override = environment["HERDR_SOCKET_PATH"] {
+            guard override.hasPrefix("/") else { return nil }
+            socket = override
+        } else {
+            // A client-only override can route input to a different server than its API.
+            guard launch.session != nil || environment["HERDR_CLIENT_SOCKET_PATH"] == nil else { return .clientOnly }
+            guard let path = herdrSocket(session: session, config: config) else { return nil }
+            socket = path
+        }
+
+        // Saved machines share the local server socket even while a remote receives input.
+        // Selection belongs to each live client; the persisted selection can be another's.
+        let catalog = state + "/herdr/client/endpoints.json"
+        let local = herdrIsLocalOnly(catalog: catalog)
+        trail.herdrCatalogs[catalog] = local
+        guard local else { return .clientOnly }
         trail.herdrSockets.append(socket)
-        guard let shell = run((session.map { ["--session", $0] } ?? []) + ["pane", "process-info"])
-            .flatMap(herdrShell(fromProcessInfo:)),
-            let tty = ttyPath(shell.pid)
-        else { return nil }
-        // Each named server has its own pane IDs.
-        let label = "herdr:" + (session.map { $0 + "/" } ?? "") + shell.pane
-        return .tty(tty, label: label)
+        return read(socket, &trail)
+    }
+
+    /// The server reports one focused pane. Only when this is its sole TUI client
+    /// does that answer identify the terminal that receives this client's keyboard.
+    struct HerdrClient: Hashable {
+        let pid: pid_t
+        let server: pid_t
+        let socket: String
+
+        func isOnlyClient() -> Bool {
+            let accepted = TerminalProcess.unixSockets(ofPID: server).filter { !$0.listening && $0.path == socket }
+            let peers = Set(accepted.map(\.peerID))
+            guard peers.count == 1, let peer = peers.first, peer != 0 else { return false }
+            return TerminalProcess.unixSockets(ofPID: pid).contains { $0.id == peer && $0.peerPath == socket }
+        }
+    }
+
+    static func herdrFocusedPane(socket: String, clientPID: pid_t, trail: inout TerminalTrail) -> Pane? {
+        TerminalWatcher.Environment.withUnixPeer(at: socket) { fd, server in
+            // Herdr inserts "-client" before the API socket's extension, even for custom paths.
+            let clientSocket = (socket as NSString).deletingPathExtension + "-client.sock"
+            let client = HerdrClient(pid: clientPID, server: server, socket: clientSocket)
+            func verifyClient() -> Bool {
+                let only = client.isOnlyClient()
+                trail.herdrClients[client] = only
+                return only
+            }
+            guard verifyClient() else { return .clientOnly }
+            let query: [String: Any] = ["id": "isp", "method": "pane.process_info", "params": [:]]
+            guard let reply = TerminalWatcher.Environment.jsonReply(to: query, on: fd),
+                  let shell = herdrShell(fromProcessInfo: reply), let tty = TerminalProcess.ttyPath(ofPID: shell.pid) else { return nil }
+            guard verifyClient() else { return .clientOnly }
+            return .tty(tty, label: "herdr:" + socket + "/" + shell.pane)
+        }
+    }
+
+    /// Herdr's client checks this catalog once a second and can add machines without a restart.
+    static func herdrIsLocalOnly(catalog: String) -> Bool {
+        struct Catalog: Decodable {
+            struct SSH: Decodable { let enabled: Bool }
+            let ssh: [SSH]?
+            let version: Int
+        }
+        do {
+            let bytes = try Data(contentsOf: URL(fileURLWithPath: catalog))
+            let catalog = try JSONDecoder().decode(Catalog.self, from: bytes)
+            return catalog.version == 1 && catalog.ssh?.contains(where: \.enabled) != true
+        } catch let error as NSError where error.domain == NSCocoaErrorDomain && error.code == NSFileReadNoSuchFileError {
+            return true
+        } catch {
+            return false
+        }
     }
 
     /// The first of `sessions` that `ask` answers for, with its answer; each is asked at most once.
@@ -154,28 +221,32 @@ extension Multiplexer {
             .map { $0.lastPathComponent }
     }
 
-    /// The named session a herdr TUI client attached to, from its argv:
-    /// `herdr --session X`, `--session=X` or `herdr session attach X`; nil for
-    /// the default session.
-    static func herdrSession(fromArguments arguments: [String]) -> String? {
-        var index = 1 // skip argv[0]
-        while index < arguments.endIndex {
-            let argument = arguments[index]
-            index += 1
-            if argument == "--session" { return index < arguments.endIndex ? arguments[index] : nil }
-            if argument.hasPrefix("--session=") { return String(argument.dropFirst("--session=".count)) }
-            if argument == "session", arguments[index...].first == "attach" {
-                return arguments[(index + 1)...].first { !$0.hasPrefix("-") }
+    /// Only the full local UI follows the server's focused pane. Direct terminal/agent
+    /// attaches route keyboard input to their explicit target; other subcommands run a CLI.
+    struct HerdrLaunch {
+        let session: String?
+
+        init?(arguments: [String]) {
+            guard !arguments.isEmpty else { return nil }
+            let args = Array(arguments.dropFirst())
+            if args.isEmpty || args == ["client"] {
+                session = nil
+            } else if args.count == 2, args[0] == "--session" {
+                session = args[1]
+            } else if args.count == 1, args[0].hasPrefix("--session=") {
+                session = String(args[0].dropFirst("--session=".count))
+            } else if args.count == 3, args.prefix(2) == ["session", "attach"] {
+                session = args[2]
+            } else {
+                return nil
             }
         }
-        return nil
     }
 
-    /// The socket of herdr `session` (nil: the default one), or nil for a name
-    /// that would leave the sessions directory.
-    static func herdrSocket(session: String?) -> String? {
-        let herdr = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".config/herdr")
-        guard let session else { return herdr.appendingPathComponent("herdr.sock").path }
+    /// Herdr uses the unnamed server for both a bare launch and an explicit "default".
+    static func herdrSocket(session: String?, config: String = FileManager.default.homeDirectoryForCurrentUser.path + "/.config") -> String? {
+        let herdr = URL(fileURLWithPath: config).appendingPathComponent("herdr")
+        guard let session, session != "default" else { return herdr.appendingPathComponent("herdr.sock").path }
         guard !session.isEmpty, !session.contains("/"), session != ".", session != ".." else { return nil }
         return herdr.appendingPathComponent("sessions/\(session)/herdr.sock").path
     }
@@ -211,7 +282,7 @@ extension Multiplexer {
 
     /// `herdr pane process-info`: the focused pane's shell pid and pane id. An
     /// error reply (`server_not_running`) has no `result`.
-    static func herdrShell(fromProcessInfo output: String) -> (pid: pid_t, pane: String)? {
+    static func herdrShell(fromProcessInfo output: Data) -> (pid: pid_t, pane: String)? {
         struct Reply: Decodable {
             struct Result: Decodable { let processInfo: Info }
             struct Info: Decodable {
@@ -224,7 +295,7 @@ extension Multiplexer {
 
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        guard let info = (try? decoder.decode(Reply.self, from: Data(output.utf8)))?.result.processInfo,
+        guard let info = (try? decoder.decode(Reply.self, from: output))?.result.processInfo,
               info.shellPid > 0
         else { return nil }
         return (info.shellPid, info.paneId)
