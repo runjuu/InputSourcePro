@@ -70,7 +70,7 @@ extension Terminal {
         return tty.map { TerminalProcess.foregroundProgram(onTTY: $0, pane: pane) } ?? TerminalReading(program: nil, pane: nil)
     }
 
-    /// Refresh the cached tty for this process. Herdr's view watcher supplies
+    /// Refresh the cached tty for this process. Herdr's mod supplies
     /// its pane, so a refresh has nothing to publish until that lookup succeeds.
     func refreshedProgram(pid: pid_t) -> TerminalReading? {
         // A second Alacritty window can open since the last lookup. Only a fresh
@@ -84,21 +84,20 @@ extension Terminal {
         return self == .herdr ? nil : TerminalProbe.program(self, pid: pid)
     }
 
-    /// What a Herdr pane named by its view file runs: the tty of the pane's
-    /// process (asked of `hc`), read like a lookup, which sees through shell
-    /// wrappers and multiplexers; that tty becomes the focused one. Nil when
-    /// `hc` can't tell or the process has no tty: Herdr can't tell yet, which
-    /// is not a shell; the focused tty is forgotten. Call on `TerminalProcess.queue`.
-    func paneProgram(
-        pane: String, appPID: pid_t,
-        herdrPID: (String) -> pid_t? = { HerdrDesktop.pid(ofTerminal: $0) },
+    /// A non-terminal pane or a machine-qualified address has no local tty.
+    /// An unanswered local lookup stays retryable until the last ordinary read.
+    func herdrReading(
+        _ focus: HerdrDesktop.Focus, pid: pid_t, lastTry: Bool,
         ttyPath: (pid_t) -> String? = TerminalProcess.ttyPath(ofPID:)
     ) -> TerminalReading? {
-        let pid = herdrPID(pane)
-        let tty = pid.flatMap(ttyPath)
-        IndicatorDiagnostics.record("terminal.pane bundle=\(rawValue) pid=\(pid.map(String.init) ?? "-") tty=\(tty ?? "-") pane=\(pane)")
-        let found = focusedProgram(onTTY: tty, pane: pane, pid: appPID)
-        return tty == nil ? nil : found
+        guard let address = focus.terminal, !address.contains("/") else {
+            _ = focusedProgram(onTTY: nil, pid: pid)
+            return TerminalReading(program: nil, pane: focus.terminal ?? focus.pane, paneControlUnavailable: true)
+        }
+        let tty = focus.pid.flatMap { $0 > 0 ? ttyPath($0) : nil }
+        let reading = focusedProgram(onTTY: tty, pane: address, pid: pid)
+        if tty != nil { return reading }
+        return lastTry ? TerminalReading(program: nil, pane: address) : nil
     }
 }
 

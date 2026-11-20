@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A21680000000000000000001 /* input-source-pro in Resources */ = {isa = PBXBuildFile; fileRef = A21680000000000000000002 /* input-source-pro */; };
 		C34000000000000000000002 /* KeyboardAppearanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C34000000000000000000001 /* KeyboardAppearanceTests.swift */; };
 		C3400000000000000000F002 /* ColorHexTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3400000000000000000F001 /* ColorHexTests.swift */; };
 		D73000012F20000000000001 /* CaretChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D73000022F20000000000001 /* CaretChannel.swift */; };
@@ -258,6 +259,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A21680000000000000000002 /* input-source-pro */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "input-source-pro"; sourceTree = "<group>"; };
 		C34000000000000000000001 /* KeyboardAppearanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardAppearanceTests.swift; sourceTree = "<group>"; };
 		C3400000000000000000F001 /* ColorHexTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorHexTests.swift; sourceTree = "<group>"; };
 		D73000022F20000000000001 /* CaretChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tools/CaretPalette/CaretChannel.swift; sourceTree = SOURCE_ROOT; };
@@ -757,6 +759,7 @@
 			children = (
 				4A20AD682892993F00620D14 /* Videos */,
 				4A2A1732280BA6A800E13249 /* Assets.xcassets */,
+				A21680000000000000000002 /* input-source-pro */,
 				4A2AACCA280BAD3700CA8124 /* Info.plist */,
 				4A5BABE92830A720009F42D7 /* Localizable.strings */,
 				B85000000000000000000005 /* MacIMEKit-LICENSE.txt */,
@@ -1041,6 +1044,7 @@
 				D58168CA28943A5400E84058 /* Indicator-Near-Cursor-Demo-Dark.mp4 in Resources */,
 				D58168CB28943A5400E84058 /* Indicator-Near-Cursor-Demo-Light.mp4 in Resources */,
 				4A2A1733280BA6A800E13249 /* Assets.xcassets in Resources */,
+				A21680000000000000000001 /* input-source-pro in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

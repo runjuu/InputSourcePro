@@ -31,7 +31,7 @@ struct TerminalTrail: Equatable {
     var ttys: [TTY] = []
     /// The default tmux server answered.
     var tmux = false
-    /// Sockets of the herdr TUI servers that answered.
+    /// Sockets used by the herdr TUI clients on this trail.
     var herdrSockets: [String] = []
     var zellij: Zellij?
 
@@ -64,13 +64,13 @@ extension TerminalTrail.TTY {
 
 /// Notices changes in the frontmost terminal's focused pane without shell
 /// hooks or plugins, and calls `refresh` so the pane is read again (Herdr's
-/// view file calls `focusHerdr` with the pane it names):
+/// mod calls `focusHerdr` with the pane and displayed terminal):
 /// - libproc: each tty the last lookup read, for a job starting or ending, and the
 ///   program read on it, for one that ends inside its shell's process group;
 /// - tmux: a control-mode client, for pane, window and session switches;
 /// - herdr TUI: a `pane.focused` subscription on the session's socket;
 /// - zellij: its client list, polled, since it has neither ttys nor events;
-/// - Herdr's desktop app: its view file, for pane, tab and space switches.
+/// - Herdr's desktop app: its focus mod, for pane, tab, space and displayed-terminal changes.
 ///
 /// Watches only while a terminal with Terminal Rules is frontmost (`watching`).
 /// Each lookup's trail is handed to `follow`, which replaces the polls with
@@ -108,10 +108,8 @@ final class TerminalWatcher {
         /// Opens a connection without waiting on it, or nil when its server can't be reached.
         var connect: (Connection, _ send: @escaping (ConnectionEvent) -> Void) -> AnyCancellable?
         var delay: (TimeInterval) -> AnyPublisher<Date, Never>
-        /// The focused pane Herdr's view file names (nil when unreadable): once
-        /// at once, then after each change to the file's directory; on the main
-        /// thread, until cancelled. Nil when the directory can't be opened.
-        var herdrView: (_ send: @escaping (String?) -> Void) -> AnyCancellable?
+        /// Focus reports from Herdr's mod, delivered on the main thread until cancellation.
+        var herdrView: (_ send: @escaping (HerdrDesktop.Focus?) -> Void) -> AnyCancellable?
     }
 
     static let libprocInterval: TimeInterval = 0.1
@@ -131,7 +129,7 @@ final class TerminalWatcher {
     private let environment: Environment
     /// `paneMayHaveChanged`: a multiplexer reported the change, not a job starting or ending on a tty.
     private let refresh: (_ paneMayHaveChanged: Bool) -> Void
-    private let focusHerdr: (String) -> Void
+    private let focusHerdr: (HerdrDesktop.Focus) -> Void
 
     private var active: Terminal?
     /// Counts `watching` subscriptions, so a late cancel of an earlier one is ignored.
@@ -155,15 +153,16 @@ final class TerminalWatcher {
     private var connections: [Connection: AnyCancellable] = [:]
     /// Attaches dropped in a row since a connection's last handshake; each one waits longer.
     private var drops: [Connection: Int] = [:]
-    private var closing: AnyCancellable?
+    private var activeConnections = Set<Connection>()
+    private var closing: [Connection: AnyCancellable] = [:]
     private var herdrView: AnyCancellable?
-    /// The pane Herdr's view file last named in this watch, nil before it named one.
-    private var herdrPane: String?
+    /// The last pane and displayed terminal reported in the current watch.
+    private var herdrPane: HerdrDesktop.Focus?
 
     init(
         environment: Environment = .live(),
         refresh: @escaping (_ paneMayHaveChanged: Bool) -> Void,
-        focusHerdr: @escaping (String) -> Void
+        focusHerdr: @escaping (HerdrDesktop.Focus) -> Void
     ) {
         self.environment = environment
         self.refresh = refresh
@@ -195,10 +194,8 @@ final class TerminalWatcher {
         session += 1
         active = terminal
         watchHerdrView(terminal == .herdr)
-        if let trail = trails[terminal] {
-            // A stale baseline reads as a change, which looks the pane up again.
-            watch(trail)
-        }
+        // A stale baseline reads as a change, which looks the pane up again.
+        watch(trails[terminal] ?? TerminalTrail())
         return session
     }
 
@@ -243,36 +240,33 @@ final class TerminalWatcher {
             })
         }
 
-        if trail.tmux || !trail.herdrSockets.isEmpty {
-            closing = nil
-            if trail.tmux { open(.tmux) }
-            trail.herdrSockets.forEach { open(.herdr(socket: $0)) }
-        } else if !connections.isEmpty, closing == nil {
-            // Nothing in front goes through a server any more (tmux detached, the herdr TUI
-            // left, another terminal, or none): the connections are kept for the grace period, then closed.
-            closing = environment.delay(Self.connectionGrace)
-                .sink { [weak self] _ in self?.closeConnections() }
+        activeConnections = Set(trail.herdrSockets.map(Connection.herdr))
+        if trail.tmux { activeConnections.insert(.tmux) }
+        for connection in activeConnections {
+            closing[connection] = nil
+            open(connection)
+        }
+        for connection in connections.keys where !activeConnections.contains(connection) && closing[connection] == nil {
+            closing[connection] = environment.delay(Self.connectionGrace)
+                .sink { [weak self] _ in self?.close(connection) }
         }
     }
 
-    /// Starts or stops watching Herdr's view file.
+    /// Starts or stops the Herdr focus mod.
     private func watchHerdrView(_ isOn: Bool) {
         guard isOn != (herdrView != nil) else { return }
         herdrPane = nil
-        // A directory not there yet (Herdr's first launch) is not watched, so the next start tries again.
         herdrView = isOn ? environment.herdrView { [weak self] in self?.receiveHerdrView($0) } : nil
         record(src: "herdr-view", isOn ? (herdrView == nil ? "unavailable" : "start") : "stop")
     }
 
-    /// Focuses the pane the view file names when it is another than last time,
-    /// the first read included: that read is Herdr's focus on coming to the
-    /// front, so no separate lookup can miss a switch made since. An
-    /// unreadable read, or a change to another file in the directory, does nothing.
-    private func receiveHerdrView(_ pane: String?) {
-        guard active == .herdr, let pane, pane != herdrPane else { return }
+    /// A lost report clears the prior pane. The same pane can show a different terminal.
+    private func receiveHerdrView(_ pane: HerdrDesktop.Focus?) {
+        guard active == .herdr, pane != herdrPane else { return }
         herdrPane = pane
-        record(src: "herdr-view", "trigger pane=\(pane)")
-        focusHerdr(pane)
+        let focus = pane ?? .init(pane: nil, terminal: nil)
+        record(src: "herdr-mod", "focus pane=\(focus.pane ?? "-") terminal=\(focus.terminal ?? "-")")
+        focusHerdr(focus)
     }
 
     /// Per tty in `ttys` (by its `pid`), the uptime before which its program's end is not
@@ -338,6 +332,13 @@ final class TerminalWatcher {
     }
 
     private func receive(_ event: ConnectionEvent, from connection: Connection) {
+        guard activeConnections.contains(connection) else {
+            switch event {
+            case .closed, .dropped: close(connection)
+            case .ready, .changed: break
+            }
+            return
+        }
         switch event {
         case .ready:
             // A herdr pane focused after the lookup but before the subscription went unreported:
@@ -372,13 +373,11 @@ final class TerminalWatcher {
         }
     }
 
-    private func closeConnections() {
-        for connection in connections.keys {
-            record(connection, "stop")
-        }
-        connections = [:]
-        drops = [:]
-        closing = nil
+    private func close(_ connection: Connection) {
+        record(connection, "stop")
+        connections[connection] = nil
+        drops[connection] = nil
+        closing[connection] = nil
     }
 
     // MARK: Checks (run on the poll queue)
@@ -525,7 +524,7 @@ extension TerminalWatcher.Environment {
                 }
             },
             delay: { Timer.delay(seconds: $0) },
-            herdrView: { send in watchDirectory(HerdrDesktop.directory, read: HerdrDesktop.focusedPane, send: send) }
+            herdrView: HerdrDesktop.watch
         )
     }
 
@@ -552,7 +551,7 @@ extension TerminalWatcher.Environment {
     /// once at once, then after each change; on the main thread, none once the
     /// result is cancelled. Nil when the directory can't be opened.
     /// A directory deleted or renamed while watched goes unnoticed until it is watched again.
-    static func watchDirectory(_ path: String, read: @escaping () -> String?, send: @escaping (String?) -> Void) -> AnyCancellable? {
+    static func watchDirectory<Value>(_ path: String, read: @escaping () -> Value, send: @escaping (Value) -> Void) -> AnyCancellable? {
         // O_EVTONLY on a local directory doesn't block, so the caller learns at once whether it opened.
         let fd = Darwin.open(path, O_EVTONLY)
         guard fd >= 0 else { return nil }

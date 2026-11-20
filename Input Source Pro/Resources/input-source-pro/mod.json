@@ -1,0 +1,4 @@
+{
+    "place": "none",
+    "overlay": { "kind": "window", "frame": "none", "at": { "x": 0, "y": 0 } }
+}

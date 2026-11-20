@@ -20,7 +20,13 @@ enum Multiplexer: String {
     }
 
     /// Where the CLI is installed, nil when it is in none of the usual places.
-    var executable: String? { TerminalProcess.executable(named: rawValue) }
+    var executable: String? {
+        if self == .herdr {
+            let localBin = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin").path
+            return TerminalProcess.executable(named: rawValue, in: [localBin] + TerminalProcess.executableDirectories)
+        }
+        return TerminalProcess.executable(named: rawValue)
+    }
 
     /// The focused pane of the client running on `clientTTY` with `arguments`
     /// (its argv), or nil when the multiplexer can't be asked. A multiplexer
@@ -66,6 +72,9 @@ enum Multiplexer: String {
         run: ([String]) -> String?,
         ttyPath: (pid_t) -> String? = TerminalProcess.ttyPath(ofPID:)
     ) -> Pane? {
+        // A --remote client draws the remote server locally. Its session name
+        // can also exist on this Mac, where it identifies a different pane.
+        guard !arguments.dropFirst().contains(where: { $0 == "--remote" || $0.hasPrefix("--remote=") }) else { return nil }
         let session = herdrSession(fromArguments: arguments)
         guard let socket = herdrSocket(session: session) else { return nil }
         trail.herdrSockets.append(socket)
@@ -73,7 +82,9 @@ enum Multiplexer: String {
             .flatMap(herdrShell(fromProcessInfo:)),
             let tty = ttyPath(shell.pid)
         else { return nil }
-        return .tty(tty, label: "herdr:" + shell.pane)
+        // Each named server has its own pane IDs.
+        let label = "herdr:" + (session.map { $0 + "/" } ?? "") + shell.pane
+        return .tty(tty, label: label)
     }
 
     /// The first of `sessions` that `ask` answers for, with its answer; each is asked at most once.
