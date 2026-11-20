@@ -422,6 +422,58 @@ final class ApplicationVMTerminalTests: XCTestCase {
         XCTAssertFalse(switched)
     }
 
+    func testPendingCommandReappliesWhenKeyboardFocusReturnsWithoutAnActivation() async throws {
+        let app = FakeApp(bundleIdentifier: Terminal.iterm.rawValue, pid: 999_122)
+        let tty = "/dev/ttys122"
+        let writer = TerminalProcess.Identity(pid: 122, startTime: 0)
+        let program = TerminalProgram(key: "nvim", pane: tty, tty: tty)
+        let target = InputSource.getCurrentInputSource()
+        let original = OtherInputSource(tisInputSource: target.tisInputSource)
+        let prefs = try Self.inMemoryPreferencesVM()
+        let restore = Self.setTerminalPreferences(prefs, enabled: .iterm, rules: ["nvim"])
+        defer { restore() }
+        prefs.terminalControl.select(original, on: tty, writer: writer)
+        var hasFocus = true
+        var focusChecks = 0
+        let lock = NSLock()
+        var probes = 0
+        let vm = ApplicationVM(preferencesVM: prefs, environment: .init(
+            frontmostApplication: { app }, focusedApplication: { nil },
+            runningApplications: Just([app]).eraseToAnyPublisher(), isTerminalEnabled: prefs.isTerminalEnabled,
+            probedProgram: { _, _ in
+                lock.withLock { probes += 1 }
+                return TerminalReading(program: program, pane: tty, tty: tty)
+            },
+            terminalPanelFocus: Self.standardTerminalWindow,
+            ttyOwner: { ($0, tty, 0) }, jobState: { _, _ in .foreground },
+            inputSourceForReconciliation: { original }, hasKeyboardFocus: { _ in
+                focusChecks += 1
+                return hasFocus
+            }
+        ))
+        try await Self.waitFor("the controlled editor's activation probes") {
+            vm.appKind?.getTerminalInfo()?.program == program && lock.withLock { probes >= 2 }
+        }
+        var published: [InputSource] = []
+        let contexts = vm.$appKind.dropFirst().compactMap { app in
+            app.flatMap { prefs.getAppAutoSwitchKeyboard($0)?.inputSource }
+        }.sink { published.append($0) }
+        defer { contexts.cancel() }
+
+        hasFocus = false
+        let probesBeforeHandback = lock.withLock { probes }
+        await vm.receiveTerminalControl(lines: "isp:122:select:\(target.persistentIdentifier)\n")
+        let checksAfterCommand = focusChecks
+        try await Self.waitFor("a pending command waits for keyboard focus") { focusChecks > checksAfterCommand }
+        XCTAssertEqual(prefs.terminalControl.current(on: tty, in: .iterm), target)
+        XCTAssertTrue(published.isEmpty)
+        XCTAssertEqual(lock.withLock { probes }, probesBeforeHandback)
+
+        hasFocus = true
+        try await Self.waitFor("the editor reapplies its source after the panel closes") { published == [target] }
+        XCTAssertGreaterThan(lock.withLock { probes }, probesBeforeHandback)
+    }
+
     func testCommandsOnlyControlTerminalsEnabledWhenTheyArrived() async throws {
         let app = FakeApp(bundleIdentifier: Terminal.iterm.rawValue, pid: 999_113)
         let tty = "/dev/ttys113"
