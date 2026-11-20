@@ -133,7 +133,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
         }
     }
 
-    private static func waitFor(_ what: String, _ condition: () -> Bool, file: StaticString = #filePath, line: UInt = #line) async throws {
+    static func waitFor(_ what: String, _ condition: () -> Bool, file: StaticString = #filePath, line: UInt = #line) async throws {
         let deadline = Date().addingTimeInterval(5)
         while !condition() {
             guard Date() < deadline else { return XCTFail("Timed out: \(what)", file: file, line: line) }
@@ -297,8 +297,15 @@ final class ApplicationVMTerminalTests: XCTestCase {
         try await Self.waitFor("the same shell regained focus") { vm.appKind?.controlledShellTTY == secondTTY }
         let refocused = try XCTUnwrap(vm.appKind)
         XCTAssertEqual(preferencesVM.getAppAutoSwitchKeyboard(refocused)?.inputSource, secondSource)
-        preferencesVM.cacheKeyboardFor(refocused, keyboard: firstSource)
-        XCTAssertEqual(preferencesVM.terminalControl.current(on: secondTTY, in: .ghostty), firstSource)
+        // A source notification can beat publication of the receiving app.
+        front = other
+        vm.cacheKeyboardFor(refocused, keyboard: firstSource)
+        XCTAssertEqual(preferencesVM.terminalControl.current(on: secondTTY, in: .ghostty), secondSource)
+        front = ghostty
+        vm.cacheKeyboardFor(refocused, keyboard: firstSource)
+        try await Self.waitFor("a manual change updates the verified shell") {
+            preferencesVM.terminalControl.current(on: secondTTY, in: .ghostty) == firstSource
+        }
         XCTAssertNil(preferencesVM.appKeyboardCache.retrieve(refocused))
 
         await vm.receiveTerminalControl(lines: "isp:102:release\n")
@@ -309,6 +316,39 @@ final class ApplicationVMTerminalTests: XCTestCase {
         await vm.receiveTerminalControl(lines: "isp:102:select:\(secondSource.persistentIdentifier)\n")
         try await Self.waitFor("the shell took control from the terminal's app rule") { vm.appKind?.controlledShellTTY == secondTTY }
         XCTAssertEqual(preferencesVM.terminalControl.current(on: secondTTY, in: .ghostty), secondSource)
+    }
+
+    func testManualSourceChangesOnlyUpdateTheVerifiedPaneBeforeItsNextPush() async throws {
+        let app = FakeApp(bundleIdentifier: Terminal.iterm.rawValue, pid: 999_119)
+        let writer = TerminalProcess.Identity(pid: 119, startTime: 0)
+        let tty = "/dev/ttys119"
+        let live = InputSource.getCurrentInputSource()
+        let original = OtherInputSource(tisInputSource: live.tisInputSource)
+        let prefs = try Self.inMemoryPreferencesVM()
+        let restore = Self.setTerminalPreferences(prefs, enabled: .iterm, rules: [])
+        defer { restore() }
+        prefs.terminalControl.select(original, on: tty, writer: writer)
+        let lock = NSLock()
+        var focusedTTY = tty
+        let vm = ApplicationVM(preferencesVM: prefs, environment: .init(
+            frontmostApplication: { app }, focusedApplication: { app },
+            runningApplications: Just([app]).eraseToAnyPublisher(), isTerminalEnabled: { $0 == .iterm },
+            probedProgram: { _, _ in lock.withLock { TerminalReading(program: nil, pane: focusedTTY, tty: focusedTTY) } },
+            terminalPanelFocus: .init(read: { _, _ in AnyCancellable {} }),
+            ttyOwner: { ($0, tty, 0) }, jobState: { _, _ in .foreground }, inputSourceForReconciliation: { live }
+        ))
+        try await Self.waitFor("the original pane has focus") { vm.appKind?.controlledShellTTY == tty }
+        let originalContext = try XCTUnwrap(vm.appKind)
+        lock.withLock { focusedTTY = "/dev/ttys120" }
+        vm.cacheKeyboardFor(originalContext, keyboard: live)
+        await vm.receiveTerminalControl(lines: "isp:119:pop\n")
+        XCTAssertEqual(prefs.terminalControl.current(on: tty, in: .iterm), original)
+
+        lock.withLock { focusedTTY = tty }
+        await vm.receiveTerminalControl(lines: "isp:119:pop\n")
+        vm.cacheKeyboardFor(originalContext, keyboard: live)
+        await vm.receiveTerminalControl(lines: "isp:119:push:\(live.persistentIdentifier)\n")
+        XCTAssertEqual(prefs.terminalControl.pop(on: tty, writer: writer, in: .iterm), live)
     }
 
     func testCommandsOnlyControlTerminalsEnabledWhenTheyArrived() async throws {
@@ -706,6 +746,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
         let writer = TerminalProcess.Identity(pid: 111, startTime: 0)
         let program = TerminalProgram(key: "nvim", pane: tty, tty: tty)
         let source = InputSource.getCurrentInputSource()
+        var liveSource: InputSource = OtherInputSource(tisInputSource: source.tisInputSource)
         let prefs = try Self.inMemoryPreferencesVM()
         let restore = Self.setTerminalPreferences(prefs, enabled: .iterm, rules: ["nvim"])
         defer { restore() }
@@ -739,7 +780,8 @@ final class ApplicationVMTerminalTests: XCTestCase {
             terminalPanelFocus: .init(read: { _, _ in AnyCancellable {} }),
             ttyOwner: { writerAlive ? ($0, tty, 0) : nil }, jobState: { _, _ in .foreground },
             temporaryInputWindowInProgress: { windowOpen },
-            temporaryInputWindowRestored: restored.handleEvents(receiveSubscription: { _ in handbackWaits += 1 }).eraseToAnyPublisher()
+            temporaryInputWindowRestored: restored.handleEvents(receiveSubscription: { _ in handbackWaits += 1 }).eraseToAnyPublisher(),
+            inputSourceForReconciliation: { liveSource }
         ))
         try await Self.waitFor("both activation probes") { lock.withLock { probes >= 2 } }
         let delivered = expectation(description: "settled probe delivered")
@@ -761,16 +803,23 @@ final class ApplicationVMTerminalTests: XCTestCase {
             front = terminal
             restored.send()
         }
-        let switches = vm.terminalSwitches.sink { _ in openWindow() }
+        var switchCount = 0
+        let switches = vm.terminalSwitches.sink { selected in
+            switchCount += 1
+            liveSource = selected
+            openWindow()
+        }
         defer { contexts.cancel(); switches.cancel() }
         let initialWaits = handbackWaits
-        let batch = Task { await vm.receiveTerminalControl(lines: "isp:111:select:\(source.persistentIdentifier)\nisp:111:release\n") }
+        let selectLine = "isp:111:select:\(source.persistentIdentifier)\n"
+        let batch = Task { await vm.receiveTerminalControl(lines: selectLine + selectLine + "isp:111:release\n") }
         try await Self.waitFor("the release waits for the first command's window") { handbackWaits > initialWaits }
         XCTAssertTrue(prefs.terminalControl.isControlled(tty))
         handBackWindow()
         try await Self.waitFor("NSWorkspace has handed back before AX") { laggingFocusReads > 0 }
         focused = terminal
         await batch.value
+        XCTAssertEqual(switchCount, 1, "Selecting the same source on focus return must not open another window")
         XCTAssertFalse(prefs.terminalControl.isControlled(tty))
         XCTAssertEqual(publishedProgramSources, 1, "The unchanged editor reapplies its terminal rule")
 
@@ -790,9 +839,8 @@ final class ApplicationVMTerminalTests: XCTestCase {
         openWindow()
         writerAlive = false
         let beforeExit = publishedProgramSources
-        let beforeExitProbe = lock.withLock { probes }
-        try await Self.waitFor("the writer exits and its recheck runs") {
-            !prefs.terminalControl.isControlled(tty) && lock.withLock { probes > beforeExitProbe }
+        try await Self.waitFor("the writer exits while the temporary window has focus") {
+            !prefs.terminalControl.isControlled(tty)
         }
         let beforeExitHandback = laggingFocusReads
         handBackWindow()
@@ -891,6 +939,10 @@ final class ApplicationVMTerminalTests: XCTestCase {
         let preferencesVM = PreferencesVM(permissionsVM: PermissionsVM(), container: container)
         preferencesVM.mainStorage.refresh()
         return preferencesVM
+    }
+
+    final class OtherInputSource: InputSource {
+        override var persistentIdentifier: String { "test.other-input-source" }
     }
 
     /// An app that isn't running: AX on its pid answers nothing.

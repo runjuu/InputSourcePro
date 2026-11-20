@@ -302,7 +302,7 @@ extension IndicatorVM {
                     return (status.inputSource, .appSpecified(status))
                 },
                 select: { source, app in inputSourceVM.select(inputSource: source, app: app?.getApp()) },
-                cache: { app, source in preferencesVM.cacheKeyboardFor(app, keyboard: source) },
+                cache: { app, source in self.applicationVM.cacheKeyboardFor(app, keyboard: source) },
                 noChanges: .noChanges,
                 system: .system,
                 shortcut: .shortcut,

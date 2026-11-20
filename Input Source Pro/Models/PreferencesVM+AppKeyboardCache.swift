@@ -2,7 +2,7 @@ import AppKit
 
 extension PreferencesVM {
     /// The controlled pane whose own source takes precedence over rules and the cache.
-    private func controlledTerminalPane(_ appKind: AppKind) -> (terminal: Terminal, tty: String)? {
+    func controlledTerminalPane(_ appKind: AppKind) -> (terminal: Terminal, tty: String)? {
         guard let terminal = Terminal(appKind.getApp()),
               let tty = appKind.getTerminalInfo()?.program.tty ?? appKind.controlledShellTTY,
               terminalControl.isControlled(tty, in: terminal) else { return nil }
@@ -46,11 +46,6 @@ extension PreferencesVM {
     }
 
     func cacheKeyboardFor(_ appKind: AppKind, keyboard: InputSource) {
-        if let pane = controlledTerminalPane(appKind) {
-            terminalControl.follow(keyboard, on: pane.tty, in: pane.terminal)
-            return
-        }
-
         let defaultKeyboard = getAppDefaultKeyboard(appKind)
 
         if appNeedCacheKeyboard(appKind),

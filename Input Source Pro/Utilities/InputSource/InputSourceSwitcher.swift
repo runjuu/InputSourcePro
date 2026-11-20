@@ -11,6 +11,9 @@ enum InputSourceSwitcher {
 
         var isBusy: Bool { active != nil }
 
+        /// A cancelled activation may still land after the source was read.
+        var hasSupersededSelection: Bool { active?.isCurrent == false && pending == nil }
+
         mutating func begin(target: Source, current: Source) -> UUID {
             precondition(!isBusy)
             let id = UUID()
@@ -148,6 +151,7 @@ enum InputSourceSwitcher {
     private static var pendingWorkItems: [DispatchWorkItem] = []
     private static var pendingPrivateSelection: PrivateInputSourceSelector.Request?
     private static var privateSelectionQueue = PrivateSelectionQueue<InputSource>()
+    static var hasSupersededPrivateSelection: Bool { privateSelectionQueue.hasSupersededSelection }
     private static var privateSelectionActivationObserver: NSObjectProtocol?
     private static var temporaryInputWindow: NSWindow?
     private static var temporaryInputWindowPreviousApplication: NSRunningApplication?
