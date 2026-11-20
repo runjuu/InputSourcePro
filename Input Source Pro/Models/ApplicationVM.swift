@@ -25,6 +25,7 @@ final class ApplicationVM: ObservableObject {
     private weak var watchedTerminalApp: NSRunningApplication?
     private var terminalFocusRevision: UInt64 = 0
     private var terminalFocusSettleUntil: TimeInterval = 0
+    private var lastTerminalHandback: TimeInterval?
     private let terminalRefreshes = PassthroughSubject<Void, Never>()
     private let terminalControlRechecks = PassthroughSubject<Terminal, Never>()
     private var terminalControlPendingTTYs = Set<String>()
@@ -154,6 +155,7 @@ extension ApplicationVM {
                 guard let self else { return Empty().eraseToAnyPublisher() }
 
                 self.watchedTerminalApp = terminal == nil ? nil : app
+                self.lastTerminalHandback = nil
                 self.terminalControlPendingTTYs.removeAll()
                 self.terminalFocusDidChange()
                 if let terminal {
@@ -297,18 +299,25 @@ extension ApplicationVM {
         var remaining = messages[...]
         while !remaining.isEmpty {
             let waiting = environment.temporaryInputWindowInProgress()
-            if waiting, let app = watchedTerminalApp {
-                // A first push needs the live source of the pane we're returning to.
-                // The FIFO already holds later batches while this delivery is suspended.
-                let handback = environment.temporaryInputWindowRestored
-                    .merge(with: Timer.delay(seconds: 1).mapToVoid())
-                    .first()
-                for await _ in handback.values { break }
-                if !environment.temporaryInputWindowInProgress() {
+            var windowStillOpen = waiting
+            if let app = watchedTerminalApp {
+                if waiting {
+                    // A first push needs the live source of the pane we're returning to.
+                    // The FIFO already holds later batches while this delivery is suspended.
+                    let handback = environment.temporaryInputWindowRestored
+                        .merge(with: Timer.delay(seconds: 1).mapToVoid())
+                        .first()
+                    for await _ in handback.values { break }
+                    windowStillOpen = environment.temporaryInputWindowInProgress()
+                }
+                // A terminal's focus-gained hook can write after the window is
+                // already closed, while AX still names ISP as the focused app.
+                let recentlyRestored = lastTerminalHandback.map { ProcessInfo.processInfo.systemUptime - $0 <= 0.8 } ?? false
+                if (waiting || recentlyRestored) && !windowStillOpen {
                     for await _ in settledHandback(for: app).values { break }
                 }
             }
-            await receiveTerminalControl(&remaining, epoch: epoch, waitedForHandback: waiting)
+            await receiveTerminalControl(&remaining, epoch: epoch, windowStillOpen: windowStillOpen)
         }
     }
 
@@ -326,12 +335,12 @@ extension ApplicationVM {
     }
 
     private func receiveTerminalControl(
-        _ remaining: inout ArraySlice<TerminalControlCommand>, epoch: UInt64, waitedForHandback: Bool
+        _ remaining: inout ArraySlice<TerminalControlCommand>, epoch: UInt64, windowStillOpen: Bool
     ) async {
         // A focus-lost hook can reach the FIFO before the terminal's AX or tmux
         // notification reaches us. Verify the pane again after each handback.
         var focusedTTY: String?
-        let windowStillOpen = waitedForHandback && environment.temporaryInputWindowInProgress()
+        let handbackBeforeLookup = lastTerminalHandback
         let initialApp = windowStillOpen ? nil : currentTerminalForControl()
         var publishReading: (() -> Void)?
         if let app = initialApp, let terminal = Terminal(app) {
@@ -362,8 +371,10 @@ extension ApplicationVM {
             publishReading?()
             publishReading = nil
         }
-        // The lookup itself may have overlapped a selection from an ordinary rule.
-        if !waitedForHandback, environment.temporaryInputWindowInProgress() { return }
+        // An ordinary rule can open and even close a window during the lookup.
+        // Keep the commands queued and verify the pane after that handback.
+        guard handbackBeforeLookup == lastTerminalHandback,
+              windowStillOpen || !environment.temporaryInputWindowInProgress() else { return }
         var changedTTYs = Set<String>()
         repeat {
             let message = remaining.removeFirst()
@@ -500,7 +511,7 @@ extension ApplicationVM {
                 target = source
             }
         case .pop:
-            target = preferencesVM.terminalControl.pop(on: tty, writer: writer, epoch: epoch)
+            target = preferencesVM.terminalControl.pop(on: tty, writer: writer, in: focusedTerminal, epoch: epoch)
         case .release:
             preferencesVM.terminalControl.release(tty, writer: writer)
         }
@@ -686,6 +697,10 @@ extension ApplicationVM {
         // The temporary input window's activation is intentionally ignored by
         // the app watcher. Verify the pane once it actually hands focus back.
         let restoredFocus = environment.temporaryInputWindowRestored
+            .handleEvents(receiveOutput: { [weak self] _ in
+                self?.lastTerminalHandback = ProcessInfo.processInfo.systemUptime
+                self?.terminalFocusDidChange()
+            })
             .filter { [weak self] in self?.terminalControlPendingTTYs.isEmpty == false }
             .flatMapLatest { [weak self] _ -> AnyPublisher<Void, Never> in
                 self?.settledHandback(for: app) ?? Empty().eraseToAnyPublisher()

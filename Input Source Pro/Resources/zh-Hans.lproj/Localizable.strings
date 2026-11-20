@@ -269,4 +269,4 @@
 "Remember the current input source, then switch" = "记住当前输入法，再切换";
 "Switch back to the remembered input source" = "切回记住的输入法";
 "Hand the pane back to the rules" = "把窗格交还给规则";
-"<pid> is a process running in that pane; <id> is an input source ID such as com.apple.keylayout.ABC. Alacritty needs distinguishable window titles. Panes inside Zellij are not supported." = "<pid> 是在该窗格里运行的进程；<id> 是输入法 ID，例如 com.apple.keylayout.ABC。Alacritty 需要可区分的窗口标题。不支持 Zellij 里的窗格。";
+"<pid> is a process running in that pane; <id> is an input source ID such as com.apple.keylayout.ABC. For program control in Alacritty, use one window per Alacritty process. Panes inside Zellij are not supported." = "<pid> 是在该窗格里运行的进程；<id> 是输入法 ID，例如 com.apple.keylayout.ABC。要在 Alacritty 中使用程序控制，每个 Alacritty 进程只打开一个窗口。不支持 Zellij 里的窗格。";

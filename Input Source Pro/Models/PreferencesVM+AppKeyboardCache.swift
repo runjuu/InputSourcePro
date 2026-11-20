@@ -1,11 +1,12 @@
 import AppKit
 
 extension PreferencesVM {
-    /// The tty of the pane a program controls, which skips rules and the cache.
-    func controlledTerminalTTY(_ appKind: AppKind) -> String? {
-        guard let terminal = Terminal(appKind.getApp()) else { return nil }
-        let tty = appKind.getTerminalInfo()?.program.tty ?? appKind.controlledShellTTY
-        return tty.flatMap { terminalControl.isControlled($0, in: terminal) ? $0 : nil }
+    /// The controlled pane whose own source takes precedence over rules and the cache.
+    private func controlledTerminalPane(_ appKind: AppKind) -> (terminal: Terminal, tty: String)? {
+        guard let terminal = Terminal(appKind.getApp()),
+              let tty = appKind.getTerminalInfo()?.program.tty ?? appKind.controlledShellTTY,
+              terminalControl.isControlled(tty, in: terminal) else { return nil }
+        return (terminal, tty)
     }
 
     func appNeedCacheKeyboard(_ appKind: AppKind) -> Bool {
@@ -45,8 +46,8 @@ extension PreferencesVM {
     }
 
     func cacheKeyboardFor(_ appKind: AppKind, keyboard: InputSource) {
-        if let tty = controlledTerminalTTY(appKind) {
-            terminalControl.follow(keyboard, on: tty)
+        if let pane = controlledTerminalPane(appKind) {
+            terminalControl.follow(keyboard, on: pane.tty, in: pane.terminal)
             return
         }
 
@@ -84,8 +85,8 @@ extension PreferencesVM {
         _ appKind: AppKind
     ) -> AppAutoSwitchKeyboardStatus? {
         // A controlled pane goes back to its own source, or stays as it is.
-        if let tty = controlledTerminalTTY(appKind) {
-            return terminalControl.current(on: tty).map { .specified($0) }
+        if let pane = controlledTerminalPane(appKind) {
+            return terminalControl.current(on: pane.tty, in: pane.terminal).map { .specified($0) }
         }
 
         if let cachedKeyboard = getAppCachedKeyboard(appKind) {
