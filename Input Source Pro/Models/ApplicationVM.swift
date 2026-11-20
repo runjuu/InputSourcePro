@@ -56,12 +56,13 @@ final class ApplicationVM: ObservableObject {
         var runningApplications: AnyPublisher<[NSRunningApplication], Never>
         var isTerminalEnabled: (Terminal) -> Bool
         /// Asks a terminal for its focused pane; runs off the main thread.
-        var probedProgram: (Terminal) -> TerminalReading
+        var probedProgram: (Terminal, pid_t) -> TerminalReading
         var terminalPanelFocus: TerminalPanelFocus.Environment
         /// The process a program's command is traced back to, with its tty.
         var ttyOwner: (pid_t) -> TerminalProcess.TTYOwner? = { TerminalProcess.ttyOwner(ofPID: $0) }
         /// Where a controlling program's process stands on its tty.
         var jobState: (pid_t, String) -> TerminalProcess.JobState = TerminalProcess.jobState
+        var temporaryInputWindowRestored: AnyPublisher<Void, Never> = Empty().eraseToAnyPublisher()
 
         @MainActor static func live(_ preferencesVM: PreferencesVM) -> Self {
             Self(
@@ -76,7 +77,8 @@ final class ApplicationVM: ObservableObject {
                 runningApplications: NSWorkspace.shared.publisher(for: \.runningApplications).eraseToAnyPublisher(),
                 isTerminalEnabled: preferencesVM.isTerminalEnabled,
                 probedProgram: TerminalProbe.program,
-                terminalPanelFocus: .live
+                terminalPanelFocus: .live,
+                temporaryInputWindowRestored: InputSourceSwitcher.temporaryInputWindowRestored
             )
         }
     }
@@ -296,8 +298,9 @@ extension ApplicationVM {
         let initialApp = currentTerminalForControl()
         var publishReading: (() -> Void)?
         if let app = initialApp, let terminal = Terminal(app) {
+            let pid = app.processIdentifier
             let probe = environment.probedProgram
-            let lookup = { TerminalProcess.onQueue { probe(terminal) } }
+            let lookup = { TerminalProcess.onQueue { probe(terminal, pid) } }
             // Ghostty can still name the departed split for 20 ms after its
             // focus-out hook fires, even before we receive any focus event.
             let ghosttySettleUntil = terminal == .ghostty ? ProcessInfo.processInfo.systemUptime + 0.020 : 0
@@ -309,7 +312,7 @@ extension ApplicationVM {
                 guard currentTerminalForControl() == app else { break }
                 guard revision == terminalFocusRevision else { continue }
                 let reading = await withCheckedContinuation { continuation in
-                    TerminalProcess.queue.async { continuation.resume(returning: probe(terminal)) }
+                    TerminalProcess.queue.async { continuation.resume(returning: probe(terminal, pid)) }
                 }
                 guard currentTerminalForControl() == app else { break }
                 guard revision == terminalFocusRevision else { continue }
@@ -318,19 +321,22 @@ extension ApplicationVM {
                 break
             }
         }
-        let confirmed = publishReading != nil
         func publishVerifiedPane() {
             publishReading?()
             publishReading = nil
         }
         let changedTTYs = messages.compactMap {
-            receiveTerminalControl($0, focusedTTY: focusedTTY, publishVerifiedPane: publishVerifiedPane)
+            receiveTerminalControl($0, focusedTTY: focusedTTY, verifiedApp: initialApp, publishVerifiedPane: publishVerifiedPane)
         }
         publishVerifiedPane()
-        // Another terminal may already have completed its activation lookup
-        // while this batch waited. Reconcile the terminal that now has focus.
-        if !confirmed, !changedTTYs.isEmpty, let app = currentTerminalForControl(), let terminal = Terminal(app) {
-            terminalControlPendingTTYs.formUnion(changedTTYs)
+        guard !changedTTYs.isEmpty, watchedTerminalApp != nil else { return }
+        let currentApp = currentTerminalForControl()
+        // The terminal may have changed during verification, or a preceding
+        // command may have opened ISP's temporary input window mid-batch.
+        // A change to the verified pane that did not switch live is still owed.
+        guard focusedTTY == nil || currentApp != initialApp || changedTTYs.contains(where: { $0 == focusedTTY }) else { return }
+        terminalControlPendingTTYs.formUnion(changedTTYs)
+        if let app = currentApp, let terminal = Terminal(app) {
             terminalControlRechecks.send(terminal)
         }
     }
@@ -402,7 +408,7 @@ extension ApplicationVM {
     /// On the focused pane it switches like a shortcut would, through the same
     /// select path as rules; elsewhere it only updates the state.
     private func receiveTerminalControl(
-        _ message: TerminalControlCommand, focusedTTY: String?, publishVerifiedPane: () -> Void
+        _ message: TerminalControlCommand, focusedTTY: String?, verifiedApp: NSRunningApplication?, publishVerifiedPane: () -> Void
     ) -> String? {
         // Use the tty owner for foreground checks and the writer PID for its lifetime.
         guard let owner = environment.ttyOwner(message.pid) else { return nil }
@@ -416,7 +422,7 @@ extension ApplicationVM {
             IndicatorDiagnostics.record("terminal.isp ignored pid=\(owner.pid) tty=\(tty) cmd=\(message.command.name) background")
             return nil
         }
-        let focusedApp = focusedTTY == tty ? currentTerminalForControl() : nil
+        let focusedApp = focusedTTY == tty && currentTerminalForControl() == verifiedApp ? verifiedApp : nil
         let previousWriter = preferencesVM.terminalControl.activeWriter(on: tty)
         preferencesVM.terminalControl.check(tty, state: terminalWriterState)
         var target: InputSource?
@@ -556,6 +562,7 @@ extension ApplicationVM {
 
     private func watchTerminalProgram(_ app: NSRunningApplication, _ terminal: Terminal) -> AnyPublisher<AppKind, Never> {
         let preferencesVM = preferencesVM
+        let pid = app.processIdentifier
         let probedProgram = environment.probedProgram
         // What was read before the terminal left the front may have ended, or be another
         // pane's: the terminal is published once its focused pane has been read again.
@@ -566,7 +573,7 @@ extension ApplicationVM {
         let refreshes = terminalRefreshes
             .merge(with: terminalRefreshes.delay(for: .milliseconds(100), scheduler: DispatchQueue.main))
             .throttle(for: .milliseconds(100), scheduler: DispatchQueue.main, latest: true)
-            .map { () -> TerminalLookup in { TerminalProcess.onQueue(terminal.refreshedProgram) } }
+            .map { () -> TerminalLookup in { TerminalProcess.onQueue { terminal.refreshedProgram(pid: pid) } } }
 
         // Re-ask which pane has focus on activation and on AX changes: a tab
         // or split switch may announce itself only as a title change, and
@@ -609,7 +616,7 @@ extension ApplicationVM {
             // a click on another split is what brought it to the front.
             .merge(with: Just(()).delay(for: settle, scheduler: DispatchQueue.main))
             .prepend(())
-            .map { () -> TerminalLookup in { TerminalProcess.onQueue { probedProgram(terminal) } } }
+            .map { () -> TerminalLookup in { TerminalProcess.onQueue { probedProgram(terminal, pid) } } }
 
         // Lookups run in order on one queue, so the latest one has the newest
         // answer. Results publish through terminalProgramChanges, held or not.
@@ -624,16 +631,25 @@ extension ApplicationVM {
 
         // An earlier lookup may already be in flight when a writer exits or a
         // batch loses focus. Only a fresh, settled probe can settle that request.
+        // The temporary input window's activation is intentionally ignored by
+        // the app watcher. Verify the pane once it actually hands focus back.
+        let restoredFocus = environment.temporaryInputWindowRestored
+            .filter { [weak self] in
+                guard let self else { return false }
+                return !self.terminalControlPendingTTYs.isEmpty && self.currentTerminalForControl() == app
+            }
         let controlRechecks = terminalControlRechecks
             .filter { $0 == terminal }
+            .mapToVoid()
+            .merge(with: restoredFocus)
             .debounce(for: settle, scheduler: DispatchQueue.main)
             .flatMapLatest { [weak self] _ in
                 let revision = self?.terminalFocusRevision
-                let lookup = { TerminalProcess.onQueue { probedProgram(terminal) } }
+                let lookup = { TerminalProcess.onQueue { probedProgram(terminal, pid) } }
                 return lookup().map { ($0, lookup, revision) }
             }
             .compactMap { [weak self] reading, lookup, revision -> Void? in
-                guard let self else { return nil }
+                guard let self, self.currentTerminalForControl() == app else { return nil }
                 guard revision == self.terminalFocusRevision else {
                     self.terminalControlRechecks.send(terminal)
                     return nil

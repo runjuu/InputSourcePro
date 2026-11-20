@@ -183,7 +183,7 @@ final class TerminalPanelFocusTests: XCTestCase {
             focusedApplication: { nil },
             runningApplications: Just([textEdit, ghostty]).eraseToAnyPublisher(),
             isTerminalEnabled: { $0 == .ghostty },
-            probedProgram: { _ in
+            probedProgram: { _, _ in
                 state.lock.withLock { state.probes += 1 }
                 return TerminalReading(program: TerminalProgram(key: "claude", pane: tty), pane: tty)
             },
@@ -236,7 +236,7 @@ final class TerminalPanelFocusTests: XCTestCase {
             focusedApplication: { nil },
             runningApplications: Just([ghostty]).eraseToAnyPublisher(),
             isTerminalEnabled: { $0 == .ghostty },
-            probedProgram: { terminal in
+            probedProgram: { terminal, _ in
                 // Runs on the probe queue, which knows whether the panel has focus.
                 terminal.isPanelFocused
                     ? TerminalReading(program: TerminalProgram(key: "zsh-tool", pane: panelTTY), pane: panelTTY)

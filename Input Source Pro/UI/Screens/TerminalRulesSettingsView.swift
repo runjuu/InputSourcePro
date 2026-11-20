@@ -55,7 +55,7 @@ struct TerminalRulesSettingsView: View {
     /// The `isp:` protocol, see `TerminalControlCommand`.
     var programControlHelp: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("A program can take over its own pane, so Terminal Rules and App rules no longer apply there, by writing a line to:".i18n())
+            Text("Enable your terminal, then send one command per line to control the input source in your pane.".i18n())
             Text("~/Library/Application Support/Input Source Pro/terminal-control")
                 .font(.system(.body, design: .monospaced))
 
@@ -76,11 +76,12 @@ struct TerminalRulesSettingsView: View {
                 }
             }
 
-            Text("<pid> is a process running in that pane; <id> is an input source ID such as com.apple.keylayout.ABC. Panes inside Zellij are not supported.".i18n())
+            Text("<pid> is a process running in that pane; <id> is an input source ID such as com.apple.keylayout.ABC. Alacritty needs distinguishable window titles. Panes inside Zellij are not supported.".i18n())
                 .foregroundColor(.secondary)
         }
         .textSelection(.enabled)
-        .fixedSize()
+        .frame(width: 440, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
         .padding()
     }
 

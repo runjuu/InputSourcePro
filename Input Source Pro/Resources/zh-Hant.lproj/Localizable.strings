@@ -264,9 +264,9 @@
 "Receive beta updates" = "接收測試版更新";
 "Stable updates resume when a newer stable build is available." = "當有更新的穩定版組建可用時，將恢復穩定版更新。";
 
-"A program can take over its own pane, so Terminal Rules and App rules no longer apply there, by writing a line to:" = "程式可以接管自己所在的窗格，讓終端規則和 App 規則在那裡不再生效，方法是往這個檔案寫一行：";
+"Enable your terminal, then send one command per line to control the input source in your pane." = "啟用使用的終端機後，將指令寫入以下檔案即可控制目前窗格的輸入法，每行一個指令。";
 "Switch to the input source" = "切換到該輸入法";
 "Remember the current input source, then switch" = "記住目前輸入法，再切換";
 "Switch back to the remembered input source" = "切回記住的輸入法";
 "Hand the pane back to the rules" = "把窗格交還給規則";
-"<pid> is a process running in that pane; <id> is an input source ID such as com.apple.keylayout.ABC. Panes inside Zellij are not supported." = "<pid> 是在該窗格裡執行的程序；<id> 是輸入法 ID，例如 com.apple.keylayout.ABC。不支援 Zellij 裡的窗格。";
+"<pid> is a process running in that pane; <id> is an input source ID such as com.apple.keylayout.ABC. Alacritty needs distinguishable window titles. Panes inside Zellij are not supported." = "<pid> 是在該窗格裡執行的程序；<id> 是輸入法 ID，例如 com.apple.keylayout.ABC。Alacritty 需要可區分的視窗標題。不支援 Zellij 裡的窗格。";

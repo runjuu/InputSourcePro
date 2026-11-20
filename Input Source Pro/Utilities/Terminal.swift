@@ -42,14 +42,14 @@ extension Terminal {
     /// `TerminalProbe` answer), so a refresh reads it again without asking the
     /// terminal. Confined to `TerminalProcess.queue`, which orders it with the
     /// reads that use it.
-    private static var focusedTTYs: [Terminal: String] = [:]
+    private static var focusedTTYs: [Terminal: (pid: pid_t, path: String)] = [:]
     /// Terminals whose floating panel has focus (`TerminalPanelFocus`), so
     /// `TerminalProbe` asks for the panel's pane. Confined to `TerminalProcess.queue`.
     private static var focusedPanels: Set<Terminal> = []
 
     var isPanelFocused: Bool { Self.focusedPanels.contains(self) }
     /// The tty a refresh reads again, nil when none is remembered. Call on `TerminalProcess.queue`.
-    var focusedTTY: String? { Self.focusedTTYs[self] }
+    var focusedTTY: String? { Self.focusedTTYs[self]?.path }
 
     /// Marks whether this terminal's floating panel has focus and forgets the
     /// focused tty, which belonged to the other side. Call on `TerminalProcess.queue`.
@@ -64,20 +64,21 @@ extension Terminal {
 
     /// What `tty` runs, which becomes this terminal's focused tty; nil forgets
     /// it and reads nothing, in no known pane. Call on `TerminalProcess.queue`.
-    func focusedProgram(onTTY tty: String?) -> TerminalReading {
-        Self.focusedTTYs[self] = tty
+    func focusedProgram(onTTY tty: String?, pid: pid_t) -> TerminalReading {
+        Self.focusedTTYs[self] = tty.map { (pid, $0) }
         return tty.map { TerminalProcess.foregroundProgram(onTTY: $0) } ?? TerminalReading(program: nil, pane: nil)
     }
 
     /// The focused pane, read again on the remembered tty; the terminal is
     /// probed for its tty when none is remembered. Call on `TerminalProcess.queue`.
-    func refreshedProgram() -> TerminalReading {
-        let focused = Self.focusedTTYs[self]
+    func refreshedProgram(pid: pid_t) -> TerminalReading {
+        let cached = Self.focusedTTYs[self]
+        let focused = cached?.pid == pid ? cached?.path : nil
         IndicatorDiagnostics.record("terminal.refresh bundle=\(rawValue) tty=\(focused ?? "-")")
         if let focused {
             return TerminalProcess.foregroundProgram(onTTY: focused)
         }
-        return TerminalProbe.program(self)
+        return TerminalProbe.program(self, pid: pid)
     }
 }
 
