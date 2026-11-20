@@ -294,6 +294,31 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertFalse(TerminalTrail.isAlive(pid_t.max))
     }
 
+    func testHerdrExecRefreshesWithoutChangingPIDOrPane() throws {
+        let input = Pipe()
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", "read go; exec /bin/cat"]
+        process.standardInput = input
+        process.standardOutput = FileHandle.nullDevice
+        try process.run()
+        defer {
+            input.fileHandleForWriting.closeFile()
+            process.waitUntilExit()
+        }
+
+        let harness = Harness()
+        harness.bringToFront(.ghostty)
+        let trail = TerminalTrail(herdrExecPIDs: [process.processIdentifier])
+        harness.watcher.follow(trail, for: .ghostty)
+        waitUntil("exec watch registered") { harness.refreshes == 1 }
+        harness.watcher.follow(trail, for: .ghostty)
+        input.fileHandleForWriting.write(Data("go\n".utf8))
+        waitUntil("same process execed cat") { harness.refreshes == 2 }
+        XCTAssertEqual(harness.paneChanges, 0)
+        XCTAssertTrue(process.isRunning)
+    }
+
     func testTTYIsWatchedThroughItsEarliestReadableProcess() {
         let processes = [
             TerminalProcess(pid: 9, pgid: 9, foregroundPgid: 9, startTime: 3, comm: "nvim"),

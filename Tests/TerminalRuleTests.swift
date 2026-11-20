@@ -381,10 +381,12 @@ final class MultiplexerTests: XCTestCase {
             XCTAssertEqual(Array(reading.trail.herdrClients.values), [client.sole], client.socket)
             if client.sole && client.singleTab != false && client.popup != true {
                 XCTAssertEqual(try XCTUnwrap(reading.tty), TerminalProcess.ttyPath(ofPID: client.shell))
+                XCTAssertTrue(reading.trail.herdrExecPIDs.contains(client.shell), "Watch the shown shell for an in-place exec")
             } else {
                 XCTAssertEqual(reading.program?.key, "herdr")
                 XCTAssertNil(reading.tty)
                 XCTAssertTrue(reading.paneControlUnavailable)
+                XCTAssertTrue(reading.trail.herdrExecPIDs.isEmpty)
             }
         }
     }
