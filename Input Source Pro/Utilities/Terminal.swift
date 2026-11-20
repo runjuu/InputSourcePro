@@ -90,8 +90,8 @@ extension Terminal {
 /// so a shell is tied to its pane too. `pane` is nil when no pane was read.
 /// `trail` is what the lookup went through, for `TerminalWatcher`; it is not
 /// part of what was read, so two readings compare equal without it. `tty` is
-/// the innermost tty read (through multiplexers), nil when none was; it is left
-/// out of `==` too, since `pane` already tells panes apart.
+/// the focused pane's tty when the emulator and its multiplexers can identify it.
+/// `pane` already tells panes apart for equality.
 struct TerminalReading: Equatable {
     let program: TerminalProgram?
     let pane: String?
@@ -249,12 +249,26 @@ extension TerminalProcess {
         }
         let arguments = arguments(pid: process.pid)
         let found = program(comm: process.comm, arguments: arguments)
-        let reading = TerminalReading(program: TerminalProgram(key: found.key, name: found.name, pane: pane, tty: path), pane: pane, tty: path)
-        guard depth < Multiplexer.maxDepth, let multiplexer = Multiplexer(rawValue: found.key) else { return reading }
+        return foregroundProgram(found, onTTY: path, pane: pane, depth: depth, trail: &trail) { multiplexer, trail in
+            multiplexer.focusedPane(clientPID: process.pid, clientTTY: path, arguments: arguments, trail: &trail)
+        }
+    }
+
+    static func foregroundProgram(
+        _ found: TerminalProgram, onTTY path: String, pane: String, depth: Int, trail: inout TerminalTrail,
+        focusedPane: (Multiplexer, inout TerminalTrail) -> Multiplexer.Pane?
+    ) -> TerminalReading {
+        let multiplexer = Multiplexer(rawValue: found.key)
+        // The client is still a Terminal Rule match when its inner pane can't be read.
+        // Only that inner pane can identify the tty for program control.
+        let tty = multiplexer == nil ? path : nil
+        let program = TerminalProgram(key: found.key, name: found.name, pane: pane, tty: tty)
+        let reading = TerminalReading(program: program, pane: pane, tty: tty)
+        guard let multiplexer, depth < Multiplexer.maxDepth else { return reading }
 
         let inner: TerminalReading
         var paneTTY: String?
-        switch multiplexer.focusedPane(clientPID: process.pid, clientTTY: path, arguments: arguments, trail: &trail) {
+        switch focusedPane(multiplexer, &trail) {
         case nil:
             inner = reading
         case let .tty(tty, label)?:

@@ -575,10 +575,7 @@ extension ApplicationVM {
                 retryDelay = revision == previousRequest ? min(60, retryDelay * 2) : 0.5
                 previousRequest = revision
                 retryAt = now + retryDelay
-                return lookup().filter { reading in
-                    revision == requestRevision() && (reading.tty != nil || reading.paneControlUnavailable)
-                }
-                .eraseToAnyPublisher()
+                return lookup().filter { _ in revision == requestRevision() }.eraseToAnyPublisher()
             }
             .first()
             .eraseToAnyPublisher()
@@ -624,6 +621,8 @@ extension ApplicationVM {
                     }
                     .eraseToAnyPublisher()
             }
+            // A failed command probe leaves the focused pane and its keyboard in place.
+            .filter { !forControl || $0.tty != nil || $0.paneControlUnavailable }
             .eraseToAnyPublisher()
         }
     }

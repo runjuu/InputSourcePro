@@ -195,6 +195,25 @@ final class TerminalProcessTests: XCTestCase {
 }
 
 final class MultiplexerTests: XCTestCase {
+    func testUnreadableTmuxPaneKeepsTheRuleWithoutExposingItsClientTTY() {
+        let client = "/dev/ttys010"
+        let program = TerminalProgram(key: "tmux", name: "tmux: client")
+        for depth in [0, 1, Multiplexer.maxDepth] {
+            var trail = TerminalTrail()
+            var asked = false
+            let reading = TerminalProcess.foregroundProgram(program, onTTY: client, pane: client, depth: depth, trail: &trail) { mux, _ in
+                XCTAssertEqual(mux, .tmux)
+                asked = true
+                return nil
+            }
+            XCTAssertEqual(asked, depth < Multiplexer.maxDepth)
+            XCTAssertEqual(reading.program, TerminalProgram(key: program.key, name: program.name, pane: client))
+            XCTAssertEqual(reading.pane, client)
+            XCTAssertNil(reading.tty)
+            XCTAssertFalse(reading.paneControlUnavailable)
+        }
+    }
+
     func testTmuxClientsNameThePaneTTYOfTheAskedClient() {
         // Each client's line carries its own session's pane; a control-mode client has no tty.
         let clients = "/dev/ttys092 /dev/ttys010\n/dev/ttys091 /dev/ttys016\n /dev/ttys039\n"

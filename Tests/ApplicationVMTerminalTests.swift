@@ -492,6 +492,48 @@ final class ApplicationVMTerminalTests: XCTestCase {
         XCTAssertEqual(lock.withLock { handbackProbes }, 3)
     }
 
+    func testUnansweredCommandProbeKeepsAnotherPanesControlledKeyboard() async throws {
+        let app = FakeApp(bundleIdentifier: Terminal.iterm.rawValue, pid: 999_123)
+        let focusedTTY = "/dev/ttys123"
+        let otherTTY = "/dev/ttys124"
+        let writer = TerminalProcess.Identity(pid: 123, startTime: 0)
+        let prefs = try Self.inMemoryPreferencesVM()
+        let restore = Self.setTerminalPreferences(prefs, enabled: .iterm, rules: [])
+        defer { restore() }
+        prefs.terminalControl.select(InputSource.getCurrentInputSource(), on: focusedTTY, writer: writer)
+        let lock = NSLock()
+        var probes = 0
+        var failNextProbe = false
+        let vm = ApplicationVM(preferencesVM: prefs, environment: .init(
+            frontmostApplication: { app }, focusedApplication: { app },
+            runningApplications: Just([app]).eraseToAnyPublisher(), isTerminalEnabled: prefs.isTerminalEnabled,
+            probedProgram: { _, _ in
+                lock.withLock {
+                    probes += 1
+                    if failNextProbe {
+                        failNextProbe = false
+                        return TerminalReading(program: nil, pane: nil)
+                    }
+                    return TerminalReading(program: nil, pane: focusedTTY, tty: focusedTTY)
+                }
+            },
+            terminalPanelFocus: Self.standardTerminalWindow,
+            ttyOwner: { ($0, $0 == writer.pid ? focusedTTY : otherTTY, 0) }, jobState: { _, _ in .foreground }
+        ))
+        try await Self.waitFor("the controlled shell's activation probes") {
+            vm.appKind?.controlledShellTTY == focusedTTY && lock.withLock { probes >= 2 }
+        }
+
+        var publications = 0
+        let contexts = vm.$appKind.dropFirst().sink { _ in publications += 1 }
+        defer { contexts.cancel() }
+        lock.withLock { failNextProbe = true }
+        await vm.receiveTerminalControl(lines: "isp:124:pop\n")
+        XCTAssertFalse(lock.withLock { failNextProbe })
+        XCTAssertEqual(publications, 0, "An unanswered lookup must not apply the App Rule to the focused shell")
+        XCTAssertEqual(prefs.focusedTerminalTTY(.iterm), focusedTTY)
+    }
+
     func testCommandsOnlyControlTerminalsEnabledWhenTheyArrived() async throws {
         let app = FakeApp(bundleIdentifier: Terminal.iterm.rawValue, pid: 999_113)
         let tty = "/dev/ttys113"
