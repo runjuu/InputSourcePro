@@ -37,6 +37,12 @@ final class ApplicationVM: ObservableObject {
     }
     private var pendingPaneKeyboard: PaneKeyboardObservation?
     private var verifyingPaneKeyboard = false
+    private struct FocusedControlWriter {
+        let app: NSRunningApplication
+        let tty: String
+        let writer: TerminalProcess.Identity
+        let focusRevision: UInt64
+    }
     private let terminalRefreshes = PassthroughSubject<Void, Never>()
     private let terminalControlRechecks = PassthroughSubject<Terminal, Never>()
     private var terminalControlPendingTTYs = Set<String>()
@@ -77,6 +83,7 @@ final class ApplicationVM: ObservableObject {
         var temporaryInputWindowInProgress: () -> Bool = { false }
         var temporaryInputWindowRestored: AnyPublisher<Void, Never> = Empty().eraseToAnyPublisher()
         var inputSourceForReconciliation: @MainActor () -> InputSource = { InputSourceSwitcher.inputSourceForReconciliation() }
+        var hasKeyboardFocus: (pid_t) -> Bool = { _ in true }
 
         @MainActor static func live(_ preferencesVM: PreferencesVM) -> Self {
             Self(
@@ -93,7 +100,12 @@ final class ApplicationVM: ObservableObject {
                 probedProgram: TerminalProbe.program,
                 terminalPanelFocus: .live,
                 temporaryInputWindowInProgress: { InputSourceSwitcher.isTemporaryInputWindowInProgress },
-                temporaryInputWindowRestored: InputSourceSwitcher.temporaryInputWindowRestored
+                temporaryInputWindowRestored: InputSourceSwitcher.temporaryInputWindowRestored,
+                hasKeyboardFocus: { pid in
+                    if let focused = PrivateInputSourceSelector.keyFocusPID() { return focused == pid }
+                    guard let app: UIElement = try? systemWideElement.attribute(.focusedApplication) else { return false }
+                    return (try? app.pid()) == pid
+                }
             )
         }
     }
@@ -348,7 +360,15 @@ extension ApplicationVM {
         let epoch = preferencesVM.terminalControl.epoch
         guard preferencesVM.terminalControl.acceptsCommands(from: epoch) else { return }
         let messages = lines.split { $0 == "\n" || $0 == "\r\n" }.compactMap(TerminalControlCommand.init(line:))
+        guard !messages.isEmpty else { return }
         var remaining = messages[...]
+        var previousFocus = appKind.flatMap { context -> FocusedControlWriter? in
+            guard let pane = preferencesVM.controlledTerminalPane(context),
+                  preferencesVM.focusedTerminalTTY(pane.terminal) == pane.tty,
+                  let writer = preferencesVM.terminalControl.activeWriter(on: pane.tty, in: pane.terminal),
+                  context.getApp() == currentTerminalForControl() else { return nil }
+            return FocusedControlWriter(app: context.getApp(), tty: pane.tty, writer: writer, focusRevision: terminalFocusRevision)
+        }
         while !remaining.isEmpty {
             let waiting = environment.temporaryInputWindowInProgress()
             var windowStillOpen = waiting
@@ -369,7 +389,7 @@ extension ApplicationVM {
                     for await _ in settledHandback(for: app).values { break }
                 }
             }
-            await receiveTerminalControl(&remaining, epoch: epoch, windowStillOpen: windowStillOpen)
+            await receiveTerminalControl(&remaining, epoch: epoch, windowStillOpen: windowStillOpen, previousFocus: &previousFocus)
         }
     }
 
@@ -387,7 +407,8 @@ extension ApplicationVM {
     }
 
     private func receiveTerminalControl(
-        _ remaining: inout ArraySlice<TerminalControlCommand>, epoch: UInt64, windowStillOpen: Bool
+        _ remaining: inout ArraySlice<TerminalControlCommand>, epoch: UInt64, windowStillOpen: Bool,
+        previousFocus: inout FocusedControlWriter?
     ) async {
         // A focus-lost hook can reach the FIFO before the terminal's AX or tmux
         // notification reaches us. Verify the pane again after each handback.
@@ -414,7 +435,8 @@ extension ApplicationVM {
         repeat {
             let message = remaining.removeFirst()
             if let tty = receiveTerminalControl(
-                message, epoch: epoch, focusedTTY: focusedTTY, verifiedApp: initialApp, publishVerifiedPane: publishVerifiedPane
+                message, epoch: epoch, focusedTTY: focusedTTY, verifiedApp: initialApp,
+                previousFocus: &previousFocus, publishVerifiedPane: publishVerifiedPane
             ) {
                 changedTTYs.insert(tty)
             }
@@ -487,6 +509,9 @@ extension ApplicationVM {
 
     private func currentTerminalForControl() -> NSRunningApplication? {
         guard let app = watchedTerminalApp, let terminal = Terminal(app), preferencesVM.isTerminalEnabled(terminal) else { return nil }
+        // A nonactivating panel can take keyboard focus without changing the
+        // frontmost app or delivering its Accessibility notification yet.
+        guard environment.hasKeyboardFocus(app.processIdentifier) else { return nil }
         let front = environment.frontmostApplication()
         let panel = preferencesVM.terminalPanel
         guard front == app || panel == app else { return nil }
@@ -536,7 +561,7 @@ extension ApplicationVM {
             guard let self, !forControl || self.currentTerminalForControl() == app else { return Empty().eraseToAnyPublisher() }
             let panel = self.preferencesVM.terminalPanel == app
             let pid = app.processIdentifier
-            let readPanel = self.environment.terminalPanelFocus.controlAttributes
+            let panelEnvironment = self.environment.terminalPanelFocus
             let revision = self.terminalFocusRevision
             return lookup().flatMap { [weak self] reading -> AnyPublisher<TerminalReading, Never> in
                 guard let self else { return Empty().eraseToAnyPublisher() }
@@ -547,27 +572,25 @@ extension ApplicationVM {
                     self.preferencesVM.terminalControl.isControlled($0, in: terminal) || self.terminalControlPendingTTYs.contains($0)
                 } == true
                 let checkPanel = panel || terminal == .ghostty && (forControl || controlsPane)
-                if forControl || checkPanel {
+                if forControl || checkPanel || controlsPane {
                     guard revision == self.terminalFocusRevision, self.currentTerminalForControl() == app else {
                         return Empty().eraseToAnyPublisher()
                     }
                 }
                 guard checkPanel else { return Just(reading).eraseToAnyPublisher() }
-                return TerminalProcess.onQueue { readPanel(pid) }
-                    .compactMap { [weak self] attributes in
-                        guard let self, revision == self.terminalFocusRevision, self.currentTerminalForControl() == app else { return nil }
-                        if let attributes {
-                            let focused = TerminalPanelFocus.isPanelFocused(attributes)
-                            if focused != panel {
-                                self.terminalPanelFocus.reconcile(pid, isFocused: focused)
-                                return nil
-                            }
-                            guard attributes.isFrontmost else { return nil }
-                        } else if panel {
-                            // The panel was standing in for the real frontmost app.
+                return TerminalProcess.onQueue { () -> TerminalPanelFocus.Focus? in
+                    if let focus = panelEnvironment.controlAttributes(pid)?.focus { return focus }
+                    if !panel, terminal == .ghostty, panelEnvironment.ghosttyHasOnlyWindowSurfaces(pid) { return .window }
+                    return nil
+                }
+                    .compactMap { [weak self] focus in
+                        guard let self, let focus, revision == self.terminalFocusRevision, self.currentTerminalForControl() == app else { return nil }
+                        let focused = focus == .panel
+                        if focused != panel {
+                            self.terminalPanelFocus.reconcile(pid, isFocused: focused)
                             return nil
                         }
-                        return reading
+                        return focus == .background ? nil : reading
                     }
                     .eraseToAnyPublisher()
             }
@@ -579,7 +602,8 @@ extension ApplicationVM {
     /// On the focused pane it switches like a shortcut would, through the same
     /// select path as rules; elsewhere it only updates the state.
     private func receiveTerminalControl(
-        _ message: TerminalControlCommand, epoch: UInt64, focusedTTY: String?, verifiedApp: NSRunningApplication?, publishVerifiedPane: () -> Void
+        _ message: TerminalControlCommand, epoch: UInt64, focusedTTY: String?, verifiedApp: NSRunningApplication?,
+        previousFocus: inout FocusedControlWriter?, publishVerifiedPane: () -> Void
     ) -> String? {
         // Settings can change while verification is in flight. Keep the batch
         // only for terminals that have stayed enabled since it arrived.
@@ -624,7 +648,15 @@ extension ApplicationVM {
         case let .push(id):
             if let source = resolve(id) {
                 let live = focusedTerminal.map { ($0, environment.inputSourceForReconciliation()) }
-                preferencesVM.terminalControl.push(source, on: tty, writer: writer, live: live, epoch: epoch)
+                // TIS can already know about a manual switch whose notification
+                // hasn't arrived. Sample it only for the writer that stayed in
+                // focus; a resumed pane still needs its own remembered source.
+                let useLiveForCurrentWriter = previousFocus?.app == focusedApp && previousFocus?.tty == tty
+                    && previousFocus?.writer == writer && previousFocus?.focusRevision == terminalFocusRevision
+                    && previousWriter == writer && !InputSourceSwitcher.hasSupersededPrivateSelection
+                preferencesVM.terminalControl.push(
+                    source, on: tty, writer: writer, live: live, useLiveForCurrentWriter: useLiveForCurrentWriter, epoch: epoch
+                )
                 target = source
             }
         case .pop:
@@ -632,6 +664,9 @@ extension ApplicationVM {
         case .release:
             preferencesVM.terminalControl.release(tty, writer: writer)
         }
+        // Consecutive commands in one delivery stack their preceding result,
+        // even while the system is still applying that selection.
+        if target != nil, previousFocus?.tty == tty { previousFocus = nil }
         terminalWriterChanges.send(())
 
         IndicatorDiagnostics.record("terminal.isp pid=\(message.pid) owner=\(owner.pid) tty=\(tty) cmd=\(message.command.name) focused=\(focusedApp != nil) source=\(target?.persistentIdentifier ?? "-")")

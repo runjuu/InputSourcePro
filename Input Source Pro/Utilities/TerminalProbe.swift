@@ -52,9 +52,25 @@ enum TerminalProbe {
 
     /// The quick terminal's tty: Ghostty's one terminal outside every window.
     private static func ghosttyPanelTTY(pid: pid_t) -> String? {
-        let ttys = { (terminals: NSAppleEventDescriptor) in ask(.ghostty, pid: pid, property("Gtty", of: terminals)).map(strings) }
-        guard let all = ttys(every("Gtrm")), let inWindows = ttys(every("Gtrm", of: every("Gwnd"))) else { return nil }
-        return panelTTY(all: all, inWindows: inWindows)
+        guard let ttys = ghosttySurfaceProperties("Gtty", pid: pid) else { return nil }
+        return panelTTY(all: ttys.all, inWindows: ttys.inWindows)
+    }
+
+    /// Without an AX answer, the regular window is unambiguous only if no
+    /// quick-terminal surface exists. Surface IDs also cover a tty still opening.
+    static func ghosttyHasOnlyWindowSurfaces(pid: pid_t) -> Bool {
+        guard let ids = ghosttySurfaceProperties("ID  ", pid: pid), !ids.all.isEmpty,
+              ids.all.allSatisfy({ !$0.isEmpty }) else { return false }
+        return ids.all.sorted() == ids.inWindows.sorted()
+    }
+
+    private static func ghosttySurfaceProperties(_ code: String, pid: pid_t) -> (all: [String], inWindows: [String])? {
+        let read = { (terminals: NSAppleEventDescriptor) in
+            ask(.ghostty, pid: pid, property(code, of: terminals)).flatMap(strings)
+        }
+        // Read all surfaces last so a freshly opened quick terminal is included.
+        guard let windows = read(every("Gtrm", of: every("Gwnd"))), let all = read(every("Gtrm")) else { return nil }
+        return (all, windows)
     }
 
     /// The only tty in `all` that no window holds; nil when there is none, or
@@ -129,9 +145,14 @@ enum TerminalProbe {
     }
 
     /// The strings in `descriptor`, nested lists flattened (one list per window).
-    private static func strings(_ descriptor: NSAppleEventDescriptor) -> [String] {
-        guard descriptor.descriptorType == DescType(typeAEList) else { return descriptor.stringValue.map { [$0] } ?? [] }
-        return (0 ..< descriptor.numberOfItems).flatMap { descriptor.atIndex($0 + 1).map(strings) ?? [] }
+    private static func strings(_ descriptor: NSAppleEventDescriptor) -> [String]? {
+        guard descriptor.descriptorType == DescType(typeAEList) else { return descriptor.stringValue.map { [$0] } }
+        var values = [String]()
+        for index in 0 ..< descriptor.numberOfItems {
+            guard let item = descriptor.atIndex(index + 1), let strings = strings(item) else { return nil }
+            values.append(contentsOf: strings)
+        }
+        return values
     }
 
     // MARK: - WezTerm
