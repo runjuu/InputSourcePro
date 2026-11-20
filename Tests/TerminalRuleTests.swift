@@ -176,11 +176,11 @@ final class TerminalProcessTests: XCTestCase {
         TerminalProcess.queue.sync {
             // /dev/null runs no foreground job, so it reads as a shell prompt in that pane.
             let shell = TerminalReading(program: nil, pane: "/dev/null", tty: "/dev/null")
-            XCTAssertEqual(Terminal.ghostty.focusedProgram(onTTY: "/dev/null"), shell)
-            XCTAssertEqual(Terminal.ghostty.refreshedProgram(), shell)
+            XCTAssertEqual(Terminal.ghostty.focusedProgram(onTTY: "/dev/null", pid: getpid()), shell)
+            XCTAssertEqual(Terminal.ghostty.refreshedProgram(pid: getpid()), shell)
             XCTAssertEqual(Terminal.ghostty.focusedTTY, "/dev/null")
 
-            XCTAssertEqual(Terminal.ghostty.focusedProgram(onTTY: nil), TerminalReading(program: nil, pane: nil))
+            XCTAssertEqual(Terminal.ghostty.focusedProgram(onTTY: nil, pid: getpid()), TerminalReading(program: nil, pane: nil))
             XCTAssertNil(Terminal.ghostty.focusedTTY, "Forgotten: the next refresh asks the terminal")
         }
     }
@@ -430,15 +430,16 @@ final class TerminalProgramGateTests: XCTestCase {
 }
 
 final class TerminalProbeTests: XCTestCase {
-    func testWezTermFocusedPaneComesFromTheFirstClient() {
+    func testWezTermFocusedPaneComesFromTheFrontGUIClient() {
         let clients = """
         [{"pid": 46286, "workspace": "default", "focused_pane_id": 2},
          {"pid": 51000, "workspace": "default", "focused_pane_id": 7}]
         """
 
-        XCTAssertEqual(TerminalProbe.focusedPaneID(fromClients: clients), 2)
-        XCTAssertNil(TerminalProbe.focusedPaneID(fromClients: "[]"))
-        XCTAssertNil(TerminalProbe.focusedPaneID(fromClients: "Error: failed to connect"))
+        XCTAssertEqual(TerminalProbe.focusedPaneID(fromClients: clients, pid: 51000), 7)
+        XCTAssertNil(TerminalProbe.focusedPaneID(fromClients: clients, pid: 99999))
+        XCTAssertNil(TerminalProbe.focusedPaneID(fromClients: "[]", pid: 1))
+        XCTAssertNil(TerminalProbe.focusedPaneID(fromClients: "Error: failed to connect", pid: 1))
     }
 
     func testWezTermPaneTTYIsLookedUpByPaneID() {
@@ -453,14 +454,29 @@ final class TerminalProbeTests: XCTestCase {
     }
 
     func testAlacrittyWindowTitlePicksTheTTYWhoseProgramItNames() {
-        let shell = (tty: "/dev/ttys017", program: TerminalProgram?.none)
-        let claude = (tty: "/dev/ttys018", program: Optional(TerminalProgram(key: "claude", name: "2.1.318")))
+        let shell = (tty: "/dev/isp-test-shell", program: TerminalProgram?.none)
+        let claude = (tty: "/dev/isp-test-claude", program: Optional(TerminalProgram(key: "claude", name: "2.1.318")))
+        TerminalProcess.queue.sync {
+            XCTAssertEqual(TerminalProbe.alacrittyReading(titled: nil, among: [shell], pid: getpid()).tty, shell.tty)
+            XCTAssertEqual(TerminalProbe.alacrittyReading(titled: "✳ Claude Code", among: [shell, claude], pid: getpid()).tty, claude.tty)
+            XCTAssertNil(TerminalProbe.alacrittyReading(titled: "user@host: ~", among: [shell, claude], pid: getpid()).tty)
+            XCTAssertNil(TerminalProbe.alacrittyReading(titled: nil, among: [shell, claude], pid: getpid()).tty)
+            XCTAssertNil(TerminalProbe.alacrittyReading(titled: "claude", among: [], pid: getpid()).tty)
+        }
+    }
 
-        XCTAssertEqual(TerminalProbe.tty(titled: nil, among: [shell]), shell.tty)
-        XCTAssertEqual(TerminalProbe.tty(titled: "✳ Claude Code", among: [shell, claude]), claude.tty)
-        XCTAssertNil(TerminalProbe.tty(titled: "user@host: ~", among: [shell, claude]))
-        XCTAssertNil(TerminalProbe.tty(titled: nil, among: [shell, claude]))
-        XCTAssertNil(TerminalProbe.tty(titled: "claude", among: []))
+    func testAlacrittyWindowsWithTheSameProgramHaveARuleButNoControllableTTY() {
+        let editor = TerminalProgram(key: "nvim")
+        let first = (tty: "/dev/isp-test-first", program: Optional(editor))
+        let second = (tty: "/dev/isp-test-second", program: Optional(editor))
+        TerminalProcess.queue.sync {
+            _ = TerminalProbe.alacrittyReading(titled: nil, among: [first], pid: getpid())
+            let reading = TerminalProbe.alacrittyReading(titled: "nvim", among: [first, second], pid: getpid())
+            XCTAssertEqual(reading.program, editor)
+            XCTAssertNil(reading.pane)
+            XCTAssertNil(reading.tty)
+            XCTAssertNil(Terminal.alacritty.focusedTTY, "A later refresh must not restore the previous window's tty")
+        }
     }
 }
 
@@ -691,7 +707,7 @@ final class FocusedTerminalTTYTests: XCTestCase {
         let vm = ApplicationVM(preferencesVM: preferences, environment: .init(
             frontmostApplication: { nil }, focusedApplication: { nil },
             runningApplications: Just([]).eraseToAnyPublisher(), isTerminalEnabled: { _ in false },
-            probedProgram: { _ in TerminalReading(program: nil, pane: nil) },
+            probedProgram: { _, _ in TerminalReading(program: nil, pane: nil) },
             terminalPanelFocus: .init(read: { _, _ in AnyCancellable {} }),
             ttyOwner: { _ in (parent, tty, writerStartTime) },
             jobState: { _, _ in .foreground }

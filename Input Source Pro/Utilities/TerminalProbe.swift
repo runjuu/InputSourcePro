@@ -18,43 +18,41 @@ enum TerminalProbe {
     /// The focused pane's program, nil for a shell prompt or, in no known
     /// pane, when the terminal can't be asked. The tty it finds becomes the
     /// terminal's focused tty, which refreshes read again. Call on `TerminalProcess.queue`.
-    static func program(_ terminal: Terminal) -> TerminalReading {
-        terminal.focusedProgram(onTTY: focusedTTY(of: terminal))
-    }
-
-    private static func focusedTTY(of terminal: Terminal) -> String? {
+    static func program(_ terminal: Terminal, pid: pid_t) -> TerminalReading {
+        let tty: String?
         switch terminal {
         case .ghostty:
-            // The quick terminal belongs to no window, so `front window` names the window behind it.
-            guard terminal.isPanelFocused else {
-                // tty of focused terminal of selected tab of front window
-                return askTTY(terminal, property("Gtty", of: property("GTfT", of: property("GWsT", of: property("GFWn")))))
+            // The quick terminal belongs to no window; the front window is the one behind it.
+            if terminal.isPanelFocused {
+                tty = ghosttyPanelTTY(pid: pid)
+            } else {
+                tty = askTTY(terminal, pid: pid, property("Gtty", of: property("GTfT", of: property("GWsT", of: property("GFWn")))))
             }
-            return ghosttyPanelTTY()
         case .iterm:
             // tty of current session of current tab of current window
-            return askTTY(terminal, property("Stty", of: property("Wcsn", of: property("Crtb", of: property("Crwn")))))
+            tty = askTTY(terminal, pid: pid, property("Stty", of: property("Wcsn", of: property("Crtb", of: property("Crwn")))))
         case .terminalApp:
             // tty of selected tab of window 1
-            return askTTY(terminal, property("ttty", of: property("tcnt", of: element("cwin", at: 1))))
+            tty = askTTY(terminal, pid: pid, property("ttty", of: property("tcnt", of: element("cwin", at: 1))))
         case .wezterm:
-            return weztermTTY()
+            tty = weztermTTY(pid: pid)
         case .alacritty:
-            return alacrittyTTY()
+            return alacrittyReading(ofPID: pid)
         }
+        return terminal.focusedProgram(onTTY: tty, pid: pid)
     }
 
     // MARK: - Apple Events (Ghostty, iTerm2, Terminal)
 
     /// `specifier`'s value in `terminal`, if it is a tty path.
-    private static func askTTY(_ terminal: Terminal, _ specifier: NSAppleEventDescriptor) -> String? {
-        guard let tty = ask(terminal, specifier)?.stringValue, tty.hasPrefix("/dev/") else { return nil }
+    private static func askTTY(_ terminal: Terminal, pid: pid_t, _ specifier: NSAppleEventDescriptor) -> String? {
+        guard let tty = ask(terminal, pid: pid, specifier)?.stringValue, tty.hasPrefix("/dev/") else { return nil }
         return tty
     }
 
     /// The quick terminal's tty: Ghostty's one terminal outside every window.
-    private static func ghosttyPanelTTY() -> String? {
-        let ttys = { (terminals: NSAppleEventDescriptor) in ask(.ghostty, property("Gtty", of: terminals)).map(strings) }
+    private static func ghosttyPanelTTY(pid: pid_t) -> String? {
+        let ttys = { (terminals: NSAppleEventDescriptor) in ask(.ghostty, pid: pid, property("Gtty", of: terminals)).map(strings) }
         guard let all = ttys(every("Gtrm")), let inWindows = ttys(every("Gtrm", of: every("Gwnd"))) else { return nil }
         return panelTTY(all: all, inWindows: inWindows)
     }
@@ -71,11 +69,9 @@ enum TerminalProbe {
     /// with a `get` Apple Event sent from this thread; nil when it isn't
     /// running, fails or doesn't answer in time. In process: an `osascript`
     /// run costs about 300 ms, the event about 10.
-    private static func ask(_ terminal: Terminal, _ specifier: NSAppleEventDescriptor) -> NSAppleEventDescriptor? {
+    private static func ask(_ terminal: Terminal, pid: pid_t, _ specifier: NSAppleEventDescriptor) -> NSAppleEventDescriptor? {
         let now = ProcessInfo.processInfo.systemUptime
-        guard automationDenied[terminal].map({ now - $0 >= automationRetryInterval }) ?? true,
-              let pid = NSRunningApplication.runningApplications(withBundleIdentifier: terminal.rawValue).first?.processIdentifier
-        else { return nil }
+        guard automationDenied[terminal].map({ now - $0 >= automationRetryInterval }) ?? true else { return nil }
 
         let event = NSAppleEventDescriptor(
             eventClass: AEEventClass(kAECoreSuite),
@@ -142,10 +138,8 @@ enum TerminalProbe {
 
     /// The `wezterm` CLI: the one inside the running app (a download from wezterm.org
     /// installs nothing else), else one a package manager installed.
-    private static var wezterm: String? {
-        let bundled = NSRunningApplication
-            .runningApplications(withBundleIdentifier: Terminal.wezterm.rawValue)
-            .first?.bundleURL?
+    private static func weztermExecutable(pid: pid_t) -> String? {
+        let bundled = NSRunningApplication(processIdentifier: pid)?.bundleURL?
             .appendingPathComponent("Contents/MacOS/wezterm").path
         return bundled.flatMap { FileManager.default.isExecutableFile(atPath: $0) ? $0 : nil }
             ?? TerminalProcess.executable(named: "wezterm")
@@ -153,22 +147,27 @@ enum TerminalProbe {
 
     /// The focused pane's tty from `wezterm cli`, which talks to the running
     /// GUI; nil when it isn't running (`--no-auto-start`: never start a mux server).
-    private static func weztermTTY() -> String? {
-        guard let wezterm else { return nil }
+    private static func weztermTTY(pid: pid_t) -> String? {
+        guard let wezterm = weztermExecutable(pid: pid) else { return nil }
         let cli = { (command: String) in
             TerminalProcess.output(of: wezterm, arguments: ["cli", "--no-auto-start", command, "--format", "json"])
         }
         guard let clients = cli("list-clients"),
-              let pane = focusedPaneID(fromClients: clients),
+              let pane = focusedPaneID(fromClients: clients, pid: pid),
               let panes = cli("list")
         else { return nil }
         return tty(ofPane: pane, in: panes)
     }
 
-    /// `focused_pane_id` of the first client in `wezterm cli list-clients --format json`.
-    static func focusedPaneID(fromClients output: String) -> Int? {
-        struct Client: Decodable { let focusedPaneId: Int? }
-        return (try? snakeCaseDecoder.decode([Client].self, from: Data(output.utf8)))?.first?.focusedPaneId
+    /// The frontmost GUI process's pane. Another connected client can have its own focus.
+    static func focusedPaneID(fromClients output: String, pid: pid_t) -> Int? {
+        struct Client: Decodable {
+            let pid: pid_t
+            let focusedPaneId: Int?
+        }
+        let clients = (try? snakeCaseDecoder.decode([Client].self, from: Data(output.utf8))) ?? []
+        let matches = clients.filter { $0.pid == pid }
+        return matches.count == 1 ? matches[0].focusedPaneId : nil
     }
 
     /// `tty_name` of pane `id` in `wezterm cli list --format json`.
@@ -193,31 +192,42 @@ enum TerminalProbe {
     /// Alacritty has no scripting interface, but each window's shell is a child
     /// of its process with its own tty; with several windows, the focused
     /// window's title picks one.
-    private static func alacrittyTTY() -> String? {
-        guard let pid = NSRunningApplication
-            .runningApplications(withBundleIdentifier: Terminal.alacritty.rawValue)
-            .first?.processIdentifier
-        else { return nil }
-
+    private static func alacrittyReading(ofPID pid: pid_t) -> TerminalReading {
         let ttys = childTTYs(of: pid)
-        guard ttys.count > 1 else { return ttys.first }
+        guard ttys.count > 1 else { return Terminal.alacritty.focusedProgram(onTTY: ttys.first, pid: pid) }
+        var trail = TerminalTrail()
         let programs = ttys.map { tty in
-            (tty: tty, program: TerminalProcess.foregroundProcess(in: TerminalProcess.processes(onTTY: tty)).map {
+            let processes = TerminalProcess.processes(onTTY: tty)
+            if let watched = TerminalTrail.TTY(watching: processes, foregroundPgid: TerminalTrail.foregroundPgid(ofPID:)) {
+                trail.ttys.append(watched)
+            }
+            return (tty: tty, program: TerminalProcess.foregroundProcess(in: processes).map {
                 TerminalProcess.program(comm: $0.comm, arguments: TerminalProcess.arguments(pid: $0.pid))
             })
         }
-        return tty(titled: focusedWindowTitle(of: pid), among: programs)
+        var reading = alacrittyReading(titled: focusedWindowTitle(of: pid), among: programs, pid: pid)
+        // If a job exits, an ambiguous title can start identifying one window.
+        if reading.pane == nil { reading.trail = trail }
+        return reading
     }
 
-    /// The window whose title names a tty's foreground program, or the only tty.
-    /// shortcut: with several windows, a window whose program doesn't put its
-    /// name in the title (a shell prompt, plain vim) matches nothing and gets the
-    /// App Rule, and windows running the same program can't be told apart; ask
-    /// Alacritty for its focused window if it ever gains an IPC query for it.
-    static func tty(titled title: String?, among programs: [(tty: String, program: TerminalProgram?)]) -> String? {
-        guard programs.count > 1 else { return programs.first?.tty }
-        guard let title else { return nil }
-        return programs.first { $0.program.map { title.localizedCaseInsensitiveContains($0.key) } ?? false }?.tty
+    /// Several windows can put the same program in their titles. A shared program
+    /// can still match a Terminal Rule, but none of those ttys identifies the focused pane.
+    static func alacrittyReading(
+        titled title: String?, among programs: [(tty: String, program: TerminalProgram?)], pid: pid_t
+    ) -> TerminalReading {
+        let terminal = Terminal.alacritty
+        guard programs.count > 1 else { return terminal.focusedProgram(onTTY: programs.first?.tty, pid: pid) }
+        let matches = programs.filter { candidate in
+            guard let title, let program = candidate.program else { return false }
+            return title.localizedCaseInsensitiveContains(program.key)
+        }
+        if matches.count == 1 { return terminal.focusedProgram(onTTY: matches[0].tty, pid: pid) }
+
+        let unknown = terminal.focusedProgram(onTTY: nil, pid: pid)
+        guard let shared = matches.first?.program, Multiplexer(rawValue: shared.key) == nil,
+              matches.allSatisfy({ $0.program == shared }) else { return unknown }
+        return TerminalReading(program: shared, pane: nil)
     }
 
     /// The controlling ttys of `pid`'s children. They are `login`, owned by
