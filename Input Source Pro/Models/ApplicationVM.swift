@@ -552,6 +552,38 @@ extension ApplicationVM {
         }
     }
 
+    /// A pending command is settled by a verified tty (including another
+    /// pane), or by a known unsupported configuration. Retry unanswered reads
+    /// while this terminal remains watched. Only one probe runs at a time.
+    private func pendingControlReading(
+        for app: NSRunningApplication, lookup: @escaping TerminalLookup, requestRevision: @escaping () -> UInt64
+    ) -> AnyPublisher<TerminalReading, Never> {
+        var previousRequest: UInt64?
+        var retryAt: TimeInterval = 0
+        var retryDelay: TimeInterval = 0
+        return Timer.interval(seconds: 0.25)
+            .prepend(Date())
+            .delay(for: .milliseconds(Self.terminalFocusSettleMilliseconds), scheduler: DispatchQueue.main)
+            .flatMapFirst { [weak self] _ -> AnyPublisher<TerminalReading, Never> in
+                let revision = requestRevision()
+                let now = ProcessInfo.processInfo.systemUptime
+                guard let self, revision != previousRequest || now >= retryAt,
+                      now >= self.terminalFocusSettleUntil, !self.environment.temporaryInputWindowInProgress(),
+                      self.currentTerminalForControl() == app else { return Empty().eraseToAnyPublisher() }
+                // A terminal that stays unreadable (e.g. Automation denied)
+                // gets at most one probe per minute after the initial retries.
+                retryDelay = revision == previousRequest ? min(60, retryDelay * 2) : 0.5
+                previousRequest = revision
+                retryAt = now + retryDelay
+                return lookup().filter { reading in
+                    revision == requestRevision() && (reading.tty != nil || reading.paneControlUnavailable)
+                }
+                .eraseToAnyPublisher()
+            }
+            .first()
+            .eraseToAnyPublisher()
+    }
+
     private func validatingPanel(
         for app: NSRunningApplication, terminal: Terminal, forControl: Bool, lookup: @escaping TerminalLookup
     ) -> TerminalLookup {
@@ -859,34 +891,24 @@ extension ApplicationVM {
                 self?.terminalFocusDidChange()
             })
             .filter { [weak self] in self?.terminalControlPendingTTYs.isEmpty == false }
+        let recheckControl = controlLookup(for: app, terminal: terminal)
+        var controlRequest: UInt64 = 0
         let controlRechecks = terminalControlRechecks
             .filter { $0 == terminal }
             .mapToVoid()
             .merge(with: restoredFocus)
-            // A nonactivating panel can return the keyboard without an app or pane
-            // change. Wait for the recipient before probing this terminal again.
-            .flatMapLatest { [weak self] _ in
-                Timer.interval(seconds: 0.25).prepend(Date()).first { _ in
-                    guard let self, !self.environment.temporaryInputWindowInProgress() else { return false }
-                    return self.currentTerminalForControl() == app
-                }
+            // A new request invalidates an in-flight answer. The existing timer
+            // will probe again, so bursts of commands never queue extra probes.
+            .handleEvents(receiveOutput: { controlRequest &+= 1 })
+            .flatMapFirst { [weak self] _ -> AnyPublisher<TerminalReading, Never> in
+                guard let self else { return Empty().eraseToAnyPublisher() }
+                return self.pendingControlReading(for: app, lookup: recheckControl, requestRevision: { controlRequest })
             }
-            .debounce(for: settle, scheduler: DispatchQueue.main)
-            .flatMapLatest { [weak self] _ in
-                let revision = self?.terminalFocusRevision
-                let lookup = self?.controlLookup(for: app, terminal: terminal) ?? { Empty().eraseToAnyPublisher() }
-                return lookup().map(Optional.some).replaceEmpty(with: nil).map { ($0, lookup, revision) }
-            }
-            .compactMap { [weak self] reading, lookup, revision -> Void? in
+            .compactMap { [weak self] reading -> Void? in
                 guard let self, !self.terminalControlPendingTTYs.isEmpty else { return nil }
-                guard self.currentTerminalForControl() == app, revision == self.terminalFocusRevision else {
-                    self.terminalControlRechecks.send(terminal)
-                    return nil
-                }
-                guard let reading else { return nil }
                 let reapply = reading.tty.map(self.terminalControlPendingTTYs.contains) == true
                 self.terminalControlPendingTTYs.removeAll()
-                self.receiveTerminalProgram(reading, for: terminal, reapplyControl: reapply, recheck: lookup)
+                self.receiveTerminalProgram(reading, for: terminal, reapplyControl: reapply, recheck: recheckControl)
                 return nil
             }
 
