@@ -349,6 +349,18 @@ final class MultiplexerTests: XCTestCase {
         }
     }
 
+    func testHerdrPaneIsSharedOnlyWhileTheSessionHasOneTab() {
+        func pane(_ workspaces: String) -> String? {
+            let reply = #"{"result":{"snapshot":{"focused_pane_id":"w1:p2","workspaces":[\#(workspaces)],"panes":[{"pane_id":"w1:p2","terminal_id":"t2"}]}}}"#
+            return Multiplexer.herdrView(inSnapshot: Data(reply.utf8))?.focusedPaneId
+        }
+        XCTAssertEqual(pane(#"{"tab_count":1}"#), "w1:p2")
+        // A second client can leave the default on its own tab after disconnecting.
+        XCTAssertNil(pane(#"{"tab_count":2}"#))
+        XCTAssertNil(pane(#"{"tab_count":1},{"tab_count":1}"#))
+        XCTAssertEqual(pane(#"{"tab_count":1}"#), "w1:p2", "Closing the other tab restores a shared view")
+    }
+
     /// Driver-provided PTYs from isolated Herdr sessions, including a shared session.
     func testLiveHerdrClientFocus() throws {
         guard let json = ProcessInfo.processInfo.environment["ISP_HERDR_TUI_PROBE"] else {
@@ -359,13 +371,15 @@ final class MultiplexerTests: XCTestCase {
             let socket: String
             let shell: pid_t
             let sole: Bool
+            let singleTab: Bool?
+            let popup: Bool?
         }
         let clients = try JSONDecoder().decode([Client].self, from: Data(json.utf8))
         for client in clients {
             let reading = TerminalProcess.queue.sync { TerminalProcess.foregroundProgram(onTTY: client.tty) }
             XCTAssertEqual(reading.trail.herdrSockets, [client.socket])
-            XCTAssertEqual(Array(reading.trail.herdrClients.values), [client.sole])
-            if client.sole {
+            XCTAssertEqual(Array(reading.trail.herdrClients.values), [client.sole], client.socket)
+            if client.sole && client.singleTab != false && client.popup != true {
                 XCTAssertEqual(try XCTUnwrap(reading.tty), TerminalProcess.ttyPath(ofPID: client.shell))
             } else {
                 XCTAssertEqual(reading.program?.key, "herdr")

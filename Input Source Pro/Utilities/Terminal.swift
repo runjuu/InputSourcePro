@@ -356,7 +356,7 @@ extension TerminalProcess {
         return nil
     }
 
-    private static func processInfo(_ pid: pid_t) -> (ppid: pid_t, tty: String?, isForeground: Bool, startTime: TimeInterval)? {
+    private static func processInfo(_ pid: pid_t) -> (ppid: pid_t, tty: String?, isForeground: Bool, startTime: TimeInterval, device: dev_t)? {
         var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
         var entry = kinfo_proc()
         var size = MemoryLayout<kinfo_proc>.stride
@@ -369,7 +369,7 @@ extension TerminalProcess {
         else { return nil }
         let dev = entry.kp_eproc.e_tdev
         // NODEV: no controlling tty
-        return (entry.kp_eproc.e_ppid, ttyPath(forDevice: dev), entry.kp_eproc.e_pgid == entry.kp_eproc.e_tpgid, startTime(of: entry))
+        return (entry.kp_eproc.e_ppid, ttyPath(forDevice: dev), entry.kp_eproc.e_pgid == entry.kp_eproc.e_tpgid, startTime(of: entry), dev)
     }
 
     private static func startTime(of entry: kinfo_proc) -> TimeInterval {
@@ -408,21 +408,52 @@ extension TerminalProcess {
         let listening: Bool
     }
 
-    static func unixSockets(ofPID pid: pid_t) -> [UnixSocket] {
+    private static func fileDescriptors(ofPID pid: pid_t) -> [proc_fdinfo]? {
         let stride = Int32(MemoryLayout<proc_fdinfo>.stride)
         let size = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, nil, 0)
-        guard size > 0 else { return [] }
+        guard size > 0 else { return nil }
         var fds = [proc_fdinfo](repeating: proc_fdinfo(), count: Int(size / stride) + 8)
         let capacity = Int32(fds.count) * stride
         let read = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, &fds, capacity)
-        guard read > 0, read < capacity else { return [] }
+        guard read > 0, read < capacity else { return nil }
+        return Array(fds.prefix(Int(read / stride)))
+    }
 
+    /// macOS exposes each PTY master as /dev/ptmx, with the minor device
+    /// number of its corresponding slave. Duplicate descriptors count once.
+    static func ptyMasters(ofPID pid: pid_t) -> Set<UInt32>? {
+        guard let fds = fileDescriptors(ofPID: pid) else { return nil }
+        var devices = Set<UInt32>()
+        for fd in fds where fd.proc_fdtype == PROX_FDTYPE_VNODE {
+            var info = vnode_fdinfowithpath()
+            let size = Int32(MemoryLayout.size(ofValue: info))
+            guard proc_pidfdinfo(pid, fd.proc_fd, PROC_PIDFDVNODEPATHINFO, &info, size) == size else { return nil }
+            if withUnsafeBytes(of: info.pvip.vip_path, { $0.starts(with: "/dev/ptmx\0".utf8) }) {
+                devices.insert(info.pvip.vip_vi.vi_stat.vst_rdev & 0xffffff)
+            }
+        }
+        return devices
+    }
+
+    struct PaneTTY: Equatable {
+        let owner: Identity
+        let path: String
+        let minor: UInt32
+    }
+
+    static func paneTTY(ofPID pid: pid_t) -> PaneTTY? {
+        guard let info = processInfo(pid), let path = info.tty else { return nil }
+        return PaneTTY(owner: Identity(pid: pid, startTime: info.startTime), path: path, minor: UInt32(bitPattern: info.device) & 0xffffff)
+    }
+
+    static func unixSockets(ofPID pid: pid_t) -> [UnixSocket] {
+        guard let fds = fileDescriptors(ofPID: pid) else { return [] }
         func path(_ address: sockaddr_un) -> String {
             withUnsafeBytes(of: address.sun_path) { bytes in
                 String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self)
             }
         }
-        return fds.prefix(Int(read / stride)).compactMap { fd in
+        return fds.compactMap { fd in
             guard fd.proc_fdtype == PROX_FDTYPE_SOCKET else { return nil }
             var info = socket_fdinfo()
             let infoSize = Int32(MemoryLayout<socket_fdinfo>.size)
