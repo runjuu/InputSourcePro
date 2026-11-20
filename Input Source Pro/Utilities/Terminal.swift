@@ -275,10 +275,19 @@ extension TerminalProcess {
         processInfo(pid)?.tty
     }
 
+    /// The PID can be reused while its pane is unfocused.
+    struct Identity: Equatable {
+        let pid: pid_t
+        let startTime: TimeInterval
+    }
+
+    typealias TTYOwner = (pid: pid_t, tty: String, writerStartTime: TimeInterval)
+
     /// The nearest process at or above `pid` (up to `maxDepth` parents) that has a tty
     /// of ours, with that tty: a program's helper (`nvim --embed`) has none, its parent does.
-    static func ttyOwner(ofPID pid: pid_t, maxDepth: Int = 4) -> (pid: pid_t, tty: String)? {
-        ttyOwner(ofPID: pid, maxDepth: maxDepth) { processInfo($0).map { ($0.ppid, $0.tty) } }
+    /// The start time always belongs to the writer, even when a parent owns its tty.
+    static func ttyOwner(ofPID pid: pid_t, maxDepth: Int = 4) -> TTYOwner? {
+        ttyOwner(ofPID: pid, maxDepth: maxDepth) { processInfo($0).map { ($0.ppid, $0.tty, $0.startTime) } }
     }
 
     /// Where `pid` stands on `tty`: gone (exited, or not on it), in the background
@@ -296,30 +305,39 @@ extension TerminalProcess {
     static func ttyOwner(
         ofPID pid: pid_t,
         maxDepth: Int,
-        info: (pid_t) -> (ppid: pid_t, tty: String?)?
-    ) -> (pid: pid_t, tty: String)? {
+        info: (pid_t) -> (ppid: pid_t, tty: String?, startTime: TimeInterval)?
+    ) -> TTYOwner? {
+        guard var entry = info(pid) else { return nil }
+        let writerStartTime = entry.startTime
         var current = pid
-        for _ in 0 ... maxDepth {
-            guard let entry = info(current) else { return nil }
-            if let tty = entry.tty { return (current, tty) }
-            guard entry.ppid > 1 else { return nil }
+        for depth in 0 ... maxDepth {
+            if let tty = entry.tty { return (current, tty, writerStartTime) }
+            guard depth < maxDepth, entry.ppid > 1, let parent = info(entry.ppid) else { return nil }
             current = entry.ppid
+            entry = parent
         }
         return nil
     }
 
-    private static func processInfo(_ pid: pid_t) -> (ppid: pid_t, tty: String?, isForeground: Bool)? {
+    private static func processInfo(_ pid: pid_t) -> (ppid: pid_t, tty: String?, isForeground: Bool, startTime: TimeInterval)? {
         var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
         var entry = kinfo_proc()
         var size = MemoryLayout<kinfo_proc>.stride
-        // An exited pid still succeeds, with size 0.
+        // A reaped pid returns zero bytes. An unreaped writer can still
+        // have a tty-owning parent, but can no longer control the pane.
         guard sysctl(&mib, u_int(mib.count), &entry, &size, nil, 0) == 0,
               size == MemoryLayout<kinfo_proc>.stride,
+              Int32(entry.kp_proc.p_stat) != SZOMB,
               entry.kp_eproc.e_ucred.cr_uid == getuid()
         else { return nil }
         let dev = entry.kp_eproc.e_tdev
         // NODEV: no controlling tty
-        return (entry.kp_eproc.e_ppid, ttyPath(forDevice: dev), entry.kp_eproc.e_pgid == entry.kp_eproc.e_tpgid)
+        return (entry.kp_eproc.e_ppid, ttyPath(forDevice: dev), entry.kp_eproc.e_pgid == entry.kp_eproc.e_tpgid, startTime(of: entry))
+    }
+
+    private static func startTime(of entry: kinfo_proc) -> TimeInterval {
+        let time = entry.kp_proc.p_un.__p_starttime
+        return TimeInterval(time.tv_sec) + TimeInterval(time.tv_usec) / 1_000_000
     }
 
     static func ttyPath(forDevice device: dev_t) -> String? {
@@ -369,7 +387,6 @@ extension TerminalProcess {
         guard sysctl(&mib, u_int(mib.count), &entries, &size, nil, 0) == 0 else { return [] }
 
         return entries.prefix(size / stride).map { entry in
-            let startTime = entry.kp_proc.p_un.__p_starttime
             let comm = withUnsafeBytes(of: entry.kp_proc.p_comm) { bytes in
                 String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self)
             }
@@ -378,7 +395,7 @@ extension TerminalProcess {
                 pid: entry.kp_proc.p_pid,
                 pgid: entry.kp_eproc.e_pgid,
                 foregroundPgid: entry.kp_eproc.e_tpgid,
-                startTime: TimeInterval(startTime.tv_sec) + TimeInterval(startTime.tv_usec) / 1_000_000,
+                startTime: startTime(of: entry),
                 comm: comm
             )
         }
@@ -537,10 +554,11 @@ extension TerminalProcess {
 /// A tty has one controlling writer in the foreground. Stopped jobs keep their
 /// own keyboard and stack until they resume, release control, or exit.
 struct TerminalControlTracker<Source> {
+    typealias Writer = TerminalProcess.Identity
     static var maxStack: Int { 16 }
 
     private struct Entry {
-        let pid: pid_t
+        let writer: Writer
         var current: Source
         var stack: [Source] = []
         var isSuspended = false
@@ -552,12 +570,12 @@ struct TerminalControlTracker<Source> {
         entries[tty]?.last { !$0.isSuspended }
     }
 
-    func activePID(on tty: String) -> pid_t? {
-        activeEntry(on: tty)?.pid
+    func activeWriter(on tty: String) -> Writer? {
+        activeEntry(on: tty)?.writer
     }
 
     func isControlled(_ tty: String) -> Bool {
-        activePID(on: tty) != nil
+        activeWriter(on: tty) != nil
     }
 
     func current(on tty: String) -> Source? {
@@ -566,27 +584,27 @@ struct TerminalControlTracker<Source> {
 
     /// The last writer in a foreground job takes over. Other jobs can resume later.
     private mutating func activate(_ entry: Entry, on tty: String) {
-        entries[tty, default: []].removeAll { $0.pid == entry.pid || !$0.isSuspended }
+        entries[tty, default: []].removeAll { $0.writer.pid == entry.writer.pid || !$0.isSuspended }
         entries[tty, default: []].append(entry)
     }
 
-    mutating func select(_ source: Source, on tty: String, pid: pid_t) {
-        let stack = entries[tty]?.first { $0.pid == pid }?.stack ?? []
-        activate(Entry(pid: pid, current: source, stack: stack), on: tty)
+    mutating func select(_ source: Source, on tty: String, writer: Writer) {
+        let stack = entries[tty]?.first { $0.writer == writer }?.stack ?? []
+        activate(Entry(writer: writer, current: source, stack: stack), on: tty)
     }
 
-    mutating func push(_ source: Source, on tty: String, pid: pid_t, live: Source?) {
-        let previous = entries[tty]?.first { $0.pid == pid }
-        var entry = Entry(pid: pid, current: source, stack: previous?.stack ?? [])
-        if let base = previous?.current ?? live {
+    mutating func push(_ source: Source, on tty: String, writer: Writer, live: Source?) {
+        let previous = entries[tty]?.first { $0.writer == writer }
+        var entry = Entry(writer: writer, current: source, stack: previous?.stack ?? [])
+        if let base = previous?.current ?? live ?? activeEntry(on: tty)?.current {
             entry.stack.append(base)
             if entry.stack.count > Self.maxStack { entry.stack.removeFirst() }
         }
         activate(entry, on: tty)
     }
 
-    mutating func pop(on tty: String, pid: pid_t) -> Source? {
-        guard var entry = entries[tty]?.first(where: { $0.pid == pid }),
+    mutating func pop(on tty: String, writer: Writer) -> Source? {
+        guard var entry = entries[tty]?.first(where: { $0.writer == writer }),
               let source = entry.stack.popLast()
         else { return nil }
         entry.current = source
@@ -600,21 +618,21 @@ struct TerminalControlTracker<Source> {
         entries[tty]?[index].current = source
     }
 
-    mutating func release(_ tty: String, pid: pid_t) {
-        entries[tty]?.removeAll { $0.pid == pid }
+    mutating func release(_ tty: String, writer: Writer) {
+        entries[tty]?.removeAll { $0.writer == writer }
         if entries[tty]?.isEmpty == true { entries[tty] = nil }
     }
 
-    mutating func check(_ tty: String, state: (pid_t, String) -> TerminalProcess.JobState) {
+    mutating func check(_ tty: String, state: (Writer, String) -> TerminalProcess.JobState) {
         guard let writers = entries[tty] else { return }
-        let surviving = writers.compactMap { writer -> Entry? in
-            var writer = writer
-            switch state(writer.pid, tty) {
+        let surviving = writers.compactMap { entry -> Entry? in
+            var entry = entry
+            switch state(entry.writer, tty) {
             case .gone: return nil
-            case .background: writer.isSuspended = true
-            case .foreground: writer.isSuspended = false
+            case .background: entry.isSuspended = true
+            case .foreground: entry.isSuspended = false
             }
-            return writer
+            return entry
         }
         entries[tty] = surviving.isEmpty ? nil : surviving
     }
