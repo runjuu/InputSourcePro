@@ -362,12 +362,12 @@ final class TerminalWatcherTests: XCTestCase {
         let input = Pipe()
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/script")
-        process.arguments = ["-q", "/dev/null", "/bin/sh", "-c", #"printf %s "$$" > "$1"; read go; /bin/sleep 1; :"#, "sh", ready.path]
+        process.arguments = ["-q", "/dev/null", "/bin/sh", "-c", #"printf %s "$$" > "$1"; read go; /bin/sleep 8 & read next; exec /usr/bin/head -n 1"#, "sh", ready.path]
         process.standardInput = input
         process.standardOutput = FileHandle.nullDevice
         try process.run()
         defer {
-            if process.isRunning { try? input.fileHandleForWriting.write(contentsOf: Data("\n".utf8)) }
+            if process.isRunning { try? input.fileHandleForWriting.write(contentsOf: Data("go\nnext\nfinish\n".utf8)) }
             input.fileHandleForWriting.closeFile()
             process.waitUntilExit()
         }
@@ -401,6 +401,13 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertEqual(running.program?.key, "sleep")
         XCTAssertEqual(running.trail.ttys.first?.foregroundPgid, initial.trail.ttys.first?.foregroundPgid)
         XCTAssertTrue(running.trail.herdrShellTTYs.isEmpty, "The existing program-exit watch takes over")
+        XCTAssertTrue(running.trail.herdrExecPIDs.contains(try XCTUnwrap(shell)))
+        harness.watcher.follow(running.trail, for: .ghostty)
+        let beforeExec = harness.refreshes
+        input.fileHandleForWriting.write(Data("next\n".utf8))
+        waitUntil("the older shell replaced sleep as the selected program") {
+            harness.refreshes > beforeExec && lookup(herdr: true).program?.key == "head"
+        }
         XCTAssertEqual(harness.paneChanges, 0)
     }
 
@@ -1129,10 +1136,27 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertEqual(open.subtracting(before), [UInt32(bitPattern: info.st_rdev) & 0xffffff])
         harness.tick()
         XCTAssertEqual(harness.paneChanges, 1)
+        var interrupted = TerminalTrail(herdrMasters: [pid: before])
+        XCTAssertFalse(interrupted.confirmHerdrMasters(ofPID: pid))
         harness.watcher.follow(TerminalTrail(herdrMasters: [pid: open]), for: .ghostty)
         close(master)
         harness.tick()
         XCTAssertEqual(harness.paneChanges, 2)
+
+        // The popup was present only during the last verification. The next
+        // poll sees the original set again and must still request a fresh read.
+        harness.watcher.follow(interrupted, for: .ghostty)
+        harness.tick()
+        XCTAssertEqual(harness.paneChanges, 3)
+        var settled = TerminalTrail(herdrMasters: [pid: before])
+        XCTAssertTrue(settled.confirmHerdrMasters(ofPID: pid))
+        harness.watcher.follow(settled, for: .ghostty)
+        harness.tick()
+        XCTAssertEqual(harness.paneChanges, 3)
+
+        var unreadable = TerminalTrail(herdrMasters: [.max: before])
+        XCTAssertFalse(unreadable.confirmHerdrMasters(ofPID: .max))
+        XCTAssertTrue(unreadable.herdrInventoryIncomplete)
     }
 
     func testChangingTheSavedMachinesRefreshesTheVisibleTUI() throws {
