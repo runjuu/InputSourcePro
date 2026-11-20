@@ -127,15 +127,13 @@ enum Multiplexer: String {
                 return only
             }
             guard verifyClient() else { return .clientOnly }
+            // Keep the baseline from before the snapshot so a concurrent split or
+            // popup still wakes the watcher even when this inventory cannot be used.
+            let devices = TerminalProcess.ptyMasters(ofPID: server) ?? []
             let query: [String: Any] = ["id": "isp", "method": "session.snapshot", "params": [:]]
             guard let snapshot = TerminalWatcher.Environment.jsonReply(to: query, on: fd) else { return nil }
             guard let view = herdrView(inSnapshot: snapshot) else { return .clientOnly }
-            func masters() -> Set<UInt32> {
-                let devices = TerminalProcess.ptyMasters(ofPID: server) ?? []
-                trail.herdrMasters[server] = devices
-                return devices
-            }
-            let devices = masters()
+            trail.herdrMasters[server] = devices
             guard devices.count == view.panes.count else { return .clientOnly }
             let tty: String
             switch herdrTTY(in: view, server: server, socket: socket, masters: devices) {
@@ -145,7 +143,7 @@ enum Multiplexer: String {
                 trail.herdrInventoryIncomplete = true
                 return nil
             }
-            guard devices == masters() else { return .clientOnly }
+            guard devices == TerminalProcess.ptyMasters(ofPID: server) else { return nil }
             guard verifyClient() else { return .clientOnly }
             return .tty(tty, label: "herdr:" + socket + "/" + view.focusedPaneId)
         }
