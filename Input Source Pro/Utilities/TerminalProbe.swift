@@ -22,7 +22,7 @@ enum TerminalProbe {
         switch terminal {
         case .herdr:
             // A command needs the mod's current answer, even before the next focus notification.
-            return HerdrDesktop.queryFocus().flatMap { terminal.herdrReading($0, pid: pid, lastTry: false) }
+            return HerdrDesktop.queryFocus(pid: pid).flatMap { terminal.herdrReading($0, pid: pid, lastTry: false) }
                 ?? TerminalReading(program: nil, pane: nil)
         case .ghostty:
             // The quick terminal belongs to no window; the front window is the one behind it.

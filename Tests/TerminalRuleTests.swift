@@ -124,7 +124,9 @@ final class TerminalProcessTests: XCTestCase {
         buffer += Array("claude".utf8) + [0] + Array("--resume".utf8) + [0]
         buffer += Array("HOME=/Users/me".utf8) + [0]
 
+        buffer += Array("HERDR_SESSION=project".utf8) + [0] + Array("UNRELATED=value".utf8) + [0]
         XCTAssertEqual(TerminalProcess.arguments(fromProcArgs: buffer[...]), ["claude", "--resume"])
+        XCTAssertEqual(TerminalProcess.environment(fromProcArgs: buffer[...], keys: ["HERDR_SESSION"]), ["HERDR_SESSION": "project"])
         XCTAssertEqual(TerminalProcess.arguments(fromProcArgs: ArraySlice<UInt8>([1, 0])), [])
     }
 
@@ -296,33 +298,86 @@ final class MultiplexerTests: XCTestCase {
 
     func testHerdrProcessInfoNamesTheShell() throws {
         let reply = #"{"id":"cli:pane:process_info","result":{"process_info":{"foreground_process_group_id":7282,"foreground_processes":[{"argv":["tmux"],"argv0":"tmux","cmdline":"tmux","cwd":"/Users/me","name":"tmux","pid":7282}],"pane_id":"wB:p5Q","shell_pid":4160},"type":"pane_process_info"}}"#
-        let shell = try XCTUnwrap(Multiplexer.herdrShell(fromProcessInfo: reply))
+        let shell = try XCTUnwrap(Multiplexer.herdrShell(fromProcessInfo: Data(reply.utf8)))
 
         XCTAssertEqual(shell.pid, 4160)
         XCTAssertEqual(shell.pane, "wB:p5Q")
     }
 
     /// A server that doesn't answer yet is still subscribed to, so its handshake reads the pane again.
-    func testHerdrSocketIsNotedEvenWhenTheQueryFails() {
+    func testHerdrQueriesAndSubscribesToTheClientsAPISocket() {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).path
+        let cases: [([String], [String: String], String)] = [
+            ([], [:], home + "/.config/herdr/herdr.sock"),
+            (["--session=default"], ["HERDR_SESSION": "work", "HERDR_SOCKET_PATH": "/ignored.sock"], home + "/.config/herdr/herdr.sock"),
+            (["session", "attach", "dev"], ["HERDR_SOCKET_PATH": "/ignored.sock"], home + "/.config/herdr/sessions/dev/herdr.sock"),
+            ([], ["HERDR_SESSION": "work", "XDG_CONFIG_HOME": "/other/config"], "/other/config/herdr/sessions/work/herdr.sock"),
+            ([], ["HERDR_SOCKET_PATH": "/custom/server", "HERDR_CLIENT_SOCKET_PATH": "/different-client.sock", "HERDR_SESSION": "work"], "/custom/server"),
+        ]
+        for (args, values, expected) in cases {
+            let environment = values.merging(["HOME": home]) { $1 }
+            var trail = TerminalTrail()
+            var asked: String?
+            _ = Multiplexer.herdrPane(arguments: ["herdr"] + args, environment: environment, trail: &trail) { socket, _ in
+                asked = socket
+                return nil
+            }
+            XCTAssertEqual(asked, expected)
+            XCTAssertEqual(trail.herdrSockets, [expected])
+        }
         var trail = TerminalTrail()
-        var asked: [[String]] = []
-        let pane = Multiplexer.herdrPane(arguments: ["herdr", "--session", "work"], trail: &trail, run: { asked.append($0); return nil })
+        XCTAssertNil(Multiplexer.herdrPane(arguments: ["herdr"], environment: ["HOME": home], trail: &trail) { _, _ in nil })
+        XCTAssertEqual(trail.herdrSockets, [home + "/.config/herdr/herdr.sock"], "Subscribe even before the server answers")
+    }
 
-        XCTAssertNil(pane)
-        XCTAssertEqual(asked, [["--session", "work", "pane", "process-info"]])
-        XCTAssertEqual(trail.herdrSockets, [Multiplexer.herdrSocket(session: "work")].compactMap { $0 })
+    func testHerdrOnlyReadsTheLocalPaneWhenItsClientCannotSwitchMachines() throws {
+        let state = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: state) }
+        let folder = state.appendingPathComponent("herdr/client")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let file = folder.appendingPathComponent("endpoints.json")
+        let environment = ["HOME": "/example", "XDG_STATE_HOME": state.path]
+        for (catalog, local) in [(#"{"version":1,"ssh":[{"enabled":true}]}"#, false),
+                                 (#"{"version":1,"ssh":[{"enabled":false}]}"#, true), ("broken", false)] {
+            try Data(catalog.utf8).write(to: file, options: .atomic)
+            var trail = TerminalTrail()
+            var queried = false
+            _ = Multiplexer.herdrPane(arguments: ["herdr"], environment: environment, trail: &trail) { _, _ in queried = true; return nil }
+            XCTAssertEqual(queried, local)
+            XCTAssertEqual(trail.herdrCatalogs, [file.path: local])
+            XCTAssertEqual(trail.herdrSockets.isEmpty, !local)
+        }
+    }
 
-        let reply = #"{"result":{"process_info":{"pane_id":"p1","shell_pid":4160}}}"#
-        XCTAssertNil(Multiplexer.herdrPane(arguments: ["herdr"], trail: &trail, run: { _ in reply }, ttyPath: { _ in nil }),
-                     "The shell has exited")
-        XCTAssertEqual(trail.herdrSockets.count, 2)
-        XCTAssertEqual(Multiplexer.herdrPane(arguments: ["herdr"], trail: &trail, run: { _ in reply }, ttyPath: { _ in "/dev/ttys009" }),
-                       .tty("/dev/ttys009", label: "herdr:p1"))
+    /// Driver-provided PTYs from isolated Herdr sessions, including a shared session.
+    func testLiveHerdrClientFocus() throws {
+        guard let json = ProcessInfo.processInfo.environment["ISP_HERDR_TUI_PROBE"] else {
+            throw XCTSkip("Needs Herdr TUI clients on live PTYs")
+        }
+        struct Client: Decodable {
+            let tty: String
+            let socket: String
+            let shell: pid_t
+            let sole: Bool
+        }
+        let clients = try JSONDecoder().decode([Client].self, from: Data(json.utf8))
+        for client in clients {
+            let reading = TerminalProcess.queue.sync { TerminalProcess.foregroundProgram(onTTY: client.tty) }
+            XCTAssertEqual(reading.trail.herdrSockets, [client.socket])
+            XCTAssertEqual(Array(reading.trail.herdrClients.values), [client.sole])
+            if client.sole {
+                XCTAssertEqual(try XCTUnwrap(reading.tty), TerminalProcess.ttyPath(ofPID: client.shell))
+            } else {
+                XCTAssertEqual(reading.program?.key, "herdr")
+                XCTAssertNil(reading.tty)
+                XCTAssertTrue(reading.paneControlUnavailable)
+            }
+        }
     }
 
     func testHerdrErrorReplyIsUnknown() {
-        XCTAssertNil(Multiplexer.herdrShell(fromProcessInfo: #"{"id":"cli:pane:process_info","error":{"code":"server_not_running","message":"no server"}}"#))
-        XCTAssertNil(Multiplexer.herdrShell(fromProcessInfo: "not json"))
+        XCTAssertNil(Multiplexer.herdrShell(fromProcessInfo: Data(#"{"id":"cli:pane:process_info","error":{"code":"server_not_running","message":"no server"}}"#.utf8)))
+        XCTAssertNil(Multiplexer.herdrShell(fromProcessInfo: Data("not json".utf8)))
     }
 
     func testRefreshReadsTheRememberedTTYUntilItIsForgotten() {
@@ -339,15 +394,20 @@ final class MultiplexerTests: XCTestCase {
 
     // MARK: Herdr's desktop app
 
-    func testHerdrRemoteClientNeverQueriesLocalSession() {
-        for args in [["--remote", "workbox"], ["--session=work", "--remote=workbox"]] {
+    func testHerdrOnlyFollowsLocalFullTUIClients() {
+        for args in [["--remote", "workbox"], ["--session=work", "--remote=workbox"],
+                     ["terminal", "attach", "term_abc"], ["agent", "attach", "reviewer"], ["pane", "wait-output", "w1:p1"]] {
             var trail = TerminalTrail()
-            let pane = Multiplexer.herdrPane(arguments: ["herdr"] + args, trail: &trail, run: { _ in
-                XCTFail("Queried a local session for a remote client")
+            let pane = Multiplexer.herdrPane(arguments: ["herdr"] + args, environment: ["HOME": "/example"], trail: &trail) { _, _ in
+                XCTFail("Queried the local focused pane for a command with another target")
                 return nil
-            })
-            XCTAssertNil(pane)
+            }
+            XCTAssertEqual(pane, .clientOnly)
             XCTAssertTrue(trail.herdrSockets.isEmpty)
+            let reading = TerminalProcess.foregroundProgram(TerminalProgram(key: "herdr"), onTTY: "/dev/test", pane: "outer", depth: 0, trail: &trail) { _, _ in pane }
+            XCTAssertEqual(reading.program?.key, "herdr")
+            XCTAssertNil(reading.tty)
+            XCTAssertTrue(reading.paneControlUnavailable)
         }
     }
 

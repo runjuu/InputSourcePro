@@ -963,7 +963,7 @@ extension ApplicationVM {
             .filter { $0 == terminal }
             .mapToVoid()
             .merge(with: controlRechecks)
-            .merge(with: lookedUp, terminalWatcher.watching(terminal).setOutputType(to: Void.self),
+            .merge(with: lookedUp, terminalWatcher.watching(terminal, pid: pid).setOutputType(to: Void.self),
                    watchTerminalWriter(terminal).setOutputType(to: Void.self))
             // Leaving the front ends a Herdr pane lookup still retrying.
             .handleEvents(receiveCancel: { [weak self] in

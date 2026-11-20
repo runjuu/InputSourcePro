@@ -8,6 +8,7 @@ enum HerdrDesktop {
         let pane: String?
         let terminal: String?
         var pid: pid_t?
+        var toast: String?
     }
 
     private struct Report: Decodable {
@@ -16,14 +17,63 @@ enum HerdrDesktop {
     }
 
     static let modName = "input-source-pro"
-    static let directory = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".config/herdr-app")
     private static let bridgeQueue = DispatchQueue(label: "dev.inputsourcepro.herdr-mod", qos: .utility)
-    private static let localBin = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin")
 
-    private static func appCommand(_ arguments: [String]) -> String? {
-        let path = NSRunningApplication.runningApplications(withBundleIdentifier: Terminal.herdr.rawValue).first?.executableURL?.path
-            ?? localBin.appendingPathComponent("herdr-app").path
-        return TerminalProcess.output(of: path, arguments: arguments)
+    /// Each Herdr window serves one socket in its own HERDR_APP_HOME. Use the
+    /// frontmost process's listener, including when several instances are open.
+    struct Endpoint {
+        let pid: pid_t
+        let socket: URL
+        var directory: URL { socket.deletingLastPathComponent() }
+
+        static func resolve(pid: pid_t) -> Self? {
+            let paths = TerminalProcess.unixSocketPaths(ofPID: pid, listening: true)
+                .filter { $0.hasPrefix("/") && ($0 as NSString).lastPathComponent == "herdr-app.sock" }
+            guard paths.count == 1, let path = paths.first else { return nil }
+            return Self(pid: pid, socket: URL(fileURLWithPath: path))
+        }
+
+        /// Herdr's control protocol is one newline-delimited JSON request and reply.
+        /// Check the connected process too, in case a new window reused the path.
+        func request(_ payload: [String: Any]) -> Data? {
+            TerminalWatcher.Environment.withUnixPeer(at: socket.path) { fd, peer in
+                guard peer == pid else { return nil }
+                return TerminalWatcher.Environment.jsonReply(to: payload, on: fd)
+            }
+        }
+
+        func command(_ name: String, arguments: [String: String] = [:]) -> Bool {
+            guard let reply = request(["do": name, "args": arguments]),
+                  let result = try? JSONSerialization.jsonObject(with: reply) as? [String: Any] else { return false }
+            return result["error"] == nil
+        }
+
+        func status() -> Status? {
+            request(["status": true]).flatMap { try? JSONDecoder().decode(Status.self, from: $0) }
+        }
+
+        func report(_ key: String, token: String) -> Focus? {
+            guard let data = try? Data(contentsOf: directory.appendingPathComponent("shared.json")) else { return nil }
+            return HerdrDesktop.report(in: data, key: key, token: token)
+        }
+    }
+
+    struct Status: Decodable {
+        let overlays: [String?]
+        var running: Bool { overlays.contains(modName) }
+
+        /// A mod dialog can own the keyboard while focused() still names the pane under it.
+        func focus(_ reported: Focus?) -> Focus? {
+            guard running else { return nil }
+            if let top = overlays.last(where: { $0 != modName && $0 != (reported?.toast ?? "toast") }) {
+                // A peek identifies its keyboard terminal directly. A dialog can leave
+                // the model pane beneath it in focused() even while editing an input.
+                guard top == "layout", reported?.pane == nil, reported?.terminal != nil else {
+                    return Focus(pane: nil, terminal: nil)
+                }
+            }
+            return reported
+        }
     }
 
     /// Install into our own mod directory. Stage the first install so Herdr
@@ -67,69 +117,92 @@ enum HerdrDesktop {
         return result?.token == token ? result?.focus : nil
     }
 
-    private static func report(_ key: String, token: String) -> Focus? {
-        guard let data = try? Data(contentsOf: directory.appendingPathComponent("shared.json")) else { return nil }
-        return report(in: data, key: key, token: token)
-    }
-
-    static func queryFocus() -> Focus? {
+    static func queryFocus(pid: pid_t) -> Focus? {
         let token = UUID().uuidString
-        guard appCommand(["do", modName + ".query-" + token]) != nil else { return nil }
-        // Herdr queues mod commands and atomically saves shared state off its UI thread.
+        guard let endpoint = Endpoint.resolve(pid: pid),
+              endpoint.command(modName + ".query-" + token) else { return nil }
+        // Mod commands are queued and shared state is saved off Herdr's UI thread.
         let deadline = ProcessInfo.processInfo.systemUptime + 0.3
         repeat {
-            if let focus = report("query", token: token) { return focus }
+            if let focus = endpoint.report("query", token: token) {
+                return endpoint.status()?.focus(focus)
+            }
             Thread.sleep(forTimeInterval: 0.01)
         } while ProcessInfo.processInfo.systemUptime < deadline
         return nil
     }
 
-    static func watch(_ send: @escaping (Focus?) -> Void) -> AnyCancellable? {
+    static func watch(pid: pid_t, send: @escaping (Focus?) -> Void) -> AnyCancellable? {
         guard let resource = Bundle.main.url(forResource: modName, withExtension: nil) else { return nil }
-        let token = UUID().uuidString
         let flag = CancelFlag()
         let timer = DispatchSource.makeTimerSource(queue: bridgeQueue)
-        // State confined to bridgeQueue, including cleanup before a subsequent watch.
+        // Confined to bridgeQueue. Checking status also detects overlay changes
+        // which Herdr doesn't publish to mods or write into shared.json.
+        var endpoint: Endpoint?
+        var token = UUID().uuidString
         var observation: AnyCancellable?
         var installed = false
         var activated = false
-        let read = { report("watch", token: token) }
+        var last: Focus?
+        func publish(_ focus: Focus?) {
+            guard focus != last else { return }
+            last = focus
+            DispatchQueue.main.async { if !flag.isCancelled { send(focus) } }
+        }
+        var nextAttempt: TimeInterval = 0
         timer.setEventHandler {
             guard !flag.isCancelled else { return }
-            if !installed {
-                do {
-                    try install(from: resource, into: directory.appendingPathComponent("mods"))
-                    installed = true
-                } catch {
-                    IndicatorDiagnostics.record("terminal.herdr mod install failed: \(error)")
-                    return
+            if endpoint == nil { endpoint = Endpoint.resolve(pid: pid) }
+            guard let endpoint, let status = endpoint.status() else { publish(nil); return }
+            if !status.running || !installed {
+                publish(nil)
+                let now = ProcessInfo.processInfo.systemUptime
+                guard now >= nextAttempt else { return }
+                nextAttempt = now + 2
+                if !installed {
+                    do {
+                        try install(from: resource, into: endpoint.directory.appendingPathComponent("mods"))
+                        installed = true
+                    } catch {
+                        IndicatorDiagnostics.record("terminal.herdr mod install failed: \(error)")
+                        return
+                    }
                 }
+                if !status.running {
+                    observation = nil
+                    token = UUID().uuidString
+                    guard !flag.isCancelled, endpoint.command("mod.open", arguments: ["name": modName]) else { return }
+                }
+                activated = true
             }
             if observation == nil {
-                observation = TerminalWatcher.Environment.watchDirectory(directory.path, read: read) { value in
-                    if !flag.isCancelled { send(value) }
+                // Directory notifications follow Herdr's atomic file replacements. Read
+                // the nonce captured by this observation, and discard superseded watches.
+                let observedToken = token
+                observation = TerminalWatcher.Environment.watchDirectory(
+                    endpoint.directory.path, receiveOn: bridgeQueue,
+                    read: { () }
+                ) { _ in
+                    guard !flag.isCancelled, token == observedToken else { return }
+                    let report = endpoint.report("watch", token: observedToken)
+                    publish(endpoint.status()?.focus(report))
                 }
             }
-            guard read() == nil else { return }
-            // mod.open toggles. Ask for a snapshot first to reuse an existing copy.
-            let subscribe = ["do", modName + ".watch-" + token]
-            if appCommand(subscribe) != nil { activated = true; return }
-            struct Status: Decodable { let overlays: [String?] }
-            guard let status = appCommand(["status"]),
-                  let state = try? JSONDecoder().decode(Status.self, from: Data(status.utf8)),
-                  !state.overlays.contains(modName), !flag.isCancelled,
-                  appCommand(["do", "mod.open", "--name", modName]) != nil else { return }
-            activated = true
-            _ = appCommand(subscribe)
+            if let report = endpoint.report("watch", token: token) {
+                publish(status.focus(report))
+            } else {
+                publish(nil)
+                _ = endpoint.command(modName + ".watch-" + token)
+            }
         }
-        timer.schedule(deadline: .now(), repeating: 2, leeway: .milliseconds(200))
+        timer.schedule(deadline: .now(), repeating: .milliseconds(500), leeway: .milliseconds(50))
         timer.resume()
         return AnyCancellable {
             flag.cancel()
             timer.cancel()
             bridgeQueue.async {
                 observation?.cancel()
-                if activated { _ = appCommand(["do", "overlay.close", "--id", "mod-" + modName]) }
+                if activated { _ = endpoint?.command("overlay.close", arguments: ["id": "mod-" + modName]) }
             }
         }
     }
