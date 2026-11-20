@@ -45,6 +45,16 @@ struct TerminalTrail: Equatable {
     var herdrShellTTYs: [String] = []
     var zellij: Zellij?
 
+    /// A popup can close again before the next poll sees it. Retry an interrupted
+    /// pane lookup even if the server returns to its original set of PTYs.
+    mutating func confirmHerdrMasters(ofPID pid: pid_t) -> Bool {
+        guard let current = TerminalProcess.ptyMasters(ofPID: pid), current == herdrMasters[pid] else {
+            herdrInventoryIncomplete = true
+            return false
+        }
+        return true
+    }
+
     /// The foreground process group of `pid`'s controlling tty, from libproc;
     /// nil when `pid` is gone or can't be read (another user's, e.g. root's `login`).
     static func foregroundPgid(ofPID pid: pid_t) -> pid_t? {

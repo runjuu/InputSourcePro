@@ -255,12 +255,15 @@ extension TerminalProcess {
             trail.ttys.append(tty)
         }
         let foreground = foregroundProcess(in: processes)
-        if watchHerdrJobs, foreground == nil {
-            trail.herdrShellTTYs.append(path)
-        }
-        // Herdr keeps pane focus and the foreground group when a process execs another program or script.
-        if watchHerdrJobs, let owner = foreground ?? processes.first(where: { $0.pid == $0.foregroundPgid }) {
-            trail.herdrExecPIDs.insert(owner.pid)
+        if watchHerdrJobs {
+            if foreground == nil { trail.herdrShellTTYs.append(path) }
+            // An older shell can exec and become the selected program while its
+            // previously selected helper and the foreground group both survive.
+            for member in processes where member.pgid == member.foregroundPgid {
+                if member.isShell || member.pid == foreground?.pid {
+                    trail.herdrExecPIDs.insert(member.pid)
+                }
+            }
         }
         guard let process = foreground else {
             // Non-shell processes that are not in the foreground group explain a surprising "shell".

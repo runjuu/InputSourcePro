@@ -147,7 +147,7 @@ enum Multiplexer: String {
                 trail.herdrInventoryIncomplete = true
                 return nil
             }
-            guard devices == TerminalProcess.ptyMasters(ofPID: server) else { return nil }
+            guard trail.confirmHerdrMasters(ofPID: server) else { return nil }
             guard verifyClient() else { return .clientOnly }
             return .tty(tty, label: "herdr:" + socket + "/" + view.focusedPaneId)
         }
