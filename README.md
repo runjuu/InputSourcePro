@@ -52,6 +52,12 @@
 - Set input sources per **website** when using browsers (Safari, Chrome, Arc, Edge, Vivaldi, Opera, Brave, Firefox, Zen, Dia, and more).
 - Switch automatically as you move between apps/websites.
 
+### Terminal Rules in Herdr
+
+Enable **Herdr** in Terminal Rules to follow the program in the displayed local terminal. Input Source Pro installs a small mod under `mods/input-source-pro` in that Herdr window’s configuration directory and activates it while the window is frontmost. The mod tracks terminals swapped into the same pane. Rules pause when a dialog or an ambiguous layout obscures the terminal. The terminal’s Find field shares its pane’s rule.
+
+For the **Herdr TUI** inside another supported terminal, enable Terminal Rules for the outer terminal. Split panes are supported in a local session with one client, one workspace, one tab, and no enabled remote machines. Other sessions and plugin terminal popups use the rule for the Herdr client itself. Client-local prompts, such as Rename Tab, keep the selected pane’s rule.
+
 ### 🐈‍⬛ Elegant Input Source Indicator
 - Shows your current input source with a clean on-screen indicator.
 - Customizable and designed to stay out of your way.

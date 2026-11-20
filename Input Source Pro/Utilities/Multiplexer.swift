@@ -102,8 +102,7 @@ enum Multiplexer: String {
         return read(socket, &trail)
     }
 
-    /// The server reports one focused pane. Only when this is its sole TUI client
-    /// does that answer identify the terminal that receives this client's keyboard.
+    /// Match the server's sole client connection to this exact TUI process.
     struct HerdrClient: Hashable {
         let pid: pid_t
         let server: pid_t
@@ -128,12 +127,64 @@ enum Multiplexer: String {
                 return only
             }
             guard verifyClient() else { return .clientOnly }
-            let query: [String: Any] = ["id": "isp", "method": "pane.process_info", "params": [:]]
-            guard let reply = TerminalWatcher.Environment.jsonReply(to: query, on: fd),
-                  let shell = herdrShell(fromProcessInfo: reply), let tty = TerminalProcess.ttyPath(ofPID: shell.pid) else { return nil }
+            let query: [String: Any] = ["id": "isp", "method": "session.snapshot", "params": [:]]
+            guard let snapshot = TerminalWatcher.Environment.jsonReply(to: query, on: fd) else { return nil }
+            guard let view = herdrView(inSnapshot: snapshot) else { return .clientOnly }
+            func masters() -> Set<UInt32> {
+                let devices = TerminalProcess.ptyMasters(ofPID: server) ?? []
+                trail.herdrMasters[server] = devices
+                return devices
+            }
+            let devices = masters()
+            guard devices.count == view.panes.count else { return .clientOnly }
+            let tty: String
+            switch herdrTTY(in: view, server: server, socket: socket, masters: devices) {
+            case let .verified(path): tty = path
+            case .unavailable: return .clientOnly
+            case .incomplete:
+                trail.herdrInventoryIncomplete = true
+                return nil
+            }
+            guard devices == masters() else { return .clientOnly }
             guard verifyClient() else { return .clientOnly }
-            return .tty(tty, label: "herdr:" + socket + "/" + shell.pane)
+            return .tty(tty, label: "herdr:" + socket + "/" + view.focusedPaneId)
         }
+    }
+
+    /// Accessed only on TerminalProcess.queue. Keep the last view's split shell
+    /// identities so refreshing an unchanged session needs no request per split.
+    private static var herdrTTYs: (server: pid_t, byTerminal: [String: TerminalProcess.PaneTTY]) = (0, [:])
+
+    private enum HerdrTTY { case verified(String), unavailable, incomplete }
+
+    private static func herdrTTY(in view: HerdrView, server: pid_t, socket: String, masters: Set<UInt32>) -> HerdrTTY {
+        let previous = herdrTTYs.server == server ? herdrTTYs.byTerminal : [:]
+        var verified: [String: TerminalProcess.PaneTTY] = [:]
+        defer { herdrTTYs = (server, verified) }
+        let deadline = ProcessInfo.processInfo.systemUptime + 0.5
+        var focused: String?
+        for pane in view.panes {
+            let tty: TerminalProcess.PaneTTY
+            if let cached = previous[pane.terminalId], TerminalProcess.paneTTY(ofPID: cached.owner.pid) == cached {
+                tty = cached
+            } else {
+                // Each request needs a fresh connection; keep it on the original server.
+                guard ProcessInfo.processInfo.systemUptime < deadline else { return .incomplete }
+                let reply: Data? = TerminalWatcher.Environment.withUnixPeer(at: socket) { fd, peer in
+                    guard peer == server else { return nil }
+                    let query: [String: Any] = ["id": "isp", "method": "pane.process_info", "params": ["pane_id": pane.paneId]]
+                    return TerminalWatcher.Environment.jsonReply(to: query, on: fd)
+                }
+                guard let reply, let shell = herdrShell(fromProcessInfo: reply), shell.pane == pane.paneId,
+                      let current = TerminalProcess.paneTTY(ofPID: shell.pid) else { return .unavailable }
+                tty = current
+            }
+            verified[pane.terminalId] = tty
+            if pane.paneId == view.focusedPaneId { focused = tty.path }
+        }
+        // An unlisted master belongs to a popup or another unrepresented terminal.
+        guard Set(verified.values.map(\.minor)) == masters, let focused else { return .unavailable }
+        return .verified(focused)
     }
 
     /// Herdr's client checks this catalog once a second and can add machines without a restart.
@@ -229,17 +280,27 @@ extension Multiplexer {
         init?(arguments: [String]) {
             guard !arguments.isEmpty else { return nil }
             let args = Array(arguments.dropFirst())
-            if args.isEmpty || args == ["client"] {
-                session = nil
-            } else if args.count == 2, args[0] == "--session" {
-                session = args[1]
-            } else if args.count == 1, args[0].hasPrefix("--session=") {
-                session = String(args[0].dropFirst("--session=".count))
-            } else if args.count == 3, args.prefix(2) == ["session", "attach"] {
+            if args.starts(with: ["session", "attach"]) {
+                guard args.count == 3 else { return nil }
                 session = args[2]
-            } else {
-                return nil
+                return
             }
+            // Herdr removes global session selectors before dispatching the client command.
+            var selected: String?
+            var command: [String] = []
+            var iterator = args.makeIterator()
+            while let argument = iterator.next() {
+                if argument == "--session" {
+                    guard let value = iterator.next() else { return nil }
+                    selected = value
+                } else if argument.hasPrefix("--session=") {
+                    selected = String(argument.dropFirst("--session=".count))
+                } else {
+                    command.append(argument)
+                }
+            }
+            guard command.isEmpty || command == ["client"] else { return nil }
+            session = selected
         }
     }
 
@@ -280,7 +341,29 @@ extension Multiplexer {
         return .program(TerminalProgram(key: key, pane: label), label: label)
     }
 
-    /// `herdr pane process-info`: the focused pane's shell pid and pane id. An
+    /// Sessions can retain another client's selected tab after it disconnects. In
+    /// a single tab, pane focus is shared and the snapshot identifies its pane.
+    struct HerdrView: Decodable {
+        struct Workspace: Decodable { let tabCount: Int }
+        struct Pane: Decodable { let paneId: String; let terminalId: String }
+        let workspaces: [Workspace]
+        let focusedPaneId: String
+        let panes: [Pane]
+    }
+
+    static func herdrView(inSnapshot output: Data) -> HerdrView? {
+        struct Reply: Decodable {
+            struct Result: Decodable { let snapshot: HerdrView }
+            let result: Result
+        }
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        guard let snapshot = (try? decoder.decode(Reply.self, from: output))?.result.snapshot,
+              snapshot.workspaces.count == 1, snapshot.workspaces[0].tabCount == 1 else { return nil }
+        return snapshot
+    }
+
+    /// `herdr pane process-info`: the requested pane's shell pid and pane id. An
     /// error reply (`server_not_running`) has no `result`.
     static func herdrShell(fromProcessInfo output: Data) -> (pid: pid_t, pane: String)? {
         struct Reply: Decodable {

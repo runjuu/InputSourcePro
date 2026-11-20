@@ -60,11 +60,13 @@ enum HerdrDesktop {
 
     struct Status: Decodable {
         let overlays: [String?]
+        var errors: [String]?
         var running: Bool { overlays.contains(modName) }
+        var failed: Bool { errors?.contains { $0.hasPrefix("mod " + modName + ":") } == true }
 
         /// A mod dialog can own the keyboard while focused() still names the pane under it.
         func focus(_ reported: Focus?) -> Focus? {
-            guard running else { return nil }
+            guard running && !failed else { return nil }
             if let top = overlays.last(where: { $0 != modName && $0 != (reported?.toast ?? "toast") }) {
                 // A peek identifies its keyboard terminal directly. A dialog can leave
                 // the model pane beneath it in focused() even while editing an input.
@@ -175,6 +177,7 @@ enum HerdrDesktop {
                 }
                 activated = true
             }
+            guard !status.failed else { publish(nil); return }
             if observation == nil {
                 // Directory notifications follow Herdr's atomic file replacements. Read
                 // the nonce captured by this observation, and discard superseded watches.

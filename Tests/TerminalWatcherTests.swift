@@ -719,6 +719,17 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertNil(TerminalWatcher.Line.herdr(#"{"id":"isp","error":{"code":"bad"}}"#))
     }
 
+    func testHerdrRechecksSingleTabEligibilityOnTopologyChanges() {
+        for subscription in ["tab.created", "tab.closed", "workspace.created", "workspace.closed"] {
+            XCTAssertTrue(TerminalWatcher.Line.herdrSubscriptions.contains(subscription))
+            let event = subscription.replacingOccurrences(of: ".", with: "_")
+            let line = #"{"event":"\#(event)"}"#
+            var buffer = Array((line + "\n").utf8)
+            var ready = true
+            XCTAssertTrue(TerminalWatcher.Line.scan(&buffer, isReady: &ready, parse: TerminalWatcher.Line.herdr))
+        }
+    }
+
     func testStreamSendsOneChangePerReadThenClosed() {
         var fds: [Int32] = [0, 0]
         XCTAssertEqual(pipe(&fds), 0)
@@ -806,6 +817,7 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertNil(HerdrDesktop.Status(overlays: [name, "layout"]).focus(pane)?.terminal)
         XCTAssertNil(HerdrDesktop.Status(overlays: [name, "layout", "settings"]).focus(peek)?.terminal)
         XCTAssertNil(HerdrDesktop.Status(overlays: ["settings"]).focus(pane))
+        XCTAssertNil(HerdrDesktop.Status(overlays: [name], errors: ["mod " + name + ": failed to load"]).focus(pane))
     }
 
     /// A server that listens but never accepts: the missing handshake ends in `.dropped`.
@@ -920,6 +932,39 @@ final class TerminalWatcherTests: XCTestCase {
 
     // MARK: herdr sessions
 
+    func testIncompleteHerdrInventoryResumesWhilePaneFocusStaysPut() {
+        let harness = Harness()
+        harness.bringToFront(.ghostty)
+        harness.watcher.follow(TerminalTrail(herdrInventoryIncomplete: true), for: .ghostty)
+        harness.tick()
+        XCTAssertEqual(harness.refreshes, 1)
+        harness.watcher.follow(TerminalTrail(), for: .ghostty)
+        harness.tick()
+        XCTAssertEqual(harness.refreshes, 1)
+    }
+
+    func testHerdrRefreshesOnPopupPTYOpenAndClose() throws {
+        let pid = getpid()
+        let before = try XCTUnwrap(TerminalProcess.ptyMasters(ofPID: pid))
+        let harness = Harness()
+        harness.bringToFront(.ghostty)
+        harness.watcher.follow(TerminalTrail(herdrMasters: [pid: before]), for: .ghostty)
+        var master: Int32 = -1
+        var slave: Int32 = -1
+        XCTAssertEqual(openpty(&master, &slave, nil, nil, nil), 0)
+        defer { close(slave) }
+        var info = stat()
+        XCTAssertEqual(fstat(slave, &info), 0)
+        let open = try XCTUnwrap(TerminalProcess.ptyMasters(ofPID: pid))
+        XCTAssertEqual(open.subtracting(before), [UInt32(bitPattern: info.st_rdev) & 0xffffff])
+        harness.tick()
+        XCTAssertEqual(harness.paneChanges, 1)
+        harness.watcher.follow(TerminalTrail(herdrMasters: [pid: open]), for: .ghostty)
+        close(master)
+        harness.tick()
+        XCTAssertEqual(harness.paneChanges, 2)
+    }
+
     func testChangingTheSavedMachinesRefreshesTheVisibleTUI() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -975,6 +1020,9 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertEqual(Multiplexer.HerdrLaunch(arguments: ["herdr", "--session=work"])?.session, "work")
         XCTAssertEqual(Multiplexer.HerdrLaunch(arguments: ["herdr", "session", "attach", "work"])?.session, "work")
         XCTAssertNil(Multiplexer.HerdrLaunch(arguments: ["herdr", "session", "attach"]))
+        XCTAssertEqual(Multiplexer.HerdrLaunch(arguments: ["herdr", "client", "--session", "work"])?.session, "work")
+        XCTAssertEqual(Multiplexer.HerdrLaunch(arguments: ["herdr", "--session=work", "client"])?.session, "work")
+        XCTAssertNil(Multiplexer.HerdrLaunch(arguments: ["herdr", "--session", "work", "terminal", "attach", "t1"]))
 
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         XCTAssertEqual(Multiplexer.herdrSocket(session: nil), home + "/.config/herdr/herdr.sock")
@@ -1177,9 +1225,14 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertEqual(address(focus, in: ["type": "stack", "active": "panes", "children": [tab, agent]]), "t1")
         XCTAssertEqual(address(focus, in: ["type": "stack", "active": "agents", "children": [tab, agent]]), "t2")
         XCTAssertNil(address(focus, in: ["type": "row", "children": [tab, agent]]))
-        XCTAssertEqual(address(["terminal": "t3"], in: ["type": "row", "children": [tab, agent]]), "t3")
+        XCTAssertNil(address(["terminal": "t3"], in: ["type": "row", "children": [tab, agent]]))
+        XCTAssertEqual(address(["terminal": "t3"], in: tab), "t3")
+        for mod in ["changes", "custom-editor"] {
+            XCTAssertNil(address(focus, in: ["type": "row", "children": [tab, ["content": ["mod": mod]]]]))
+        }
         let float = ["content": ["terminal": "t3"]]
         XCTAssertNil(address(focus, in: tab.merging(["floating": [float]]) { $1 }))
+        XCTAssertNil(address(["terminal": "t1"], in: tab.merging(["floating": [float]]) { $1 }))
         XCTAssertEqual(address(focus, in: tab.merging(["floating": [["hidden": true, "content": ["terminal": "t3"]]]]) { $1 }), "t1")
     }
 

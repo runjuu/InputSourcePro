@@ -36,6 +36,9 @@ struct TerminalTrail: Equatable {
     /// Herdr's SSH catalogs on the trail and whether each allowed a local pane lookup.
     var herdrCatalogs: [String: Bool] = [:]
     var herdrClients: [Multiplexer.HerdrClient: Bool] = [:]
+    /// Herdr emits no event for popup terminals; their PTY master appears and disappears.
+    var herdrMasters: [pid_t: Set<UInt32>] = [:]
+    var herdrInventoryIncomplete = false
     var zellij: Zellij?
 
     /// The foreground process group of `pid`'s controlling tty, from libproc;
@@ -71,7 +74,7 @@ extension TerminalTrail.TTY {
 /// - libproc: each tty the last lookup read, for a job starting or ending, and the
 ///   program read on it, for one that ends inside its shell's process group;
 /// - tmux: a control-mode client, for pane, window and session switches;
-/// - herdr TUI: a `pane.focused` subscription on the session's socket;
+/// - herdr TUI: pane focus and workspace/tab creation or closure on the session socket;
 /// - zellij: its client list, polled, since it has neither ttys nor events;
 /// - Herdr's desktop app: its focus mod, for pane, tab, space and displayed-terminal changes.
 ///
@@ -243,12 +246,17 @@ final class TerminalWatcher {
             })
         }
 
-        if !trail.herdrCatalogs.isEmpty || !trail.herdrClients.isEmpty {
+        if !trail.herdrCatalogs.isEmpty || !trail.herdrClients.isEmpty || !trail.herdrMasters.isEmpty || trail.herdrInventoryIncomplete {
             let check = { () -> String? in
+                if trail.herdrInventoryIncomplete { return "continue split inventory" }
                 if let changed = trail.herdrCatalogs.first(where: { Multiplexer.herdrIsLocalOnly(catalog: $0.key) != $0.value }) {
                     return changed.key
                 }
-                return trail.herdrClients.first { $0.key.isOnlyClient() != $0.value }?.key.socket
+                if let client = trail.herdrClients.first(where: { $0.key.isOnlyClient() != $0.value }) {
+                    return client.key.socket
+                }
+                return trail.herdrMasters.first { (TerminalProcess.ptyMasters(ofPID: $0.key) ?? []) != $0.value }
+                    .map { "server=\($0.key) PTYs changed" }
             }
             polls.append(environment.poll(1, check) { [weak self] path in
                 self?.trigger(src: "herdr-client", path, paneMayHaveChanged: true, generation: generation)
@@ -483,9 +491,10 @@ extension TerminalWatcher {
             "%window-pane-changed", "%session-window-changed", "%client-session-changed", "%session-changed",
         ]
 
-        /// herdr's socket: `subscription_started` answers the subscribe request;
-        /// a `pane.focused` subscription sends one `pane_focused` per pane, tab or
-        /// workspace switch. Other events are ignored, so they never add a change.
+        /// A background tab opening or closing can change whether the server's
+        /// focused pane identifies this client, even when pane focus stays put.
+        static let herdrSubscriptions = ["pane.focused", "tab.created", "tab.closed", "workspace.created", "workspace.closed"]
+
         static func herdr(_ line: Substring) -> Line? {
             struct Message: Decodable {
                 struct Result: Decodable { let type: String? }
@@ -494,7 +503,8 @@ extension TerminalWatcher {
             }
             guard let message = try? JSONDecoder().decode(Message.self, from: Data(line.utf8)) else { return nil }
             if message.result?.type == "subscription_started" { return .ready }
-            return message.event == "pane_focused" ? .changed : nil
+            guard let event = message.event else { return nil }
+            return herdrSubscriptions.contains(event.replacingOccurrences(of: "_", with: ".")) ? .changed : nil
         }
 
         /// Takes the complete lines out of `buffer`; true when any of them is a
@@ -649,12 +659,14 @@ extension TerminalWatcher.Environment {
         })
     }
 
-    /// A `pane.focused` subscription on the herdr server at `socket`.
+    /// Watch pane focus and the topology used to establish it.
     static func subscribeHerdr(socket: String) -> (fd: Int32, onClose: () -> Void)? {
-        guard let fd = connectUnix(socket) else { return nil }
-        let request = Array(#"{"id":"isp","method":"events.subscribe","params":{"subscriptions":[{"type":"pane.focused"}]}}"#.utf8) + [UInt8(ascii: "\n")]
+        let subscriptions = TerminalWatcher.Line.herdrSubscriptions.map { ["type": $0] }
+        let payload: [String: Any] = ["id": "isp", "method": "events.subscribe", "params": ["subscriptions": subscriptions]]
+        guard var request = try? JSONSerialization.data(withJSONObject: payload), let fd = connectUnix(socket) else { return nil }
+        request.append(0x0a)
         // A fresh socket's buffer takes the request whole; anything less is a server in trouble.
-        guard Darwin.write(fd, request, request.count) == request.count else {
+        guard request.withUnsafeBytes({ Darwin.write(fd, $0.baseAddress, $0.count) }) == request.count else {
             Darwin.close(fd)
             return nil
         }
