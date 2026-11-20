@@ -59,7 +59,7 @@ final class ApplicationVM: ObservableObject {
         var probedProgram: (Terminal) -> TerminalReading
         var terminalPanelFocus: TerminalPanelFocus.Environment
         /// The process a program's command is traced back to, with its tty.
-        var ttyOwner: (pid_t) -> (pid: pid_t, tty: String)? = { TerminalProcess.ttyOwner(ofPID: $0) }
+        var ttyOwner: (pid_t) -> TerminalProcess.TTYOwner? = { TerminalProcess.ttyOwner(ofPID: $0) }
         /// Where a controlling program's process stands on its tty.
         var jobState: (pid_t, String) -> TerminalProcess.JobState = TerminalProcess.jobState
 
@@ -294,14 +294,17 @@ extension ApplicationVM {
         // notification reaches us. Verify one pane per batch, off the main thread.
         var focusedTTY: String?
         let initialApp = currentTerminalForControl()
-        var confirmed = false
+        var publishReading: (() -> Void)?
         if let app = initialApp, let terminal = Terminal(app) {
             let probe = environment.probedProgram
             let lookup = { TerminalProcess.onQueue { probe(terminal) } }
+            // Ghostty can still name the departed split for 20 ms after its
+            // focus-out hook fires, even before we receive any focus event.
+            let ghosttySettleUntil = terminal == .ghostty ? ProcessInfo.processInfo.systemUptime + 0.020 : 0
             // If focus moves during the lookup, confirm the new pane once more.
             for _ in 0 ..< 2 {
                 let revision = terminalFocusRevision
-                let delay = terminalFocusSettleUntil - ProcessInfo.processInfo.systemUptime
+                let delay = max(terminalFocusSettleUntil, ghosttySettleUntil) - ProcessInfo.processInfo.systemUptime
                 if delay > 0 { try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) }
                 guard currentTerminalForControl() == app else { break }
                 guard revision == terminalFocusRevision else { continue }
@@ -310,17 +313,23 @@ extension ApplicationVM {
                 }
                 guard currentTerminalForControl() == app else { break }
                 guard revision == terminalFocusRevision else { continue }
-                receiveTerminalProgram(reading, for: terminal, recheck: lookup)
+                publishReading = { self.receiveTerminalProgram(reading, for: terminal, recheck: lookup) }
                 focusedTTY = reading.tty
-                confirmed = true
                 break
             }
         }
-        let changedTTYs = messages.compactMap { receiveTerminalControl($0, focusedTTY: focusedTTY) }
-        // Continuous focus changes can invalidate both reads. The next settled
-        // reading must still apply a command even if the program stays the same.
-        if !confirmed, !changedTTYs.isEmpty, let app = initialApp, currentTerminalForControl() == app,
-           let terminal = Terminal(app) {
+        let confirmed = publishReading != nil
+        func publishVerifiedPane() {
+            publishReading?()
+            publishReading = nil
+        }
+        let changedTTYs = messages.compactMap {
+            receiveTerminalControl($0, focusedTTY: focusedTTY, publishVerifiedPane: publishVerifiedPane)
+        }
+        publishVerifiedPane()
+        // Another terminal may already have completed its activation lookup
+        // while this batch waited. Reconcile the terminal that now has focus.
+        if !confirmed, !changedTTYs.isEmpty, let app = currentTerminalForControl(), let terminal = Terminal(app) {
             terminalControlPendingTTYs.formUnion(changedTTYs)
             terminalControlRechecks.send(terminal)
         }
@@ -333,8 +342,9 @@ extension ApplicationVM {
 
     /// Re-resolve the writer on each read. A tty-less helper can exit while its
     /// foreground ancestor still owns the tty.
-    private func terminalWriterState(_ pid: pid_t, on tty: String) -> TerminalProcess.JobState {
-        guard let owner = environment.ttyOwner(pid), owner.tty == tty else { return .gone }
+    private func terminalWriterState(_ writer: TerminalProcess.Identity, on tty: String) -> TerminalProcess.JobState {
+        guard let owner = environment.ttyOwner(writer.pid), owner.tty == tty,
+              owner.writerStartTime == writer.startTime else { return .gone }
         return environment.jobState(owner.pid, tty)
     }
 
@@ -355,13 +365,13 @@ extension ApplicationVM {
                 return Timer.interval(seconds: 0.25).map { _ in tty }.eraseToAnyPublisher()
             }
             .handleEvents(receiveOutput: { [weak self] tty in
-                guard let self, let pid = preferencesVM.terminalControl.activePID(on: tty),
-                      self.terminalWriterState(pid, on: tty) != .foreground else { return }
+                guard let self, let writer = preferencesVM.terminalControl.activeWriter(on: tty),
+                      self.terminalWriterState(writer, on: tty) != .foreground else { return }
                 preferencesVM.terminalControl.check(tty, state: self.terminalWriterState)
-                if let focused = self.focusedTerminalApp(on: tty) {
-                    let context: AppKind = .from(focused, preferencesVM: preferencesVM)
-                    self.appKind = context
-                }
+                // Its exit can coincide with switching splits. Confirm the pane
+                // before applying the rules that replace the writer's override.
+                self.terminalControlPendingTTYs.insert(tty)
+                self.terminalControlRechecks.send(terminal)
                 self.terminalWriterChanges.send(())
             })
             .ignoreOutput()
@@ -391,18 +401,23 @@ extension ApplicationVM {
     /// A program's command to its pane's input source (see `TerminalControlTracker`).
     /// On the focused pane it switches like a shortcut would, through the same
     /// select path as rules; elsewhere it only updates the state.
-    private func receiveTerminalControl(_ message: TerminalControlCommand, focusedTTY: String?) -> String? {
+    private func receiveTerminalControl(
+        _ message: TerminalControlCommand, focusedTTY: String?, publishVerifiedPane: () -> Void
+    ) -> String? {
         // Use the tty owner for foreground checks and the writer PID for its lifetime.
         guard let owner = environment.ttyOwner(message.pid) else { return nil }
+        let writer = TerminalProcess.Identity(pid: message.pid, startTime: owner.writerStartTime)
         let tty = owner.tty
         // Only the pane's foreground job controls it: one in the background (`bg`, `&`)
         // must not switch the source under whoever is typing at the prompt.
-        guard environment.jobState(owner.pid, tty) == .foreground else {
+        let state = environment.jobState(owner.pid, tty)
+        // A background writer can relinquish its own saved stack before resuming.
+        guard state == .foreground || (state == .background && message.command == .release) else {
             IndicatorDiagnostics.record("terminal.isp ignored pid=\(owner.pid) tty=\(tty) cmd=\(message.command.name) background")
             return nil
         }
-        let focusedApp = focusedTTY == tty ? focusedTerminalApp(on: tty) : nil
-        let previousPID = preferencesVM.terminalControl.activePID(on: tty)
+        let focusedApp = focusedTTY == tty ? currentTerminalForControl() : nil
+        let previousWriter = preferencesVM.terminalControl.activeWriter(on: tty)
         preferencesVM.terminalControl.check(tty, state: terminalWriterState)
         var target: InputSource?
 
@@ -417,25 +432,30 @@ extension ApplicationVM {
         switch message.command {
         case let .select(id):
             if let source = resolve(id) {
-                preferencesVM.terminalControl.select(source, on: tty, pid: message.pid)
+                preferencesVM.terminalControl.select(source, on: tty, writer: writer)
                 target = source
             }
         case let .push(id):
             if let source = resolve(id) {
                 let live = focusedApp == nil ? nil : InputSourceSwitcher.inputSourceForReconciliation()
-                preferencesVM.terminalControl.push(source, on: tty, pid: message.pid, live: live)
+                preferencesVM.terminalControl.push(source, on: tty, writer: writer, live: live)
                 target = source
             }
         case .pop:
-            target = preferencesVM.terminalControl.pop(on: tty, pid: message.pid)
+            target = preferencesVM.terminalControl.pop(on: tty, writer: writer)
         case .release:
-            preferencesVM.terminalControl.release(tty, pid: message.pid)
+            preferencesVM.terminalControl.release(tty, writer: writer)
         }
         terminalWriterChanges.send(())
 
         IndicatorDiagnostics.record("terminal.isp pid=\(message.pid) owner=\(owner.pid) tty=\(tty) cmd=\(message.command.name) focused=\(focusedApp != nil) source=\(target?.persistentIdentifier ?? "-")")
-        let controllerChanged = previousPID != preferencesVM.terminalControl.activePID(on: tty)
+        let controllerChanged = previousWriter != preferencesVM.terminalControl.activeWriter(on: tty)
         guard let focusedApp else { return controllerChanged || target != nil ? tty : nil }
+        // The first push must see the keyboard in use before a newly discovered
+        // program's rule can select another one. Publish after recording its command.
+        let previousContext = appKind
+        publishVerifiedPane()
+        if appKind?.isSameAppOrWebsite(with: previousContext, detectAddressBar: true) == false { return nil }
         if controllerChanged {
             let context = AppKind.from(focusedApp, preferencesVM: preferencesVM)
             appKind = context
@@ -480,7 +500,9 @@ extension ApplicationVM {
     /// How long a change from a program to a shell waits before it is read again.
     static let terminalShellConfirmationDelay: TimeInterval = 0.25
 
-    private func receiveTerminalProgram(_ reading: TerminalReading, for terminal: Terminal, recheck: @escaping TerminalLookup) {
+    private func receiveTerminalProgram(
+        _ reading: TerminalReading, for terminal: Terminal, reapplyControl: Bool = false, recheck: @escaping TerminalLookup
+    ) {
         terminalWatcher.follow(reading.trail, for: terminal)
         // Before the gate: a held shell is always in the same pane, so this fires once, right away.
         if let pane = reading.pane, terminalPanes[terminal] != pane {
@@ -495,14 +517,14 @@ extension ApplicationVM {
             // A held shell's recheck is a lookup of its own: what it went through, and the
             // program it found, are what to watch from here on.
             if published.trail != reading.trail { self.terminalWatcher.follow(published.trail, for: terminal) }
-            let changed = self.updateTerminalProgram(published, for: terminal)
+            let changed = self.updateTerminalProgram(published, for: terminal, reapplyControl: reapplyControl && published.tty == reading.tty)
             let owed = self.terminalRepublishes.removeValue(forKey: terminal) != nil
             if changed || owed { self.terminalProgramChanges.send(terminal) }
         }
     }
 
     /// Records a terminal's program; true when it changed.
-    private func updateTerminalProgram(_ reading: TerminalReading, for terminal: Terminal) -> Bool {
+    private func updateTerminalProgram(_ reading: TerminalReading, for terminal: Terminal, reapplyControl: Bool) -> Bool {
         let program = reading.program
         preferencesVM.terminalTTYs[terminal] = reading.tty
         // Control follows the controlling process, not what was read: it ends once the process
@@ -510,9 +532,9 @@ extension ApplicationVM {
         // that predates it, since a just-started program is already the foreground job.
         var controlChanged = false
         if let tty = reading.tty {
-            let previousPID = preferencesVM.terminalControl.activePID(on: tty)
+            let previousWriter = preferencesVM.terminalControl.activeWriter(on: tty)
             preferencesVM.terminalControl.check(tty, state: terminalWriterState)
-            controlChanged = preferencesVM.terminalControl.activePID(on: tty) != previousPID
+            controlChanged = preferencesVM.terminalControl.activeWriter(on: tty) != previousWriter
         }
         terminalWriterChanges.send(())
         // Two shell prompts both have a nil program. Moving between them still
@@ -524,9 +546,7 @@ extension ApplicationVM {
         if changed {
             preferencesVM.terminalPrograms[terminal] = program
         }
-        let owesControlUpdate = reading.tty.map(terminalControlPendingTTYs.contains) == true
-        terminalControlPendingTTYs.removeAll()
-        if !changed, controlChanged || owesControlUpdate,
+        if !changed, controlChanged || reapplyControl,
            let tty = reading.tty, let focused = focusedTerminalApp(on: tty) {
             let context: AppKind = .from(focused, preferencesVM: preferencesVM)
             appKind = context
@@ -583,7 +603,6 @@ extension ApplicationVM {
             .throttle(for: .milliseconds(300), scheduler: DispatchQueue.main, latest: true)
             .merge(with: settledFocusChanges)
             .merge(with: titleChanges)
-            .merge(with: terminalControlRechecks.filter { $0 == terminal }.mapToVoid())
             // The terminal in front can gain or lose its panel without being picked again.
             .merge(with: terminalPanelChanges)
             // Picking the terminal asks at once and, as after a focus change, once more:
@@ -603,9 +622,32 @@ extension ApplicationVM {
                 return nil
             }
 
+        // An earlier lookup may already be in flight when a writer exits or a
+        // batch loses focus. Only a fresh, settled probe can settle that request.
+        let controlRechecks = terminalControlRechecks
+            .filter { $0 == terminal }
+            .debounce(for: settle, scheduler: DispatchQueue.main)
+            .flatMapLatest { [weak self] _ in
+                let revision = self?.terminalFocusRevision
+                let lookup = { TerminalProcess.onQueue { probedProgram(terminal) } }
+                return lookup().map { ($0, lookup, revision) }
+            }
+            .compactMap { [weak self] reading, lookup, revision -> Void? in
+                guard let self else { return nil }
+                guard revision == self.terminalFocusRevision else {
+                    self.terminalControlRechecks.send(terminal)
+                    return nil
+                }
+                let reapply = reading.tty.map(self.terminalControlPendingTTYs.contains) == true
+                self.terminalControlPendingTTYs.removeAll()
+                self.receiveTerminalProgram(reading, for: terminal, reapplyControl: reapply, recheck: lookup)
+                return nil
+            }
+
         return terminalProgramChanges
             .filter { $0 == terminal }
             .mapToVoid()
+            .merge(with: controlRechecks)
             .merge(with: lookedUp, terminalWatcher.watching(terminal).setOutputType(to: Void.self),
                    watchTerminalWriter(terminal).setOutputType(to: Void.self))
             .map { AppKind.from(app, preferencesVM: preferencesVM) }
