@@ -131,7 +131,11 @@ enum Multiplexer: String {
             // popup still wakes the watcher even when this inventory cannot be used.
             let devices = TerminalProcess.ptyMasters(ofPID: server) ?? []
             let query: [String: Any] = ["id": "isp", "method": "session.snapshot", "params": [:]]
-            guard let snapshot = TerminalWatcher.Environment.jsonReply(to: query, on: fd) else { return nil }
+            guard let snapshot = TerminalWatcher.Environment.jsonReply(to: query, on: fd) else {
+                // An established subscription may stay quiet when this server recovers.
+                trail.herdrInventoryIncomplete = true
+                return nil
+            }
             guard let view = herdrView(inSnapshot: snapshot) else { return .clientOnly }
             trail.herdrMasters[server] = devices
             guard devices.count == view.panes.count else { return .clientOnly }
@@ -173,7 +177,8 @@ enum Multiplexer: String {
                     let query: [String: Any] = ["id": "isp", "method": "pane.process_info", "params": ["pane_id": pane.paneId]]
                     return TerminalWatcher.Environment.jsonReply(to: query, on: fd)
                 }
-                guard let reply, let shell = herdrShell(fromProcessInfo: reply), shell.pane == pane.paneId,
+                guard let reply else { return .incomplete }
+                guard let shell = herdrShell(fromProcessInfo: reply), shell.pane == pane.paneId,
                       let current = TerminalProcess.paneTTY(ofPID: shell.pid) else { return .unavailable }
                 tty = current
             }

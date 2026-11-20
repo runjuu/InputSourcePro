@@ -67,7 +67,8 @@ extension Terminal {
     /// it and reads nothing, in no known pane. Call on `TerminalProcess.queue`.
     func focusedProgram(onTTY tty: String?, pane: String? = nil, pid: pid_t) -> TerminalReading {
         Self.focusedTTYs[self] = tty.map { (pid, $0, pane) }
-        return tty.map { TerminalProcess.foregroundProgram(onTTY: $0, pane: pane) } ?? TerminalReading(program: nil, pane: nil)
+        return tty.map { TerminalProcess.foregroundProgram(onTTY: $0, pane: pane, watchHerdrJobs: self == .herdr) }
+            ?? TerminalReading(program: nil, pane: nil)
     }
 
     /// Refresh the cached tty for this process. Herdr's mod supplies
@@ -79,7 +80,7 @@ extension Terminal {
         let cached = Self.focusedTTYs[self].flatMap { $0.pid == pid ? $0 : nil }
         IndicatorDiagnostics.record("terminal.refresh bundle=\(rawValue) tty=\(cached?.path ?? "-")")
         if let cached {
-            return TerminalProcess.foregroundProgram(onTTY: cached.path, pane: cached.pane)
+            return TerminalProcess.foregroundProgram(onTTY: cached.path, pane: cached.pane, watchHerdrJobs: self == .herdr)
         }
         return self == .herdr ? nil : TerminalProbe.program(self, pid: pid)
     }
@@ -240,22 +241,25 @@ extension TerminalProcess {
     /// focused pane, nested up to `Multiplexer.maxDepth`; when it can't be asked,
     /// the multiplexer itself is the program. Spawns processes then, so call it
     /// on `queue`.
-    static func foregroundProgram(onTTY path: String, pane: String? = nil) -> TerminalReading {
+    static func foregroundProgram(onTTY path: String, pane: String? = nil, watchHerdrJobs: Bool = false) -> TerminalReading {
         var trail = TerminalTrail()
-        var reading = foregroundProgram(onTTY: path, pane: pane, depth: 0, watchExec: false, trail: &trail)
+        var reading = foregroundProgram(onTTY: path, pane: pane, depth: 0, watchHerdrJobs: watchHerdrJobs, trail: &trail)
         reading.trail = trail
         return reading
     }
 
-    private static func foregroundProgram(onTTY path: String, pane: String?, depth: Int, watchExec: Bool, trail: inout TerminalTrail) -> TerminalReading {
+    private static func foregroundProgram(onTTY path: String, pane: String?, depth: Int, watchHerdrJobs: Bool, trail: inout TerminalTrail) -> TerminalReading {
         let pane = pane ?? path
         let processes = processes(onTTY: path)
         if let tty = TerminalTrail.TTY(watching: processes, foregroundPgid: TerminalTrail.foregroundPgid(ofPID:)) {
             trail.ttys.append(tty)
         }
         let foreground = foregroundProcess(in: processes)
-        // Herdr keeps the outer title and pane focus when a shell or program execs in place.
-        if watchExec, let owner = foreground ?? processes.first(where: { $0.pid == $0.foregroundPgid }) {
+        if watchHerdrJobs, foreground == nil {
+            trail.herdrShellTTYs.append(path)
+        }
+        // Herdr keeps pane focus and the foreground group when a process execs another program or script.
+        if watchHerdrJobs, let owner = foreground ?? processes.first(where: { $0.pid == $0.foregroundPgid }) {
             trail.herdrExecPIDs.insert(owner.pid)
         }
         guard let process = foreground else {
@@ -267,13 +271,13 @@ extension TerminalProcess {
         }
         let arguments = arguments(pid: process.pid)
         let found = program(comm: process.comm, arguments: arguments)
-        return foregroundProgram(found, onTTY: path, pane: pane, depth: depth, watchExec: watchExec, trail: &trail) { multiplexer, trail in
+        return foregroundProgram(found, onTTY: path, pane: pane, depth: depth, watchHerdrJobs: watchHerdrJobs, trail: &trail) { multiplexer, trail in
             multiplexer.focusedPane(clientPID: process.pid, clientTTY: path, arguments: arguments, trail: &trail)
         }
     }
 
     static func foregroundProgram(
-        _ found: TerminalProgram, onTTY path: String, pane: String, depth: Int, watchExec: Bool = false, trail: inout TerminalTrail,
+        _ found: TerminalProgram, onTTY path: String, pane: String, depth: Int, watchHerdrJobs: Bool = false, trail: inout TerminalTrail,
         focusedPane: (Multiplexer, inout TerminalTrail) -> Multiplexer.Pane?
     ) -> TerminalReading {
         let multiplexer = Multiplexer(rawValue: found.key)
@@ -293,7 +297,7 @@ extension TerminalProcess {
             inner = TerminalReading(program: program, pane: pane, paneControlUnavailable: true)
         case let .tty(tty, label)?:
             paneTTY = tty
-            inner = foregroundProgram(onTTY: tty, pane: label, depth: depth + 1, watchExec: watchExec || multiplexer == .herdr, trail: &trail)
+            inner = foregroundProgram(onTTY: tty, pane: label, depth: depth + 1, watchHerdrJobs: watchHerdrJobs || multiplexer == .herdr, trail: &trail)
         case let .program(paneProgram, label)?:
             inner = TerminalReading(program: paneProgram, pane: label, paneControlUnavailable: true)
         }

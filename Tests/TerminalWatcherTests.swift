@@ -294,29 +294,114 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertFalse(TerminalTrail.isAlive(pid_t.max))
     }
 
-    func testHerdrExecRefreshesWithoutChangingPIDOrPane() throws {
+    func testHerdrDesktopFollowsScriptsThatExecTheSameInterpreter() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let ready = directory.appendingPathComponent("ready")
+        let first = """
+            open(my $file, ">", "ready") or die $!;
+            print $file $$;
+            close($file);
+            alarm 10;
+            scalar <STDIN>;
+            exec "/usr/bin/perl", "second.pl";
+            """
+        try first.write(to: directory.appendingPathComponent("first.pl"), atomically: true, encoding: .utf8)
+        try "alarm 10; scalar <STDIN>;".write(to: directory.appendingPathComponent("second.pl"), atomically: true, encoding: .utf8)
+
+        // script gives both programs a controlling tty, as Herdr does.
         let input = Pipe()
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = ["-c", "read go; exec /bin/cat"]
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/script")
+        process.arguments = ["-q", "/dev/null", "/usr/bin/perl", "first.pl"]
+        process.currentDirectoryURL = directory
         process.standardInput = input
         process.standardOutput = FileHandle.nullDevice
         try process.run()
         defer {
+            if process.isRunning { try? input.fileHandleForWriting.write(contentsOf: Data("finish\n".utf8)) }
             input.fileHandleForWriting.closeFile()
             process.waitUntilExit()
         }
 
+        var scriptPID: pid_t?
+        waitUntil("first script ready") {
+            scriptPID = (try? String(contentsOf: ready, encoding: .utf8)).flatMap(pid_t.init)
+            return scriptPID != nil
+        }
+        let pid = try XCTUnwrap(scriptPID)
+        let focus = HerdrDesktop.Focus(pane: "p1", terminal: "t1", pid: pid)
+        func lookup() -> TerminalReading? {
+            TerminalProcess.queue.sync { Terminal.herdr.herdrReading(focus, pid: getpid(), lastTry: true) }
+        }
+        defer { _ = TerminalProcess.queue.sync { Terminal.herdr.focusedProgram(onTTY: nil, pid: getpid()) } }
+        let initial = try XCTUnwrap(lookup())
+        XCTAssertEqual(initial.program?.key, "first")
+        XCTAssertEqual(initial.trail.herdrExecPIDs, [pid])
+
+        let harness = Harness()
+        harness.bringToFront(.herdr)
+        harness.watcher.follow(initial.trail, for: .herdr)
+        waitUntil("exec watch registered") { harness.refreshes >= 1 }
+        let refreshed = try XCTUnwrap(TerminalProcess.queue.sync { Terminal.herdr.refreshedProgram(pid: getpid()) })
+        XCTAssertEqual(refreshed.trail.herdrExecPIDs, [pid])
+        harness.watcher.follow(refreshed.trail, for: .herdr)
+        let before = harness.refreshes
+        input.fileHandleForWriting.write(Data("go\n".utf8))
+        waitUntil("same interpreter running the second script") {
+            harness.refreshes > before && lookup()?.program?.key == "second"
+        }
+        XCTAssertEqual(harness.paneChanges, 0)
+        XCTAssertEqual(lookup()?.pane, initial.pane)
+    }
+
+    func testHerdrShellStartingAChildInTheSameForegroundGroup() throws {
+        let ready = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: ready) }
+        let input = Pipe()
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/script")
+        process.arguments = ["-q", "/dev/null", "/bin/sh", "-c", #"printf %s "$$" > "$1"; read go; /bin/sleep 1; :"#, "sh", ready.path]
+        process.standardInput = input
+        process.standardOutput = FileHandle.nullDevice
+        try process.run()
+        defer {
+            if process.isRunning { try? input.fileHandleForWriting.write(contentsOf: Data("\n".utf8)) }
+            input.fileHandleForWriting.closeFile()
+            process.waitUntilExit()
+        }
+
+        var shell: pid_t?
+        waitUntil("shell is ready") {
+            shell = (try? String(contentsOf: ready, encoding: .utf8)).flatMap(pid_t.init)
+            return shell != nil
+        }
+        let tty = try XCTUnwrap(shell.flatMap(TerminalProcess.ttyPath(ofPID:)))
+        func lookup(herdr: Bool) -> TerminalReading {
+            TerminalProcess.queue.sync { TerminalProcess.foregroundProgram(onTTY: tty, watchHerdrJobs: herdr) }
+        }
+        let initial = lookup(herdr: true)
+        XCTAssertNil(initial.program)
+        XCTAssertEqual(initial.trail.herdrShellTTYs, [tty])
+        XCTAssertTrue(lookup(herdr: false).trail.herdrShellTTYs.isEmpty)
+
         let harness = Harness()
         harness.bringToFront(.ghostty)
-        let trail = TerminalTrail(herdrExecPIDs: [process.processIdentifier])
-        harness.watcher.follow(trail, for: .ghostty)
-        waitUntil("exec watch registered") { harness.refreshes == 1 }
-        harness.watcher.follow(trail, for: .ghostty)
+        harness.watcher.follow(initial.trail, for: .ghostty)
+        let poll = try XCTUnwrap(harness.livePolls.first { $0.interval == TerminalWatcher.herdrShellInterval })
+        poll.tick()
+        XCTAssertFalse(poll.isDone, "An idle shell doesn't refresh the pane")
         input.fileHandleForWriting.write(Data("go\n".utf8))
-        waitUntil("same process execed cat") { harness.refreshes == 2 }
+        waitUntil("the shell's foreground child triggered a refresh") {
+            poll.tick()
+            return poll.isDone
+        }
+        let running = lookup(herdr: true)
+        XCTAssertEqual(running.program?.key, "sleep")
+        XCTAssertEqual(running.trail.ttys.first?.foregroundPgid, initial.trail.ttys.first?.foregroundPgid)
+        XCTAssertTrue(running.trail.herdrShellTTYs.isEmpty, "The existing program-exit watch takes over")
         XCTAssertEqual(harness.paneChanges, 0)
-        XCTAssertTrue(process.isRunning)
     }
 
     func testTTYIsWatchedThroughItsEarliestReadableProcess() {
@@ -971,6 +1056,63 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertEqual(harness.refreshes, 1)
     }
 
+    func testHerdrRetriesDroppedRepliesButAcceptsProtocolErrors() throws {
+        let folder = URL(fileURLWithPath: "/tmp").appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let socket = folder.appendingPathComponent("herdr.sock").path
+        let clientSocket = folder.appendingPathComponent("herdr-client.sock").path
+        let api = try XCTUnwrap(Self.listen(at: socket))
+        defer { close(api) }
+        let listener = try XCTUnwrap(Self.listen(at: clientSocket))
+        defer { close(listener) }
+        let client = try XCTUnwrap(TerminalWatcher.Environment.connectUnix(clientSocket))
+        defer { close(client) }
+        let peer = accept(listener, nil, nil)
+        XCTAssertGreaterThanOrEqual(peer, 0)
+        defer { close(peer) }
+
+        var master: Int32 = -1, slave: Int32 = -1
+        XCTAssertEqual(openpty(&master, &slave, nil, nil, nil), 0)
+        defer { close(master); close(slave) }
+        let devices = try XCTUnwrap(TerminalProcess.ptyMasters(ofPID: getpid()))
+        let panes = devices.enumerated().map { index, _ in #"{"pane_id":"p\#(index)","terminal_id":"t\#(index)"}"# }
+        let snapshot = #"{"result":{"snapshot":{"focused_pane_id":"p0","workspaces":[{"tab_count":1}],"panes":[\#(panes.joined(separator: ","))]}}}"#
+        let unsupported = #"{"error":{"code":"unknown_method"}}"#
+        // Dropping either request needs another lookup. A server that explicitly
+        // rejects a method keeps the client rule until its state changes.
+        let cases: [(replies: [String?], retry: Bool)] = [
+            ([nil], true), ([unsupported], false),
+            ([snapshot, nil], true), ([snapshot, unsupported], false),
+        ]
+        for (replies, retry) in cases {
+            let served = expectation(description: "served \(replies.count) API requests")
+            DispatchQueue.global().async {
+                for reply in replies {
+                    var event = pollfd(fd: api, events: Int16(POLLIN), revents: 0)
+                    guard Darwin.poll(&event, 1, 1000) == 1 else { break }
+                    let fd = accept(api, nil, nil)
+                    guard fd >= 0 else { break }
+                    var request = [UInt8](repeating: 0, count: 1024)
+                    _ = Darwin.read(fd, &request, request.count)
+                    if let reply {
+                        let bytes = Array((reply + "\n").utf8)
+                        _ = Darwin.write(fd, bytes, bytes.count)
+                    }
+                    close(fd)
+                }
+                served.fulfill()
+            }
+            var trail = TerminalTrail()
+            let pane = TerminalProcess.queue.sync {
+                Multiplexer.herdrFocusedPane(socket: socket, clientPID: getpid(), trail: &trail)
+            }
+            wait(for: [served], timeout: 2)
+            XCTAssertEqual(trail.herdrInventoryIncomplete, retry)
+            XCTAssertEqual(pane, retry ? nil : .clientOnly)
+        }
+    }
+
     func testHerdrRefreshesOnPopupPTYOpenAndClose() throws {
         let pid = getpid()
         let before = try XCTUnwrap(TerminalProcess.ptyMasters(ofPID: pid))
@@ -1221,7 +1363,7 @@ final class TerminalWatcherTests: XCTestCase {
             .replacingOccurrences(of: "export default ", with: "")
     }
 
-    func testHerdrModRenewsItsLeaseAndReportsExecInPlace() throws {
+    func testHerdrModRenewsItsLeaseWithoutRewritingFocus() throws {
         let source = try bundledHerdrModScript()
         let context = try XCTUnwrap(JSContext())
         context.exceptionHandler = { _, error in XCTFail(error?.toString() ?? "JavaScript exception") }
@@ -1238,7 +1380,7 @@ final class TerminalWatcherTests: XCTestCase {
             const shared = () => null, setShared = (_, value) => { reports.push(value) };
             const focused = () => ({pane: "p1", terminal: "t1"});
             const layout = () => ({content: {tab: "active"}});
-            const record = {address: "t1", state: "live", pid: 17, foreground: {argv: ["sh"]}};
+            const record = {address: "t1", state: "live", pid: 17};
             const terminals = () => [record];
             \(source)
             const mod = new InputSourceFocus();
@@ -1248,9 +1390,6 @@ final class TerminalWatcherTests: XCTestCase {
         context.evaluateScript("deliver('watch-session')")
         XCTAssertEqual(context.evaluateScript("cancelled")?.toInt32(), 2, "A heartbeat renews the original deadline")
         XCTAssertEqual(context.evaluateScript("reports.length")?.toInt32(), 1, "Renewal alone creates no shared-file write")
-        context.evaluateScript("record.foreground.argv = ['vim']; mod.publish('watch', mod.watch)")
-        XCTAssertEqual(context.evaluateScript("reports.length")?.toInt32(), 2)
-        XCTAssertEqual(context.evaluateScript("reports[1].focus.executable")?.toString(), "vim")
         context.evaluateScript("deadline()")
         XCTAssertEqual(context.evaluateScript("closed")?.toString(), "mod-input-source-pro", "A missing observer cannot leave the mod running")
     }

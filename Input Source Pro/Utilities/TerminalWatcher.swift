@@ -38,8 +38,11 @@ struct TerminalTrail: Equatable {
     var herdrClients: [Multiplexer.HerdrClient: Bool] = [:]
     /// Herdr emits no event for popup terminals; their PTY master appears and disappears.
     var herdrMasters: [pid_t: Set<UInt32>] = [:]
+    /// A verified server still owes a reply or has more splits to inspect on the next poll.
     var herdrInventoryIncomplete = false
     var herdrExecPIDs = Set<pid_t>()
+    /// Verified ttys where a shell can start a child in its own foreground group.
+    var herdrShellTTYs: [String] = []
     var zellij: Zellij?
 
     /// The foreground process group of `pid`'s controlling tty, from libproc;
@@ -120,6 +123,7 @@ final class TerminalWatcher {
     }
 
     static let libprocInterval: TimeInterval = 0.1
+    static let herdrShellInterval: TimeInterval = 0.75
     static let zellijInterval: TimeInterval = 0.5
     static let connectionGrace: TimeInterval = 10
     /// How long after it was first read a program that follows another in the same
@@ -237,6 +241,17 @@ final class TerminalWatcher {
             })
         }
 
+        if !trail.herdrShellTTYs.isEmpty {
+            let paths = trail.herdrShellTTYs
+            polls.append(environment.poll(Self.herdrShellInterval, {
+                paths.first { path in
+                    TerminalProcess.foregroundProcess(in: TerminalProcess.processes(onTTY: path)) != nil
+                }
+            }) { [weak self] path in
+                self?.trigger(src: "herdr-shell", path, paneMayHaveChanged: false, generation: generation)
+            })
+        }
+
         if trail.zellij?.session != watchedZellij {
             record(src: "zellij-poll", trail.zellij.map { "start session=\($0.session)" } ?? "stop")
             watchedZellij = trail.zellij?.session
@@ -250,7 +265,7 @@ final class TerminalWatcher {
 
         if !trail.herdrCatalogs.isEmpty || !trail.herdrClients.isEmpty || !trail.herdrMasters.isEmpty || trail.herdrInventoryIncomplete {
             let check = { () -> String? in
-                if trail.herdrInventoryIncomplete { return "continue split inventory" }
+                if trail.herdrInventoryIncomplete { return "retry pane inventory" }
                 if let changed = trail.herdrCatalogs.first(where: { Multiplexer.herdrIsLocalOnly(catalog: $0.key) != $0.value }) {
                     return changed.key
                 }
