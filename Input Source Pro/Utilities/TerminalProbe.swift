@@ -234,11 +234,8 @@ enum TerminalProbe {
         guard sysctl(&mib, u_int(mib.count), &entries, &size, nil, 0) == 0 else { return [] }
 
         return entries.prefix(size / stride).compactMap { entry in
-            guard entry.kp_eproc.e_ppid == pid,
-                  entry.kp_eproc.e_tdev != -1, // NODEV: no controlling tty
-                  let name = devname(entry.kp_eproc.e_tdev, S_IFCHR)
-            else { return nil }
-            return "/dev/" + String(cString: name)
+            guard entry.kp_eproc.e_ppid == pid else { return nil }
+            return TerminalProcess.ttyPath(forDevice: entry.kp_eproc.e_tdev)
         }
     }
 
