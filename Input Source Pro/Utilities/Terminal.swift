@@ -565,20 +565,56 @@ struct TerminalControlTracker<Source> {
         var current: Source
         var stack: [Source] = []
         var isSuspended = false
+        var epoch: UInt64
     }
 
     private var entries: [String: [Entry]] = [:]
+    private var enabledAt: [Terminal: UInt64] = [:]
+    private(set) var epoch: UInt64 = 0
+
+    /// A tmux pane can be shared across emulators. Enabling one lets it use
+    /// commands received from now on, while the others keep their pane state.
+    mutating func setEnabledTerminals(_ terminals: [Terminal]) {
+        let enabled = Set(terminals)
+        guard enabled != Set(enabledAt.keys) else { return }
+        let added = enabled.subtracting(enabledAt.keys)
+        enabledAt = enabledAt.filter { enabled.contains($0.key) }
+        if !added.isEmpty {
+            epoch += 1
+            for terminal in added { enabledAt[terminal] = epoch }
+        }
+        // A stack kept for another emulator can be dropped once the last
+        // terminal that was enabled for it turns its switch off.
+        guard let oldest = enabledAt.values.min() else {
+            entries.removeAll()
+            return
+        }
+        entries = entries.compactMapValues { writers in
+            let remaining = writers.filter { $0.epoch >= oldest }
+            return remaining.isEmpty ? nil : remaining
+        }
+    }
+
+    func acceptsCommands(from epoch: UInt64) -> Bool {
+        enabledAt.values.contains { $0 <= epoch }
+    }
+
+    func acceptsCommands(from epoch: UInt64, in terminal: Terminal) -> Bool {
+        enabledAt[terminal].map { $0 <= epoch } == true
+    }
 
     private func activeEntry(on tty: String) -> Entry? {
         entries[tty]?.last { !$0.isSuspended }
     }
 
-    func activeWriter(on tty: String) -> Writer? {
-        activeEntry(on: tty)?.writer
+    func activeWriter(on tty: String, in terminal: Terminal? = nil) -> Writer? {
+        guard let entry = activeEntry(on: tty) else { return nil }
+        if let terminal, !acceptsCommands(from: entry.epoch, in: terminal) { return nil }
+        return entry.writer
     }
 
-    func isControlled(_ tty: String) -> Bool {
-        activeWriter(on: tty) != nil
+    func isControlled(_ tty: String, in terminal: Terminal? = nil) -> Bool {
+        activeWriter(on: tty, in: terminal) != nil
     }
 
     func current(on tty: String) -> Source? {
@@ -591,14 +627,14 @@ struct TerminalControlTracker<Source> {
         entries[tty, default: []].append(entry)
     }
 
-    mutating func select(_ source: Source, on tty: String, writer: Writer) {
+    mutating func select(_ source: Source, on tty: String, writer: Writer, epoch: UInt64? = nil) {
         let stack = entries[tty]?.first { $0.writer == writer }?.stack ?? []
-        activate(Entry(writer: writer, current: source, stack: stack), on: tty)
+        activate(Entry(writer: writer, current: source, stack: stack, epoch: epoch ?? self.epoch), on: tty)
     }
 
-    mutating func push(_ source: Source, on tty: String, writer: Writer, live: Source?) {
+    mutating func push(_ source: Source, on tty: String, writer: Writer, live: Source?, epoch: UInt64? = nil) {
         let previous = entries[tty]?.first { $0.writer == writer }
-        var entry = Entry(writer: writer, current: source, stack: previous?.stack ?? [])
+        var entry = Entry(writer: writer, current: source, stack: previous?.stack ?? [], epoch: epoch ?? self.epoch)
         if let base = previous?.current ?? live ?? activeEntry(on: tty)?.current {
             entry.stack.append(base)
             if entry.stack.count > Self.maxStack { entry.stack.removeFirst() }
@@ -606,12 +642,13 @@ struct TerminalControlTracker<Source> {
         activate(entry, on: tty)
     }
 
-    mutating func pop(on tty: String, writer: Writer) -> Source? {
+    mutating func pop(on tty: String, writer: Writer, epoch: UInt64? = nil) -> Source? {
         guard var entry = entries[tty]?.first(where: { $0.writer == writer }),
               let source = entry.stack.popLast()
         else { return nil }
         entry.current = source
         entry.isSuspended = false
+        entry.epoch = epoch ?? self.epoch
         activate(entry, on: tty)
         return source
     }

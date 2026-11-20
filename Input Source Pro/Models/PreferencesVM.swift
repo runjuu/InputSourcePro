@@ -86,6 +86,7 @@ final class PreferencesVM: ObservableObject {
         self.permissionsVM = permissionsVM
         self.container = container
         mainStorage = MainStorage(container: container)
+        terminalControl.setEnabledTerminals(preferences.enabledTerminals.compactMap(Terminal.init(rawValue:)))
         watchKeyboardConfigsChange()
     }
 
@@ -131,6 +132,7 @@ final class PreferencesVM: ObservableObject {
 
         change(&draft)
 
+        terminalControl.setEnabledTerminals(draft.enabledTerminals.compactMap(Terminal.init(rawValue:)))
         preferences = draft
     }
 

@@ -311,6 +311,55 @@ final class ApplicationVMTerminalTests: XCTestCase {
         XCTAssertEqual(preferencesVM.terminalControl.current(on: secondTTY), secondSource)
     }
 
+    func testCommandsOnlyControlTerminalsEnabledWhenTheyArrived() async throws {
+        let app = FakeApp(bundleIdentifier: Terminal.iterm.rawValue, pid: 999_113)
+        let tty = "/dev/ttys113"
+        let program = TerminalProgram(key: "nvim", pane: tty, tty: tty)
+        let prefs = try Self.inMemoryPreferencesVM()
+        let restore = Self.setTerminalPreferences(prefs, enabled: .ghostty, rules: [])
+        defer { restore() }
+        prefs.setTerminal(.ghostty, enabled: false)
+        let vm = ApplicationVM(preferencesVM: prefs, environment: .init(
+            frontmostApplication: { app }, focusedApplication: { nil },
+            runningApplications: Just([app]).eraseToAnyPublisher(), isTerminalEnabled: prefs.isTerminalEnabled,
+            probedProgram: { _, _ in TerminalReading(program: program, pane: tty, tty: tty) },
+            terminalPanelFocus: .init(read: { _, _ in AnyCancellable {} }),
+            ttyOwner: { ($0, tty, 0) }, jobState: { _, _ in .foreground }
+        ))
+        let source = InputSource.getCurrentInputSource()
+        let select = "isp:113:select:\(source.persistentIdentifier)\n"
+        await vm.receiveTerminalControl(lines: select)
+        XCTAssertFalse(prefs.terminalControl.isControlled(tty))
+
+        // The same tmux pane can subsequently be displayed by either terminal.
+        prefs.setTerminal(.ghostty, enabled: true)
+        XCTAssertFalse(prefs.terminalControl.isControlled(tty, in: .ghostty))
+        await vm.receiveTerminalControl(lines: select)
+        XCTAssertTrue(prefs.terminalControl.isControlled(tty, in: .ghostty))
+
+        prefs.setTerminal(.iterm, enabled: true)
+        try await Self.waitFor("iTerm reads the shared pane") { prefs.focusedTerminalTTY(.iterm) == tty }
+        XCTAssertNil(vm.appKind?.getTerminalInfo())
+        XCTAssertFalse(prefs.terminalControl.isControlled(tty, in: .iterm))
+        // Even though the writer did not change, its first new command creates
+        // a program context in the newly enabled terminal.
+        await vm.receiveTerminalControl(lines: select)
+        XCTAssertEqual(vm.appKind?.getTerminalInfo()?.program, program)
+        XCTAssertTrue(prefs.terminalControl.isControlled(tty, in: .iterm))
+
+        prefs.setTerminal(.iterm, enabled: false)
+        await vm.receiveTerminalControl(lines: select)
+        prefs.setTerminal(.iterm, enabled: true)
+        try await Self.waitFor("re-enabled iTerm reads the shared pane") { prefs.focusedTerminalTTY(.iterm) == tty }
+        XCTAssertNil(vm.appKind?.getTerminalInfo())
+        XCTAssertFalse(prefs.terminalControl.isControlled(tty, in: .iterm))
+        XCTAssertTrue(prefs.terminalControl.isControlled(tty, in: .ghostty))
+
+        prefs.setTerminal(.iterm, enabled: false)
+        prefs.setTerminal(.ghostty, enabled: false)
+        XCTAssertFalse(prefs.terminalControl.isControlled(tty))
+    }
+
     /// A job in the background (`bg`, `&`) can't take the pane from whoever is at the prompt.
     func testACommandFromABackgroundJobIsIgnored() async throws {
         let pid: pid_t = 999_012
@@ -329,6 +378,8 @@ final class ApplicationVMTerminalTests: XCTestCase {
             jobState: { _, _ in .background }
         )
         let preferencesVM = try Self.inMemoryPreferencesVM()
+        let restore = Self.setTerminalPreferences(preferencesVM, enabled: .ghostty, rules: [])
+        defer { restore() }
         let applicationVM = ApplicationVM(preferencesVM: preferencesVM, environment: environment)
 
         let source = InputSource.getCurrentInputSource().persistentIdentifier
@@ -343,6 +394,8 @@ final class ApplicationVMTerminalTests: XCTestCase {
         let tty = "/dev/ttys110"
         let writer: pid_t = 110
         let prefs = try Self.inMemoryPreferencesVM()
+        let restore = Self.setTerminalPreferences(prefs, enabled: .ghostty, rules: [])
+        defer { restore() }
         let vm = ApplicationVM(preferencesVM: prefs, environment: .init(
             frontmostApplication: { app }, focusedApplication: { nil },
             runningApplications: Just([app]).eraseToAnyPublisher(), isTerminalEnabled: { _ in false },
@@ -380,6 +433,8 @@ final class ApplicationVMTerminalTests: XCTestCase {
             jobState: { pid, _ in pid == alive || state.lock.withLock { state.isAlive } ? .foreground : .gone }
         )
         let preferencesVM = try Self.inMemoryPreferencesVM()
+        let restore = Self.setTerminalPreferences(preferencesVM, enabled: .ghostty, rules: [])
+        defer { restore() }
         let applicationVM = ApplicationVM(preferencesVM: preferencesVM, environment: environment)
 
         let source = InputSource.getCurrentInputSource().persistentIdentifier
@@ -649,12 +704,19 @@ final class ApplicationVMTerminalTests: XCTestCase {
         defer { restore() }
         prefs.terminalControl.select(source, on: tty, writer: writer)
         var front: NSRunningApplication = terminal
+        var focused: NSRunningApplication = terminal
+        var windowOpen = false
+        var handbackWaits = 0
+        var laggingFocusReads = 0
         let restored = PassthroughSubject<Void, Never>()
         let lock = NSLock()
         var probes = 0
         var pane = tty
         let vm = ApplicationVM(preferencesVM: prefs, environment: .init(
-            frontmostApplication: { front }, focusedApplication: { nil },
+            frontmostApplication: { front }, focusedApplication: {
+                if front == terminal && focused == temporaryWindow { laggingFocusReads += 1 }
+                return focused
+            },
             runningApplications: Just([terminal]).eraseToAnyPublisher(), isTerminalEnabled: { $0 == .iterm },
             probedProgram: { _, _ in
                 lock.withLock {
@@ -664,7 +726,8 @@ final class ApplicationVMTerminalTests: XCTestCase {
             },
             terminalPanelFocus: .init(read: { _, _ in AnyCancellable {} }),
             ttyOwner: { ($0, tty, 0) }, jobState: { _, _ in .foreground },
-            temporaryInputWindowRestored: restored.eraseToAnyPublisher()
+            temporaryInputWindowInProgress: { windowOpen },
+            temporaryInputWindowRestored: restored.handleEvents(receiveSubscription: { _ in handbackWaits += 1 }).eraseToAnyPublisher()
         ))
         try await Self.waitFor("both activation probes") { lock.withLock { probes >= 2 } }
         let delivered = expectation(description: "settled probe delivered")
@@ -676,26 +739,55 @@ final class ApplicationVMTerminalTests: XCTestCase {
             if app?.getTerminalInfo()?.program == program { publishedProgramSources += 1 }
         }
         // A CJKV selection brings up ISP's temporary window during the first command.
-        let switches = vm.terminalSwitches.sink { _ in front = temporaryWindow }
+        func openWindow() {
+            windowOpen = true
+            front = temporaryWindow
+            focused = temporaryWindow
+        }
+        func handBackWindow() {
+            windowOpen = false
+            front = terminal
+            restored.send()
+        }
+        let switches = vm.terminalSwitches.sink { _ in openWindow() }
         defer { contexts.cancel(); switches.cancel() }
-        await vm.receiveTerminalControl(lines: "isp:111:select:\(source.persistentIdentifier)\nisp:111:release\n")
+        let initialWaits = handbackWaits
+        let batch = Task { await vm.receiveTerminalControl(lines: "isp:111:select:\(source.persistentIdentifier)\nisp:111:release\n") }
+        try await Self.waitFor("the release waits for the first command's window") { handbackWaits > initialWaits }
+        XCTAssertTrue(prefs.terminalControl.isControlled(tty))
+        handBackWindow()
+        try await Self.waitFor("NSWorkspace has handed back before AX") { laggingFocusReads > 0 }
+        focused = terminal
+        await batch.value
         XCTAssertFalse(prefs.terminalControl.isControlled(tty))
-        XCTAssertEqual(publishedProgramSources, 0)
-        front = terminal
-        restored.send()
-        try await Self.waitFor("the unchanged editor reapplied its terminal rule") { publishedProgramSources == 1 }
+        XCTAssertEqual(publishedProgramSources, 1, "The unchanged editor reapplies its terminal rule")
+
+        // A first push arriving during another handback remembers the live source.
+        openWindow()
+        let beforePush = handbackWaits
+        let push = Task { await vm.receiveTerminalControl(lines: "isp:111:push:\(source.persistentIdentifier)\n") }
+        try await Self.waitFor("the first push waits") { handbackWaits > beforePush }
+        XCTAssertFalse(prefs.terminalControl.isControlled(tty))
+        focused = terminal
+        handBackWindow()
+        await push.value
+        XCTAssertEqual(prefs.terminalControl.pop(on: tty, writer: writer), source)
+        let beforeAnotherPane = publishedProgramSources
 
         // An independent command while the window is frontmost stays with its
         // pane if the terminal hands focus back to a different one.
-        front = temporaryWindow
-        await vm.receiveTerminalControl(lines: "isp:111:select:\(source.persistentIdentifier)\n")
-        XCTAssertTrue(prefs.terminalControl.isControlled(tty))
+        openWindow()
+        let beforeSelect = handbackWaits
+        let select = Task { await vm.receiveTerminalControl(lines: "isp:111:select:\(source.persistentIdentifier)\n") }
+        try await Self.waitFor("the select waits") { handbackWaits > beforeSelect }
         let otherTTY = "/dev/ttys112"
         lock.withLock { pane = otherTTY }
-        front = terminal
-        restored.send()
-        try await Self.waitFor("handback read the other pane") { prefs.focusedTerminalTTY(.iterm) == otherTTY }
-        XCTAssertEqual(publishedProgramSources, 1)
+        focused = terminal
+        handBackWindow()
+        await select.value
+        XCTAssertTrue(prefs.terminalControl.isControlled(tty))
+        XCTAssertEqual(prefs.focusedTerminalTTY(.iterm), otherTTY)
+        XCTAssertEqual(publishedProgramSources, beforeAnotherPane)
         XCTAssertNil(vm.appKind?.getTerminalInfo())
     }
 

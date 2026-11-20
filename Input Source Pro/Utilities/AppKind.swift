@@ -209,7 +209,7 @@ extension AppKind {
         if let terminal = Terminal(app), preferencesVM.isTerminalEnabled(terminal) {
             if let program = preferencesVM.terminalPrograms[terminal] {
                 let rule = preferencesVM.getTerminalRule(program: program)
-                if rule != nil || program.tty.map { preferencesVM.terminalControl.isControlled($0) } == true {
+                if rule != nil || program.tty.map { preferencesVM.terminalControl.isControlled($0, in: terminal) } == true {
                     return .terminal(
                         app: app,
                         info: (
@@ -220,7 +220,7 @@ extension AppKind {
                         )
                     )
                 }
-            } else if let tty = preferencesVM.terminalTTYs[terminal], preferencesVM.terminalControl.isControlled(tty) {
+            } else if let tty = preferencesVM.terminalTTYs[terminal], preferencesVM.terminalControl.isControlled(tty, in: terminal) {
                 return .controlledShell(app: app, tty: tty, info: (focusedElement, isFocusOnInputContainer))
             }
         }
