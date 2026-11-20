@@ -195,10 +195,13 @@ final class PrivateInputSourceSelectorTests: XCTestCase {
         var queue = InputSourceSwitcher.PrivateSelectionQueue<String>()
         let first = queue.begin(target: "CH", current: "EN")
         queue.enqueue(target: "JP", current: "EN") { XCTFail("Cancelled waiting selection ran") }
+        XCTAssertFalse(queue.hasSupersededSelection)
         queue.discardPending()
         XCTAssertTrue(queue.isBusy)
+        XCTAssertTrue(queue.hasSupersededSelection)
         XCTAssertNil(queue.finish(first, current: "EN", fallback: { XCTFail("Cancelled fallback ran") }))
         XCTAssertFalse(queue.isBusy)
+        XCTAssertFalse(queue.hasSupersededSelection)
     }
 
     @MainActor

@@ -190,9 +190,10 @@ final class TerminalPanelFocusTests: XCTestCase {
             terminalPanelFocus: TerminalPanelFocus.Environment(
                 read: { _, answer in
                     let flag = CancelFlag()
-                    DispatchQueue.main.async { if !flag.isCancelled { answer(state.attributes) } }
+                    DispatchQueue.main.async { if !flag.isCancelled { answer(state.lock.withLock { state.attributes }) } }
                     return AnyCancellable(flag)
-                }
+                },
+                controlAttributes: { _ in state.lock.withLock { state.attributes } }
             )
         )
         let preferencesVM = try ApplicationVMTerminalTests.inMemoryPreferencesVM()
@@ -214,7 +215,7 @@ final class TerminalPanelFocusTests: XCTestCase {
         XCTAssertEqual(programs, ["claude"], "The window's program never stands in for the panel's")
 
         // Collapsed without a notification: the recheck while it had focus notices.
-        state.attributes = Self.window
+        state.lock.withLock { state.attributes = Self.window }
         ApplicationVMTerminalTests.waitUntil("TextEdit's rules apply again") { ruledApp() === textEdit }
         XCTAssertNil(preferencesVM.terminalPanel)
         XCTAssertNil(preferencesVM.terminalPrograms[.ghostty], "The panel's program is not the window's")
@@ -247,7 +248,8 @@ final class TerminalPanelFocusTests: XCTestCase {
                     let flag = CancelFlag()
                     DispatchQueue.main.async { if !flag.isCancelled { answer(state.lock.withLock { state.attributes }) } }
                     return AnyCancellable(flag)
-                }
+                },
+                controlAttributes: { _ in state.lock.withLock { state.attributes } }
             )
         )
         let preferencesVM = try ApplicationVMTerminalTests.inMemoryPreferencesVM()
@@ -266,6 +268,78 @@ final class TerminalPanelFocusTests: XCTestCase {
             preferencesVM.terminalPanel == nil && program() == "claude"
         }
         XCTAssertTrue(applicationVM.appKind?.getApp() === ghostty)
+    }
+
+    func testHiddenPanelCommandsCannotSwitchTheAppOrWindowUnderneath() async throws {
+        for overGhostty in [false, true] {
+            try await checkHiddenPanel(overGhostty: overGhostty, writerExits: false)
+        }
+    }
+
+    func testWriterExitRechecksThePanelBeforeApplyingItsRule() async throws {
+        try await checkHiddenPanel(overGhostty: false, writerExits: true)
+    }
+
+    private func checkHiddenPanel(overGhostty: Bool, writerExits: Bool) async throws {
+        let ghostty = ApplicationVMTerminalTests.FakeApp(bundleIdentifier: Terminal.ghostty.rawValue, pid: 999_201)
+        let other = ApplicationVMTerminalTests.FakeApp(bundleIdentifier: "com.apple.TextEdit", pid: 999_202)
+        let front = overGhostty ? ghostty : other
+        let panelTTY = "/dev/ttys201"
+        let windowTTY = "/dev/ttys202"
+        let writer = TerminalProcess.Identity(pid: 201, startTime: 0)
+        let source = InputSource.getCurrentInputSource()
+        let prefs = try ApplicationVMTerminalTests.inMemoryPreferencesVM()
+        let restore = ApplicationVMTerminalTests.setTerminalPreferences(prefs, enabled: .ghostty, rules: ["vim"])
+        defer { restore() }
+        if writerExits { prefs.terminalControl.select(source, on: panelTTY, writer: writer) }
+
+        let lock = NSLock()
+        var attributes = Self.panel
+        var reportedPanel = false
+        var alive = true
+        let vm = ApplicationVM(preferencesVM: prefs, environment: .init(
+            frontmostApplication: { front }, focusedApplication: { nil },
+            runningApplications: Just([ghostty, other]).eraseToAnyPublisher(), isTerminalEnabled: prefs.isTerminalEnabled,
+            probedProgram: { terminal, _ in
+                let tty = terminal.isPanelFocused ? panelTTY : windowTTY
+                let program = TerminalProgram(key: "vim", pane: tty, tty: tty)
+                return TerminalReading(program: program, pane: tty, tty: tty)
+            },
+            terminalPanelFocus: .init(
+                read: { _, answer in
+                    // Report the panel opening. Its dismissal produces no notification.
+                    guard !reportedPanel else { return AnyCancellable {} }
+                    reportedPanel = true
+                    DispatchQueue.main.async { answer(Self.panel) }
+                    return AnyCancellable {}
+                },
+                controlAttributes: { _ in lock.withLock { attributes } }
+            ),
+            ttyOwner: { alive ? ($0, panelTTY, 0) : nil }, jobState: { _, _ in .foreground }
+        ))
+        try await ApplicationVMTerminalTests.waitFor("quick terminal is active") {
+            prefs.terminalPanel == ghostty && vm.appKind?.getTerminalInfo()?.program.tty == panelTTY
+        }
+        var hiddenPanePublications = 0
+        var switches = 0
+        let contexts = vm.$appKind.dropFirst().sink {
+            if $0?.getTerminalInfo()?.program.tty == panelTTY { hiddenPanePublications += 1 }
+        }
+        let changes = vm.terminalSwitches.sink { _ in switches += 1 }
+        defer { contexts.cancel(); changes.cancel() }
+        lock.withLock { attributes = overGhostty ? Self.frontWindow : Self.window }
+        if writerExits {
+            alive = false
+        } else {
+            await vm.receiveTerminalControl(lines: "isp:201:push:\(source.persistentIdentifier)\n")
+            XCTAssertTrue(prefs.terminalControl.isControlled(panelTTY))
+            XCTAssertNil(prefs.terminalControl.pop(on: panelTTY, writer: writer), "The hidden pane cannot remember the actual front app's source")
+        }
+        try await ApplicationVMTerminalTests.waitFor("focus is handed back to the window underneath") {
+            prefs.terminalPanel == nil && (overGhostty ? vm.appKind?.getTerminalInfo()?.program.tty == windowTTY : vm.appKind?.getApp() == other)
+        }
+        XCTAssertEqual(hiddenPanePublications, 0)
+        XCTAssertEqual(switches, 0)
     }
 
     func testRulesFollowISPThenAPanelThenTheFocusedApp() {

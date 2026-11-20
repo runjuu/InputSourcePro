@@ -570,7 +570,7 @@ final class TerminalControlTrackerTests: XCTestCase {
 
         // A lookup for this batch finished after Ghostty was re-enabled.
         XCTAssertTrue(control.acceptsCommands(from: received))
-        control.push("ABC", on: tty, writer: first, live: "French", epoch: received)
+        control.push("ABC", on: tty, writer: first, live: (.iterm, "French"), epoch: received)
         XCTAssertFalse(control.isControlled(tty, in: .ghostty))
         XCTAssertTrue(control.isControlled(tty, in: .iterm))
 
@@ -588,10 +588,10 @@ final class TerminalControlTrackerTests: XCTestCase {
     }
 
     func testFirstPushAfterOptInRestoresTheSourceInUse() {
-        control.push("French", on: tty, writer: first, live: "Greek")
+        control.push("French", on: tty, writer: first, live: (.ghostty, "Greek"))
         control.setEnabledTerminals([.ghostty, .iterm])
         // The terminal just enabled is in front; its ordinary rule was using ABC.
-        control.push("German", on: tty, writer: first, live: "ABC")
+        control.push("German", on: tty, writer: first, live: (.iterm, "ABC"))
 
         XCTAssertEqual(control.pop(on: tty, writer: first, in: .iterm), "ABC")
         XCTAssertEqual(control.current(on: tty, in: .ghostty), "French")
@@ -602,7 +602,7 @@ final class TerminalControlTrackerTests: XCTestCase {
     }
 
     func testSelectAfterOptInDoesNotExposeAnEarlierStack() {
-        control.push("French", on: tty, writer: first, live: "Greek")
+        control.push("French", on: tty, writer: first, live: (.ghostty, "Greek"))
         control.setEnabledTerminals([.ghostty, .iterm])
         control.select("German", on: tty, writer: first)
 
@@ -612,7 +612,7 @@ final class TerminalControlTrackerTests: XCTestCase {
     }
 
     func testUnfocusedPopOnlyRestoresClientsThatSawThePush() {
-        control.push("French", on: tty, writer: first, live: "Greek")
+        control.push("French", on: tty, writer: first, live: (.ghostty, "Greek"))
         control.setEnabledTerminals([.ghostty, .iterm])
 
         XCTAssertEqual(control.pop(on: tty, writer: first), "Greek")
@@ -627,7 +627,7 @@ final class TerminalControlTrackerTests: XCTestCase {
 
     func testPushStacksCurrentThenPopReturnsToIt() {
         control.select("rime", on: tty, writer: first)
-        control.push("abc", on: tty, writer: first, live: "other")
+        control.push("abc", on: tty, writer: first, live: (.ghostty, "other"))
 
         XCTAssertEqual(control.current(on: tty, in: .ghostty), "abc")
         XCTAssertEqual(control.pop(on: tty, writer: first), "rime")
@@ -635,7 +635,7 @@ final class TerminalControlTrackerTests: XCTestCase {
     }
 
     func testFirstPushStacksTheLiveSource() {
-        control.push("abc", on: tty, writer: first, live: "rime")
+        control.push("abc", on: tty, writer: first, live: (.ghostty, "rime"))
 
         XCTAssertEqual(control.pop(on: tty, writer: first), "rime")
     }
@@ -688,7 +688,7 @@ final class TerminalControlTrackerTests: XCTestCase {
     }
 
     func testAReadingKeepsControlWhileTheProgramIsInTheForeground() {
-        control.push("abc", on: tty, writer: first, live: "rime")
+        control.push("abc", on: tty, writer: first, live: (.ghostty, "rime"))
         control.check(tty) { writer, onTTY in writer == self.first && onTTY == self.tty ? .foreground : .gone }
 
         XCTAssertTrue(control.isControlled(tty))
@@ -734,9 +734,9 @@ final class TerminalControlTrackerTests: XCTestCase {
     }
 
     func testSuspendedEditorsKeepSeparateStacksWhenTheyShareAPane() {
-        control.push("ABC", on: tty, writer: first, live: "French")
+        control.push("ABC", on: tty, writer: first, live: (.ghostty, "French"))
         control.check(tty) { _, _ in .background }
-        control.push("ABC", on: tty, writer: second, live: "Pinyin")
+        control.push("ABC", on: tty, writer: second, live: (.ghostty, "Pinyin"))
         XCTAssertEqual(control.pop(on: tty, writer: second), "Pinyin")
         control.release(tty, writer: second)
         XCTAssertFalse(control.isControlled(tty))
@@ -747,10 +747,23 @@ final class TerminalControlTrackerTests: XCTestCase {
     }
 
     func testUnfocusedTakeoverPushRemembersThePanesKnownSource() {
-        control.push("French", on: tty, writer: first, live: "Pinyin")
+        control.push("French", on: tty, writer: first, live: (.ghostty, "Pinyin"))
         control.push("ABC", on: tty, writer: second, live: nil)
         XCTAssertEqual(control.pop(on: tty, writer: second), "French")
         XCTAssertNil(control.pop(on: tty, writer: second))
+    }
+
+    func testFocusedTakeoverPushPreservesTheOtherEmulatorsSource() {
+        control.push("French", on: tty, writer: first, live: (.ghostty, "Greek"))
+        control.setEnabledTerminals([.ghostty, .iterm])
+        control.push("German", on: tty, writer: first, live: (.iterm, "ABC"))
+        XCTAssertEqual(control.pop(on: tty, writer: first, in: .iterm), "ABC")
+        XCTAssertEqual(control.current(on: tty, in: .ghostty), "French")
+
+        // iTerm's live source changed again before the new writer's first push.
+        control.push("Spanish", on: tty, writer: second, live: (.iterm, "Pinyin"))
+        XCTAssertEqual(control.pop(on: tty, writer: second, in: .iterm), "Pinyin")
+        XCTAssertEqual(control.current(on: tty, in: .ghostty), "French")
     }
 
     func testAnotherPIDTakesOverTheTTY() {

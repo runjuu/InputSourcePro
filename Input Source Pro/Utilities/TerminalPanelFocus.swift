@@ -30,6 +30,8 @@ final class TerminalPanelFocus {
         /// it, unless cancelled first; nil when AX can't answer (no permission,
         /// app busy or gone).
         var read: (_ pid: pid_t, _ answer: @escaping (Attributes?) -> Void) -> AnyCancellable
+        /// A fresh read alongside a FIFO pane probe, on its background queue.
+        var controlAttributes: (pid_t) -> Attributes? = TerminalPanelFocus.attributes
     }
 
     /// Notifications that may come with the panel showing or hiding; each one
@@ -94,6 +96,16 @@ final class TerminalPanelFocus {
             }
             if self.rereads.remove(pid) != nil { self.evaluate(pid) }
         }
+    }
+
+    /// A pane probe observed the other side of a panel transition. Retire any
+    /// older notification read before publishing the newer observation.
+    func reconcile(_ pid: pid_t, isFocused: Bool) {
+        guard watchedPIDs.contains(pid) else { return }
+        reads[pid] = nil
+        rereads.remove(pid)
+        if unanswered == pid { unanswered = nil }
+        apply(pid, isFocused: isFocused)
     }
 
     static func isPanelFocused(_ attributes: Attributes) -> Bool {
