@@ -29,13 +29,15 @@ final class TerminalWatcherTests: XCTestCase {
             }
         }
 
-        /// One watch of Herdr's view file.
+        /// One subscription to the Herdr mod.
         final class HerdrView {
-            let send: (String?) -> Void
+            let report: (HerdrDesktop.Focus?) -> Void
+
+            func send(_ pane: String?) { report(pane.map { .init(pane: $0, terminal: $0) }) }
             var isCancelled = false
 
-            init(send: @escaping (String?) -> Void) {
-                self.send = send
+            init(send: @escaping (HerdrDesktop.Focus?) -> Void) {
+                self.report = send
             }
         }
 
@@ -56,7 +58,7 @@ final class TerminalWatcherTests: XCTestCase {
         var closed: [TerminalWatcher.Connection] = []
         var timers: [(seconds: TimeInterval, subject: PassthroughSubject<Date, Never>)] = []
         var refreshes = 0
-        var focusedHerdrPanes: [String] = []
+        var focusedHerdrPanes: [String?] = []
         /// Refreshes that said the pane may have changed.
         var paneChanges = 0
         private var front: AnyCancellable?
@@ -98,7 +100,7 @@ final class TerminalWatcherTests: XCTestCase {
                 refreshes += 1
                 paneChanges += paneMayHaveChanged ? 1 : 0
             },
-            focusHerdr: { [unowned self] in focusedHerdrPanes.append($0) }
+            focusHerdr: { [unowned self] in focusedHerdrPanes.append($0.terminal) }
         )
 
         var livePolls: [Poll] { polls.filter { !$0.isCancelled && !$0.isDone } }
@@ -334,7 +336,7 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertEqual(harness.refreshes, 1)
     }
 
-    // MARK: Herdr view file
+    // MARK: Herdr focus mod
 
     func testHerdrViewFocusesEachNewPane() throws {
         let harness = Harness()
@@ -345,16 +347,13 @@ final class TerminalWatcherTests: XCTestCase {
         view.send("pA")
         XCTAssertEqual(harness.focusedHerdrPanes, ["pA"], "The first read is Herdr's focus on coming to the front")
         view.send("pA") // another file in the directory changed
-        view.send(nil) // unreadable
         XCTAssertEqual(harness.focusedHerdrPanes, ["pA"])
+        view.report(.init(pane: "pA", terminal: "sub-agent"))
+        view.report(.init(pane: "pA", terminal: "pA"))
+        view.report(.init(pane: "pB", terminal: nil))
+        view.report(.init(pane: "pB", terminal: nil))
+        XCTAssertEqual(harness.focusedHerdrPanes, ["pA", "sub-agent", "pA", nil])
 
-        view.send("pB")
-        view.send("pB")
-        view.send(nil)
-        view.send("pB")
-        XCTAssertEqual(harness.focusedHerdrPanes, ["pA", "pB"], "Same pane after an unreadable read: nothing")
-        view.send("pA")
-        XCTAssertEqual(harness.focusedHerdrPanes, ["pA", "pB", "pA"])
         XCTAssertEqual(harness.refreshes, 0, "A pane switch is a focus, not a refresh of the remembered tty")
 
         harness.watcher.follow(trail(ttys: [(10, 100)]), for: .herdr)
@@ -376,7 +375,7 @@ final class TerminalWatcherTests: XCTestCase {
     func testHerdrViewIsWatchedOnlyWhileHerdrIsFrontmost() throws {
         let harness = Harness()
         harness.bringToFront(.ghostty)
-        XCTAssertTrue(harness.herdrViews.isEmpty, "Only Herdr's desktop app has a view file")
+        XCTAssertTrue(harness.herdrViews.isEmpty, "Only Herdr's desktop app loads the mod")
 
         harness.bringToFront(.herdr)
         let first = try XCTUnwrap(harness.herdrViews.last)
@@ -433,15 +432,13 @@ final class TerminalWatcherTests: XCTestCase {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let file = directory.appendingPathComponent("view.json")
-        func view(_ pane: String) -> Data {
-            Data(#"{"active":"s","spaces":{"s":"t"},"tabs":{"t":{"focused":"\#(pane)","before":[]}}}"#.utf8)
-        }
+        func view(_ pane: String) -> Data { Data(pane.utf8) }
         try view("pA").write(to: file)
 
         var reads: [String?] = []
         let watch = try XCTUnwrap(TerminalWatcher.Environment.watchDirectory(
             directory.path,
-            read: { FileManager.default.contents(atPath: file.path).flatMap(HerdrDesktop.focusedPane(fromView:)) },
+            read: { try? String(contentsOf: file, encoding: .utf8) },
             send: { reads.append($0) }
         ))
         defer { watch.cancel() }
@@ -640,6 +637,25 @@ final class TerminalWatcherTests: XCTestCase {
         harness.leaveFront()
         harness.fireTimer(TerminalWatcher.connectionGrace)
         XCTAssertEqual(harness.closed, [herdr])
+    }
+
+    func testSwitchingHerdrSessionsExpiresOnlyTheDepartedSocket() {
+        let a = TerminalWatcher.Connection.herdr(socket: "/A")
+        let b = TerminalWatcher.Connection.herdr(socket: "/B")
+        let h = Harness()
+        h.reachable = [a, b]
+        h.bringToFront(.ghostty)
+        h.watcher.follow(trail(herdr: ["/A"]), for: .ghostty)
+        h.fireTimer(0.5)
+        h.watcher.follow(trail(herdr: ["/B"]), for: .ghostty)
+        h.fireTimer(0.5)
+        h.sends[a]?(.changed)
+        h.sends[b]?(.ready)
+        XCTAssertEqual(h.refreshes, 1)
+        h.fireTimer(TerminalWatcher.connectionGrace)
+        XCTAssertEqual(h.closed, [a])
+        h.sends[b]?(.changed)
+        XCTAssertEqual(h.refreshes, 2)
     }
 
     /// Read A, then subscribe: a switch made before the handshake sends no event,

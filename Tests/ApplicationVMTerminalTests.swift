@@ -142,7 +142,7 @@ final class ApplicationVMTerminalTests: XCTestCase {
         }
     }
 
-    /// `herdr-app ls` or `hc get` failed once, the pane unchanged: read again.
+    /// `hc get` failed once, the pane unchanged: read again.
     func testAHerdrLookupThatReadsNothingIsTriedAgain() {
         let reads = Reads()
         var received: [String?] = []

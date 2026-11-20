@@ -2,8 +2,8 @@ import AppKit
 import AXSwift
 import Darwin
 
-/// Reads the program in the focused pane. Herdr names the pane in its view
-/// file; other terminals report a tty. The kernel identifies its foreground job.
+/// Reads the program in the focused pane. Herdr's mod names the displayed
+/// terminal; other terminals report a tty. The kernel identifies its foreground job.
 /// Runs on `TerminalProcess.queue`, never on the main thread; scriptable
 /// terminals are asked with Apple Events sent from there (NSAppleScript is
 /// main-thread only).
@@ -21,13 +21,9 @@ enum TerminalProbe {
         let tty: String?
         switch terminal {
         case .herdr:
-            // FIFO commands need a fresh pane lookup even before the view watcher fires.
-            guard let pane = HerdrDesktop.focusedPane(),
-                  let address = HerdrDesktop.terminal(ofPane: pane),
-                  let reading = terminal.paneProgram(pane: address, appPID: pid) else {
-                return TerminalReading(program: nil, pane: nil)
-            }
-            return reading
+            // A command needs the mod's current answer, even before the next focus notification.
+            return HerdrDesktop.queryFocus().flatMap { terminal.herdrReading($0, pid: pid, lastTry: false) }
+                ?? TerminalReading(program: nil, pane: nil)
         case .ghostty:
             // The quick terminal belongs to no window; the front window is the one behind it.
             if terminal.isPanelFocused {

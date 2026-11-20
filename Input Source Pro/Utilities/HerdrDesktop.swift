@@ -1,106 +1,136 @@
-import Foundation
+import AppKit
+import Combine
 
-/// Herdr's desktop app, read with no setup: `view.json` names the
-/// focused pane and is rewritten on every pane, tab or space switch; the
-/// `herdr-app` and `hc` CLIs lead from that pane to its terminal and a pid.
+/// The bundled Herdr mod reports the terminal actually shown, including a
+/// sub-agent swapped into an existing pane. It runs only while Herdr is watched.
 enum HerdrDesktop {
-    static let directory = ("~/.config/herdr-app" as NSString).expandingTildeInPath
-    static let viewFile = directory + "/view.json"
-    static let herdrApp = ("~/.local/bin/herdr-app" as NSString).expandingTildeInPath
-    static let hc = ("~/.local/bin/hc" as NSString).expandingTildeInPath
-
-    /// The focused pane `view.json` names now, nil when it can't be read.
-    static func focusedPane() -> String? {
-        FileManager.default.contents(atPath: viewFile).flatMap(focusedPane(fromView:))
+    struct Focus: Codable, Equatable {
+        let pane: String?
+        let terminal: String?
+        var pid: pid_t?
     }
 
-    /// The address of the terminal `pane` shows (`herdr-app ls`), nil when
-    /// Herdr can't tell. Spawns a process, so call it off the main thread.
-    static func terminal(ofPane pane: String, run: (_ path: String, _ arguments: [String]) -> String? = runCLI) -> String? {
-        guard let list = run(herdrApp, ["ls"]) else {
-            record("pane=\(pane) failed=ls")
-            return nil
-        }
-        guard let terminal = terminal(ofPane: pane, fromList: list) else {
-            record("pane=\(pane) failed=pane")
-            return nil
-        }
-        record("pane=\(pane) terminal=\(terminal)")
-        return terminal
+    private struct Report: Decodable {
+        let token: String
+        let focus: Focus
     }
 
-    /// The pid to read `terminal`'s tty from (`hc get`), nil when Herdr can't
-    /// tell. Spawns a process, so call it off the main thread.
-    static func pid(ofTerminal terminal: String, run: (_ path: String, _ arguments: [String]) -> String? = runCLI) -> pid_t? {
-        guard let pid = run(hc, ["get", terminal, "--json"]).flatMap(pid(fromTerminal:)) else {
-            record("terminal=\(terminal) failed=get")
-            return nil
-        }
-        return pid
-    }
+    static let modName = "input-source-pro"
+    static let directory = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".config/herdr-app")
+    private static let bridgeQueue = DispatchQueue(label: "dev.inputsourcepro.herdr-mod", qos: .utility)
+    private static let localBin = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin")
 
-    static func record(_ message: String) {
-        IndicatorDiagnostics.record("terminal.view bundle=\(Terminal.herdr.rawValue) \(message)")
-    }
-
-    /// Runs a Herdr CLI; nil when it is missing, fails, or hangs.
-    static func runCLI(_ path: String, _ arguments: [String]) -> String? {
-        guard FileManager.default.isExecutableFile(atPath: path) else { return nil }
+    private static func appCommand(_ arguments: [String]) -> String? {
+        let path = NSRunningApplication.runningApplications(withBundleIdentifier: Terminal.herdr.rawValue).first?.executableURL?.path
+            ?? localBin.appendingPathComponent("herdr-app").path
         return TerminalProcess.output(of: path, arguments: arguments)
     }
-}
 
-// MARK: - Parsing
-
-extension HerdrDesktop {
-    /// `view.json`: the focused pane is `tabs[spaces[active]].focused`.
-    static func focusedPane(fromView data: Data) -> String? {
-        struct View: Decodable {
-            struct Tab: Decodable { let focused: String? }
-            let active: String
-            let spaces: [String: String]
-            let tabs: [String: Tab]
+    /// Install into our own mod directory. Stage the first install so Herdr
+    /// never discovers a half-installed mod. Never replace another mod.
+    static func install(from resource: URL, into mods: URL) throws {
+        let fm = FileManager.default
+        let target = mods.appendingPathComponent(modName)
+        let marker = "dev.inputsourcepro.herdr-mod"
+        try fm.createDirectory(at: mods, withIntermediateDirectories: true)
+        if !fm.fileExists(atPath: target.path) {
+            let staging = mods.deletingLastPathComponent().appendingPathComponent(".isp-mod-" + UUID().uuidString)
+            try fm.copyItem(at: resource, to: staging)
+            defer { try? fm.removeItem(at: staging) }
+            try Data().write(to: staging.appendingPathComponent(marker))
+            try fm.moveItem(at: staging, to: target)
+            return
         }
-
-        guard let view = try? JSONDecoder().decode(View.self, from: data),
-              let tab = view.spaces[view.active]
-        else { return nil }
-        return view.tabs[tab]?.focused
+        guard (try target.resourceValues(forKeys: [.isSymbolicLinkKey])).isSymbolicLink != true,
+              fm.fileExists(atPath: target.appendingPathComponent(marker).path)
+        else { throw CocoaError(.fileWriteFileExists) }
+        for file in ["mod.json", "main.js"] {
+            let destination = target.appendingPathComponent(file)
+            let bytes = try Data(contentsOf: resource.appendingPathComponent(file))
+            if (try? Data(contentsOf: destination)) != bytes { try bytes.write(to: destination, options: .atomic) }
+        }
     }
 
-    /// `herdr-app ls`: the address of the terminal `pane` shows.
-    static func terminal(ofPane pane: String, fromList output: String) -> String? {
-        struct List: Decodable {
-            struct Space: Decodable { let tabs: [Tab] }
-            struct Tab: Decodable { let terminals: [Entry] }
-            struct Entry: Decodable {
-                let terminal: String
-                let pane: String
+    /// Shared state is persisted across launches. Only a report answering
+    /// this watch (or this command probe) establishes keyboard focus.
+    static func report(in data: Data, key: String, token: String) -> Focus? {
+        struct Shared: Decodable {
+            let watch: Report?
+            let query: Report?
+            enum CodingKeys: String, CodingKey {
+                case watch = "input-source-pro.watch"
+                case query = "input-source-pro.query"
             }
-
-            let spaces: [Space]
         }
-
-        return (try? JSONDecoder().decode(List.self, from: Data(output.utf8)))?
-            .spaces.lazy
-            .flatMap(\.tabs)
-            .flatMap(\.terminals)
-            .first { $0.pane == pane }?
-            .terminal
+        guard let shared = try? JSONDecoder().decode(Shared.self, from: data) else { return nil }
+        let result = key == "watch" ? shared.watch : shared.query
+        return result?.token == token ? result?.focus : nil
     }
 
-    /// `hc get <terminal> --json`: the foreground process's pid, else the shell's.
-    static func pid(fromTerminal output: String) -> pid_t? {
-        struct Info: Decodable {
-            struct Foreground: Decodable { let pid: pid_t? }
-            let pid: pid_t?
-            let foreground: Foreground?
-        }
+    private static func report(_ key: String, token: String) -> Focus? {
+        guard let data = try? Data(contentsOf: directory.appendingPathComponent("shared.json")) else { return nil }
+        return report(in: data, key: key, token: token)
+    }
 
-        guard let info = try? JSONDecoder().decode(Info.self, from: Data(output.utf8)),
-              let pid = info.foreground?.pid ?? info.pid,
-              pid > 0
-        else { return nil }
-        return pid
+    static func queryFocus() -> Focus? {
+        let token = UUID().uuidString
+        guard appCommand(["do", modName + ".query-" + token]) != nil else { return nil }
+        // Herdr queues mod commands and atomically saves shared state off its UI thread.
+        let deadline = ProcessInfo.processInfo.systemUptime + 0.3
+        repeat {
+            if let focus = report("query", token: token) { return focus }
+            Thread.sleep(forTimeInterval: 0.01)
+        } while ProcessInfo.processInfo.systemUptime < deadline
+        return nil
+    }
+
+    static func watch(_ send: @escaping (Focus?) -> Void) -> AnyCancellable? {
+        guard let resource = Bundle.main.url(forResource: modName, withExtension: nil) else { return nil }
+        let token = UUID().uuidString
+        let flag = CancelFlag()
+        let timer = DispatchSource.makeTimerSource(queue: bridgeQueue)
+        // State confined to bridgeQueue, including cleanup before a subsequent watch.
+        var observation: AnyCancellable?
+        var installed = false
+        var activated = false
+        let read = { report("watch", token: token) }
+        timer.setEventHandler {
+            guard !flag.isCancelled else { return }
+            if !installed {
+                do {
+                    try install(from: resource, into: directory.appendingPathComponent("mods"))
+                    installed = true
+                } catch {
+                    IndicatorDiagnostics.record("terminal.herdr mod install failed: \(error)")
+                    return
+                }
+            }
+            if observation == nil {
+                observation = TerminalWatcher.Environment.watchDirectory(directory.path, read: read) { value in
+                    if !flag.isCancelled { send(value) }
+                }
+            }
+            guard read() == nil else { return }
+            // mod.open toggles. Ask for a snapshot first to reuse an existing copy.
+            let subscribe = ["do", modName + ".watch-" + token]
+            if appCommand(subscribe) != nil { activated = true; return }
+            struct Status: Decodable { let overlays: [String?] }
+            guard let status = appCommand(["status"]),
+                  let state = try? JSONDecoder().decode(Status.self, from: Data(status.utf8)),
+                  !state.overlays.contains(modName), !flag.isCancelled,
+                  appCommand(["do", "mod.open", "--name", modName]) != nil else { return }
+            activated = true
+            _ = appCommand(subscribe)
+        }
+        timer.schedule(deadline: .now(), repeating: 2, leeway: .milliseconds(200))
+        timer.resume()
+        return AnyCancellable {
+            flag.cancel()
+            timer.cancel()
+            bridgeQueue.async {
+                observation?.cancel()
+                if activated { _ = appCommand(["do", "overlay.close", "--id", "mod-" + modName]) }
+            }
+        }
     }
 }
