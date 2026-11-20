@@ -96,8 +96,6 @@ export default class InputSourceFocus extends View {
             terminal: address,
             overlayTerminal: target?.overlayTerminal ?? false,
             pid: record?.pid ?? record?.foreground?.pid ?? null,
-            // exec can replace the shell without changing its PID or foreground group.
-            executable: record?.foreground?.argv?.[0] ?? null,
             toast: tree?.toast ?? null,
         };
         const value = { token, focus };

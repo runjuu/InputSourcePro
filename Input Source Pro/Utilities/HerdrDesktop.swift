@@ -8,7 +8,6 @@ enum HerdrDesktop {
         let pane: String?
         let terminal: String?
         var pid: pid_t?
-        var executable: String?
         var toast: String?
         var overlayTerminal: Bool?
     }
