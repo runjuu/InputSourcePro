@@ -719,8 +719,8 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertNil(TerminalWatcher.Line.herdr(#"{"id":"isp","error":{"code":"bad"}}"#))
     }
 
-    func testHerdrRechecksSingleTabEligibilityOnTopologyChanges() {
-        for subscription in ["tab.created", "tab.closed", "workspace.created", "workspace.closed"] {
+    func testHerdrRechecksPaneInventoryOnTopologyChanges() {
+        for subscription in ["pane.created", "pane.closed", "tab.created", "tab.closed", "workspace.created", "workspace.closed"] {
             XCTAssertTrue(TerminalWatcher.Line.herdrSubscriptions.contains(subscription))
             let event = subscription.replacingOccurrences(of: ".", with: "_")
             let line = #"{"event":"\#(event)"}"#
@@ -809,12 +809,15 @@ final class TerminalWatcherTests: XCTestCase {
     func testHerdrDesktopClearsAnObscuredPaneButRecognizesAFocusedPeek() {
         let name = HerdrDesktop.modName
         let pane = HerdrDesktop.Focus(pane: "p1", terminal: "t1")
-        let peek = HerdrDesktop.Focus(pane: nil, terminal: "t2")
+        let peek = HerdrDesktop.Focus(pane: nil, terminal: "t2", overlayTerminal: true)
         XCTAssertEqual(HerdrDesktop.Status(overlays: [name]).focus(pane), pane)
         XCTAssertEqual(HerdrDesktop.Status(overlays: [name, "toast"]).focus(pane), pane)
         XCTAssertNil(HerdrDesktop.Status(overlays: [name, "settings", "toast"]).focus(pane)?.terminal)
         XCTAssertEqual(HerdrDesktop.Status(overlays: [name, "layout"]).focus(peek), peek)
         XCTAssertNil(HerdrDesktop.Status(overlays: [name, "layout"]).focus(pane)?.terminal)
+        let fixed = HerdrDesktop.Focus(pane: nil, terminal: "t2", overlayTerminal: false)
+        XCTAssertNil(HerdrDesktop.Status(overlays: [name, "layout"]).focus(fixed)?.terminal)
+        XCTAssertNil(HerdrDesktop.Status(overlays: [name, "layout", "layout"]).focus(peek)?.terminal)
         XCTAssertNil(HerdrDesktop.Status(overlays: [name, "layout", "settings"]).focus(peek)?.terminal)
         XCTAssertNil(HerdrDesktop.Status(overlays: ["settings"]).focus(pane))
         XCTAssertNil(HerdrDesktop.Status(overlays: [name], errors: ["mod " + name + ": failed to load"]).focus(pane))
@@ -1184,15 +1187,51 @@ final class TerminalWatcherTests: XCTestCase {
         _ = front
     }
 
-    func testBundledHerdrModReportsTheTerminalReceivingTheKeyboard() throws {
+    private func bundledHerdrModScript() throws -> String {
         let resource = try XCTUnwrap(Bundle.main.url(forResource: HerdrDesktop.modName, withExtension: nil))
-        // JavaScriptCore supplies the language runtime. Replace the two host modules
-        // with the live snapshots and shared-state sink the mod reads and writes.
-        let source = try String(contentsOf: resource.appendingPathComponent("main.js"), encoding: .utf8)
+        return try String(contentsOf: resource.appendingPathComponent("main.js"), encoding: .utf8)
             .components(separatedBy: .newlines)
             .filter { !$0.hasPrefix("import ") }
             .joined(separator: "\n")
             .replacingOccurrences(of: "export default ", with: "")
+    }
+
+    func testHerdrModRenewsItsLeaseAndReportsExecInPlace() throws {
+        let source = try bundledHerdrModScript()
+        let context = try XCTUnwrap(JSContext())
+        context.exceptionHandler = { _, error in XCTFail(error?.toString() ?? "JavaScript exception") }
+        context.evaluateScript("""
+            class View {}
+            let deliver, deadline, cancelled = 0, closed, reports = [];
+            const cx = {
+                timer: { after: (_, fire) => { deadline = fire; return { cancel: () => cancelled++ }; } },
+                spawn: task => task(cx)
+            };
+            const checking = () => false, props = () => ({overlay: "mod-input-source-pro"});
+            const nextCommand = () => new Promise(resolve => { deliver = resolve });
+            const closeOverlay = id => { closed = id };
+            const shared = () => null, setShared = (_, value) => { reports.push(value) };
+            const focused = () => ({pane: "p1", terminal: "t1"});
+            const layout = () => ({content: {tab: "active"}});
+            const record = {address: "t1", state: "live", pid: 17, foreground: {argv: ["sh"]}};
+            const terminals = () => [record];
+            \(source)
+            const mod = new InputSourceFocus();
+            mod.init({}, cx);
+            """)
+        context.evaluateScript("deliver('watch-session')")
+        context.evaluateScript("deliver('watch-session')")
+        XCTAssertEqual(context.evaluateScript("cancelled")?.toInt32(), 2, "A heartbeat renews the original deadline")
+        XCTAssertEqual(context.evaluateScript("reports.length")?.toInt32(), 1, "Renewal alone creates no shared-file write")
+        context.evaluateScript("record.foreground.argv = ['vim']; mod.publish('watch', mod.watch)")
+        XCTAssertEqual(context.evaluateScript("reports.length")?.toInt32(), 2)
+        XCTAssertEqual(context.evaluateScript("reports[1].focus.executable")?.toString(), "vim")
+        context.evaluateScript("deadline()")
+        XCTAssertEqual(context.evaluateScript("closed")?.toString(), "mod-input-source-pro", "A missing observer cannot leave the mod running")
+    }
+
+    func testBundledHerdrModReportsTheTerminalReceivingTheKeyboard() throws {
+        let source = try bundledHerdrModScript()
         let context = try XCTUnwrap(JSContext())
         context.exceptionHandler = { _, error in XCTFail(error?.toString() ?? "JavaScript exception") }
         let resolve = try XCTUnwrap(context.evaluateScript("""
@@ -1204,11 +1243,11 @@ final class TerminalWatcherTests: XCTestCase {
             const setShared = (_, value) => { report = value; };
             \(source)
             const mod = new InputSourceFocus();
-            (focus, root) => {
+            (focus, root, key = "terminal") => {
                 snapshot = focus;
                 tree = root;
                 mod.publish("query", "test");
-                return report.focus.terminal;
+                return report.focus[key];
             }
             """))
         func address(_ focus: [String: String], in tree: [String: Any]) -> String? {
@@ -1229,7 +1268,12 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertEqual(address(["terminal": "t3"], in: tab), "t3")
         for mod in ["changes", "custom-editor"] {
             XCTAssertNil(address(focus, in: ["type": "row", "children": [tab, ["content": ["mod": mod]]]]))
+            XCTAssertNil(address(focus, in: ["type": "stack", "header": ["content": ["mod": mod]], "children": [tab]]))
         }
+        let direct = ["terminal": "t1"]
+        let fixed = ["content": ["terminal": "t1"]]
+        XCTAssertEqual(resolve.call(withArguments: [direct, fixed, "overlayTerminal"])?.toBool(), false)
+        XCTAssertEqual(resolve.call(withArguments: [direct, tab, "overlayTerminal"])?.toBool(), true)
         let float = ["content": ["terminal": "t3"]]
         XCTAssertNil(address(focus, in: tab.merging(["floating": [float]]) { $1 }))
         XCTAssertNil(address(["terminal": "t1"], in: tab.merging(["floating": [float]]) { $1 }))

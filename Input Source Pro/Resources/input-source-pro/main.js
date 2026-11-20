@@ -1,5 +1,5 @@
 import { View, div } from "gpui-kit";
-import { checking, focused, layout, nextCommand, props, setShared, shared, terminals } from "herdr";
+import { checking, closeOverlay, focused, layout, nextCommand, props, setShared, shared, terminals } from "herdr";
 
 // These inline controls in Herdr's built-in layouts open dialogs for text
 // entry. The Changes panel and custom mods can take text input in place.
@@ -21,14 +21,17 @@ function mayTakeInput(content) {
 function terminalForRules(current, tree) {
     if (!current) return null;
     const reported = current.shown ?? current.terminal ?? null;
+    let inBaseLayout = false;
     const candidates = new Set();
     const floats = new Set();
     if (!current.pane && reported) candidates.add(reported);
     function visit(node) {
         if (!node || node.hidden) return;
+        if (node.content?.terminal === reported) inBaseLayout = true;
         if (node.content?.tab && current.pane) candidates.add(reported);
         if (node.content?.agent) candidates.add(current.agent ?? null);
-        if (mayTakeInput(node.content) || mayTakeInput(node.content?.pane?.header?.content)) {
+        if (mayTakeInput(node.content) || mayTakeInput(node.header?.content) ||
+            mayTakeInput(node.content?.pane?.header?.content)) {
             candidates.add(null);
         }
         for (const item of node.floating ?? []) {
@@ -46,22 +49,35 @@ function terminalForRules(current, tree) {
     visit(tree);
     if (candidates.size !== 1) return null;
     const [address] = candidates;
-    return [...floats].every(terminal => terminal === address) ? address : null;
+    if (!address || [...floats].some(terminal => terminal !== address)) return null;
+    // A fixed terminal block can still be reported under an editable dialog.
+    return { address, overlayTerminal: !current.pane && !inBaseLayout && !floats.has(address) };
 }
 
 export default class InputSourceFocus extends View {
     init(_props, cx) {
-        if (checking() || props()?.overlay !== "mod-input-source-pro") return;
+        const overlay = props()?.overlay;
+        if (checking() || overlay !== "mod-input-source-pro") return;
         // A hot reload replaces this instance and stops its command loop.
         // Invalidate the old report so ISP subscribes to this copy.
         if (shared("input-source-pro.watch")) setShared("input-source-pro.watch", null);
-        cx.spawn(async () => {
+        // ISP renews the watch every two seconds. If it exits before sending
+        // overlay.close, release this copy, even if the first watch never arrived.
+        const renew = cx => {
+            this.expiry?.cancel();
+            this.expiry = cx.timer.after(8000, () => closeOverlay(overlay));
+        };
+        renew(cx);
+        cx.spawn(async cx => {
             for (;;) {
                 const command = await nextCommand();
                 const [kind, ...parts] = command.split("-");
                 if (kind !== "watch" && kind !== "query") continue;
                 const token = parts.join("-");
-                if (kind === "watch") this.watch = token;
+                if (kind === "watch") {
+                    this.watch = token;
+                    renew(cx);
+                }
                 this.publish(kind, token);
             }
         });
@@ -70,14 +86,18 @@ export default class InputSourceFocus extends View {
     publish(kind, token) {
         const current = focused();
         const tree = layout();
-        const address = terminalForRules(current, tree);
+        const target = terminalForRules(current, tree);
+        const address = target?.address ?? null;
         const record = address && !address.includes("/")
             ? terminals().find(t => t.address === address && t.state === "live")
             : null;
         const focus = {
             pane: current?.pane ?? null,
             terminal: address,
+            overlayTerminal: target?.overlayTerminal ?? false,
             pid: record?.pid ?? record?.foreground?.pid ?? null,
+            // exec can replace the shell without changing its PID or foreground group.
+            executable: record?.foreground?.argv?.[0] ?? null,
             toast: tree?.toast ?? null,
         };
         const value = { token, focus };

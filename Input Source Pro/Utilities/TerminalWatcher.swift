@@ -493,7 +493,7 @@ extension TerminalWatcher {
 
         /// A background tab opening or closing can change whether the server's
         /// focused pane identifies this client, even when pane focus stays put.
-        static let herdrSubscriptions = ["pane.focused", "tab.created", "tab.closed", "workspace.created", "workspace.closed"]
+        static let herdrSubscriptions = ["pane.focused", "pane.created", "pane.closed", "tab.created", "tab.closed", "workspace.created", "workspace.closed"]
 
         static func herdr(_ line: Substring) -> Line? {
             struct Message: Decodable {

@@ -8,7 +8,9 @@ enum HerdrDesktop {
         let pane: String?
         let terminal: String?
         var pid: pid_t?
+        var executable: String?
         var toast: String?
+        var overlayTerminal: Bool?
     }
 
     private struct Report: Decodable {
@@ -70,7 +72,7 @@ enum HerdrDesktop {
             if let top = overlays.last(where: { $0 != modName && $0 != (reported?.toast ?? "toast") }) {
                 // A peek identifies its keyboard terminal directly. A dialog can leave
                 // the model pane beneath it in focused() even while editing an input.
-                guard top == "layout", reported?.pane == nil, reported?.terminal != nil else {
+                guard top == "layout", reported?.overlayTerminal == true, overlays.filter({ $0 == "layout" }).count == 1 else {
                     return Focus(pane: nil, terminal: nil)
                 }
             }
@@ -152,6 +154,7 @@ enum HerdrDesktop {
             DispatchQueue.main.async { if !flag.isCancelled { send(focus) } }
         }
         var nextAttempt: TimeInterval = 0
+        var nextRenewal: TimeInterval = 0
         timer.setEventHandler {
             guard !flag.isCancelled else { return }
             if endpoint == nil { endpoint = Endpoint.resolve(pid: pid) }
@@ -191,11 +194,11 @@ enum HerdrDesktop {
                     publish(endpoint.status()?.focus(report))
                 }
             }
-            if let report = endpoint.report("watch", token: token) {
-                publish(status.focus(report))
-            } else {
-                publish(nil)
-                _ = endpoint.command(modName + ".watch-" + token)
+            let report = endpoint.report("watch", token: token)
+            publish(report.flatMap(status.focus))
+            let now = ProcessInfo.processInfo.systemUptime
+            if report == nil || now >= nextRenewal {
+                if endpoint.command(modName + ".watch-" + token) { nextRenewal = now + 2 }
             }
         }
         timer.schedule(deadline: .now(), repeating: .milliseconds(500), leeway: .milliseconds(50))
