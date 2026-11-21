@@ -1454,9 +1454,12 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertNil(address(focus, in: ["type": "row", "children": [tab, agent]]))
         XCTAssertNil(address(["terminal": "t3"], in: ["type": "row", "children": [tab, agent]]))
         XCTAssertEqual(address(["terminal": "t3"], in: tab), "t3")
-        for mod in ["changes", "custom-editor"] {
-            XCTAssertNil(address(focus, in: ["type": "row", "children": [tab, ["content": ["mod": mod]]]]))
-            XCTAssertNil(address(focus, in: ["type": "stack", "header": ["content": ["mod": mod]], "children": [tab]]))
+        XCTAssertNil(address(focus, in: ["type": "row", "children": [tab, ["content": ["mod": "changes"]]]]))
+        XCTAssertNil(address(focus, in: ["type": "stack", "header": ["content": ["mod": "changes"]], "children": [tab]]))
+        // Unknown mods, such as a forked tab bar, are display-only.
+        for mod in ["tabs-mine", "custom-panel"] {
+            XCTAssertEqual(address(focus, in: ["type": "row", "children": [tab, ["content": ["mod": mod]]]]), "t1")
+            XCTAssertEqual(address(focus, in: ["type": "stack", "header": ["content": ["mod": mod]], "children": [tab]]), "t1")
         }
         let direct = ["terminal": "t1"]
         let fixed = ["content": ["terminal": "t1"]]

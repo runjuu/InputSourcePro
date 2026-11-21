@@ -1,18 +1,17 @@
 import { View, div } from "gpui-kit";
 import { checking, closeOverlay, focused, layout, nextCommand, props, setShared, shared, terminals } from "herdr";
 
-// These inline controls in Herdr's built-in layouts open dialogs for text
-// entry. The Changes panel and custom mods can take text input in place.
-const paneChrome = new Set([
-    "agents", "files", "pane", "spaces", "tabs", "terminals-bar",
-    "terminals-pane", "workspace-chrome", "workspace-status",
-]);
+// Built-in mods that take text in place inside a layout block. Other text
+// entry opens as an overlay, which ISP reads from Herdr's status. Unknown
+// mods count as display-only: a forked sidebar or tab bar must not pause
+// rules, and a missed input field only applies the pane's rule while typing.
+const inputMods = new Set(["changes"]);
 function mayTakeInput(content) {
     if (!content?.mod) return false;
     if (content.mod === "win98") {
         return !["desktop", "window", "clippy", "taskbar"].includes(content.props?.role);
     }
-    return !paneChrome.has(content.mod);
+    return inputMods.has(content.mod);
 }
 
 // A floating terminal or agent block can take focus without changing the
