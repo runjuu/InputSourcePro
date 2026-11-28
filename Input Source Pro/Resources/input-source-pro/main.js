@@ -1,13 +1,12 @@
 import { View, div } from "gpui-kit";
 import { checking, closeOverlay, focused, layout, nextCommand, props, setShared, shared, terminals } from "herdr";
 
-// Built-in mods that take text in place inside a layout block. Other text
-// entry opens as an overlay, which ISP reads from Herdr's status. Unknown
-// mods count as display-only: a forked sidebar or tab bar must not pause
-// rules, and a missed input field only applies the pane's rule while typing.
-const inputMods = new Set(["changes"]);
+// A custom layout can embed a built-in dialog's text field beside a terminal.
+// Leave unknown mods eligible for pane rules so a forked tab bar can stay visible.
+const inputMods = new Set(["changes", "help", "machine-add", "picker", "prompt"]);
 function mayTakeInput(content) {
     if (!content?.mod) return false;
+    if (content.mod === "worktree") return content.props?.action !== "remove";
     if (content.mod === "win98") {
         return !["desktop", "window", "clippy", "taskbar"].includes(content.props?.role);
     }

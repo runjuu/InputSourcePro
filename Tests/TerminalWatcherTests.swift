@@ -1454,7 +1454,12 @@ final class TerminalWatcherTests: XCTestCase {
         XCTAssertNil(address(focus, in: ["type": "row", "children": [tab, agent]]))
         XCTAssertNil(address(["terminal": "t3"], in: ["type": "row", "children": [tab, agent]]))
         XCTAssertEqual(address(["terminal": "t3"], in: tab), "t3")
-        XCTAssertNil(address(focus, in: ["type": "row", "children": [tab, ["content": ["mod": "changes"]]]]))
+        for mod in ["changes", "help", "machine-add", "picker", "prompt", "worktree"] {
+            let panel = ["content": ["mod": mod]]
+            XCTAssertNil(address(focus, in: ["type": "row", "children": [tab, panel]]), mod)
+        }
+        let removeWorktree: [String: Any] = ["content": ["mod": "worktree", "props": ["action": "remove"]]]
+        XCTAssertEqual(address(focus, in: ["type": "row", "children": [tab, removeWorktree]]), "t1")
         XCTAssertNil(address(focus, in: ["type": "stack", "header": ["content": ["mod": "changes"]], "children": [tab]]))
         // Unknown mods, such as a forked tab bar, are display-only.
         for mod in ["tabs-mine", "custom-panel"] {
